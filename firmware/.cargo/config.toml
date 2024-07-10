@@ -1,0 +1,16 @@
+[env]
+ESP_LOGLEVEL="debug"
+
+[build]
+target = "riscv32imc-unknown-none-elf"
+
+[target.'cfg(any(target_arch = "riscv32", target_arch = "xtensa"))']
+runner = "espflash flash --monitor"
+rustflags = [
+  # Required by esp-backtrace, but may negatively impact code performance
+  "-C", "force-frame-pointers",
+  # Required by esp-hal
+  "-C", "link-arg=-Tlinkall.x",
+  # Required by esp-wifi
+  "-C", "link-arg=-Trom_functions.x",
+]

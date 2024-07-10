@@ -1,0 +1,29 @@
+[package]
+name = "lsc-touch-n-drink"
+version = "0.0.0"
+authors = ["Andreas Neuhaus <git@zargony.com>"]
+edition = "2021"
+repository = "https://github.com/zargony/lsc-touch-n-drink"
+
+[profile.dev]
+# Rust debug code is slow, so always build with some optimization
+opt-level = "s"
+
+[profile.release]
+# LLVM can perform better optimizations using a single thread
+codegen-units = 1
+debug = 2
+debug-assertions = false
+incremental = false
+lto = "fat"
+opt-level = "s"
+overflow-checks = false
+
+[dependencies]
+embedded-hal = "1.0"
+embedded-hal-bus = "0.2"
+esp-backtrace = { version = "0.12", features = ["esp32c3", "panic-handler", "exception-handler", "println"] }
+esp-hal = { version = "0.18", features = ["esp32c3", "log"] }
+esp-println = { version = "0.9", features = ["esp32c3", "log"] }
+esp-wifi = { version = "0.6", features = ["esp32c3", "log", "phy-enable-usb", "wifi"] }
+log = "0.4"
