@@ -1,5 +1,6 @@
 [env]
 ESP_LOGLEVEL="debug"
+ESP_LOGTARGETS="lsc_touch_n_drink"
 
 [build]
 target = "riscv32imc-unknown-none-elf"

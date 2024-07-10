@@ -27,6 +27,7 @@
 #![no_main]
 
 mod display;
+mod wifi;
 
 use esp_backtrace as _;
 use esp_hal::clock::ClockControl;
@@ -35,8 +36,10 @@ use esp_hal::entry;
 use esp_hal::gpio::{Io, Level, Output};
 use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
+use esp_hal::rng::Rng;
 use esp_hal::spi::{master::Spi, SpiMode};
 use esp_hal::system::SystemControl;
+use esp_hal::timer::systimer::SystemTimer;
 
 #[entry]
 fn main() -> ! {
@@ -46,6 +49,7 @@ fn main() -> ! {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let delay = Delay::new(&clocks);
+    let rng = Rng::new(peripherals.RNG);
     let mut led = Output::new(io.pins.gpio8, Level::High);
 
     // Initialize logging
@@ -65,6 +69,20 @@ fn main() -> ! {
     // Display hello screen
     display.clear().unwrap();
     display.hello().unwrap();
+
+    // Initialize Wifi
+    let wifi_timer = SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let mut wifi = wifi::Wifi::new(
+        wifi_timer,
+        rng,
+        peripherals.RADIO_CLK,
+        &clocks,
+        peripherals.WIFI,
+    )
+    .unwrap();
+
+    // Test Wifi
+    wifi.test();
 
     loop {
         led.toggle();
