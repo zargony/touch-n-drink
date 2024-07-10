@@ -20,6 +20,9 @@ opt-level = "s"
 overflow-checks = false
 
 [dependencies]
+display-interface = "0.5"
+display-interface-spi = "0.5"
+embedded-graphics = "0.8"
 embedded-hal = "1.0"
 embedded-hal-bus = "0.2"
 esp-backtrace = { version = "0.12", features = ["esp32c3", "panic-handler", "exception-handler", "println"] }
@@ -27,3 +30,7 @@ esp-hal = { version = "0.18", features = ["esp32c3", "log"] }
 esp-println = { version = "0.9", features = ["esp32c3", "log"] }
 esp-wifi = { version = "0.6", features = ["esp32c3", "log", "phy-enable-usb", "wifi"] }
 log = "0.4"
+
+# SSD1309 driver with embedded-hal 1.0 and display-interface 0.5 support
+# See https://github.com/antonok-edm/ssd1309/pull/10
+ssd1309 = { git = "https://github.com/antonok-edm/ssd1309", rev = "f2f4a60" }
