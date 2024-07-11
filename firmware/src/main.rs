@@ -33,7 +33,6 @@ use embassy_executor::Spawner;
 use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_hal::clock::ClockControl;
-use esp_hal::delay::Delay;
 use esp_hal::gpio::{Io, Level, Output};
 use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
@@ -49,7 +48,6 @@ async fn main(_spawner: Spawner) {
     let clocks = ClockControl::max(system.clock_control).freeze();
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
-    let delay = Delay::new(&clocks);
     let rng = Rng::new(peripherals.RNG);
     let mut led = Output::new(io.pins.gpio8, Level::High);
 
@@ -69,7 +67,7 @@ async fn main(_spawner: Spawner) {
     // Initialize display
     let display_reset = Output::new(io.pins.gpio7, Level::High);
     let display_dc = Output::new(io.pins.gpio9, Level::Low);
-    let mut display = display::Display::new(spi, display_reset, display_dc, delay).unwrap();
+    let mut display = display::Display::new(spi, display_reset, display_dc).unwrap();
 
     // Display hello screen
     display.clear().unwrap();
