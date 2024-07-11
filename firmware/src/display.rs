@@ -11,6 +11,9 @@ use embedded_hal_bus::spi::ExclusiveDevice;
 use ssd1309::mode::GraphicsMode;
 use ssd1309::NoOutputPin;
 
+// The `ssd1309` crate unfortunately doesn't support async yet (though `display-interface`,
+// `display-interface-spi` and `embedded-hal-bus` do), so we can't use async here yet.
+
 /// Display error
 pub use display_interface::DisplayError;
 

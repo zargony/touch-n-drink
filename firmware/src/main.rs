@@ -29,20 +29,21 @@
 mod display;
 mod wifi;
 
+use embassy_executor::Spawner;
+use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_hal::clock::ClockControl;
 use esp_hal::delay::Delay;
-use esp_hal::entry;
 use esp_hal::gpio::{Io, Level, Output};
 use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
 use esp_hal::rng::Rng;
 use esp_hal::spi::{master::Spi, SpiMode};
 use esp_hal::system::SystemControl;
-use esp_hal::timer::systimer::SystemTimer;
+use esp_hal::timer::{systimer::SystemTimer, timg::TimerGroup};
 
-#[entry]
-fn main() -> ! {
+#[main]
+async fn main(_spawner: Spawner) {
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::max(system.clock_control).freeze();
@@ -51,6 +52,10 @@ fn main() -> ! {
     let delay = Delay::new(&clocks);
     let rng = Rng::new(peripherals.RNG);
     let mut led = Output::new(io.pins.gpio8, Level::High);
+
+    // Initialize async executor
+    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
+    esp_hal_embassy::init(&clocks, timg0);
 
     // Initialize logging
     esp_println::logger::init_logger_from_env();
@@ -79,13 +84,14 @@ fn main() -> ! {
         &clocks,
         peripherals.WIFI,
     )
+    .await
     .unwrap();
 
     // Test Wifi
-    wifi.test();
+    wifi.test().await;
 
     loop {
         led.toggle();
-        delay.delay_millis(500);
+        Timer::after_millis(500).await;
     }
 }

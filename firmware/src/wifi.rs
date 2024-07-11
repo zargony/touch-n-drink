@@ -21,11 +21,11 @@ pub struct Wifi<'d> {
 
 impl<'d> Wifi<'d> {
     /// Create and initialize Wifi interface
-    pub fn new(
+    pub async fn new(
         timer: Alarm<Target, Blocking, 0>,
         rng: Rng,
         radio_clocks: peripherals::RADIO_CLK,
-        clocks: &Clocks,
+        clocks: &Clocks<'d>,
         wifi: peripherals::WIFI,
     ) -> Result<Self, WifiError> {
         let inited = esp_wifi::initialize(EspWifiInitFor::Wifi, timer, rng, radio_clocks, clocks)
@@ -37,7 +37,7 @@ impl<'d> Wifi<'d> {
         debug!("Wifi state: {:?}", wifi::get_wifi_state());
 
         info!("Starting Wifi controller...");
-        controller.start().unwrap();
+        controller.start().await?;
         debug!("Wifi state: {:?}", wifi::get_wifi_state());
 
         Ok(Wifi {
@@ -48,7 +48,7 @@ impl<'d> Wifi<'d> {
     }
 
     /// Test Wifi interface
-    pub fn test(&mut self) {
+    pub async fn test(&mut self) {
         let scan_config = ScanConfig {
             ssid: None,
             bssid: None,
@@ -59,7 +59,8 @@ impl<'d> Wifi<'d> {
         info!("Starting Wifi scan...");
         let (aps, count) = self
             .controller
-            .scan_with_config_sync::<10>(scan_config)
+            .scan_with_config::<10>(scan_config)
+            .await
             .unwrap();
         info!("Wifi scan done.");
         info!("Wifi scan returned {} results: {:?}", count, aps);
