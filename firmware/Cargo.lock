@@ -155,6 +155,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ba2aab1ef3793e6f7804162debb5ac5edb93b3d650fbcc5aeb72fcd0e6c03a0"
 
 [[package]]
+name = "display-interface-i2c"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d964fa85bbbb5a6ecd06e58699407ac5dc3e3ad72dac0ab7e6b0d00a1cd262d"
+dependencies = [
+ "display-interface",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+]
+
+[[package]]
 name = "display-interface-spi"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -173,6 +184,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef5282ad69563b5fc40319526ba27e0e7363d552a896f0297d54f767717f9b95"
 dependencies = [
  "litrs",
+]
+
+[[package]]
+name = "dummy-pin"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c38a4cc2cb15bb5c6105aa0ff207c478741add66acc8b42df637d7c2f9ba252"
+dependencies = [
+ "embedded-hal 1.0.0",
 ]
 
 [[package]]
@@ -754,7 +774,7 @@ name = "lsc-touch-n-drink"
 version = "0.0.0"
 dependencies = [
  "display-interface",
- "display-interface-spi",
+ "dummy-pin",
  "embassy-executor",
  "embassy-time",
  "embedded-graphics",
@@ -767,7 +787,7 @@ dependencies = [
  "esp-println",
  "esp-wifi",
  "log",
- "ssd1309",
+ "ssd1306",
 ]
 
 [[package]]
@@ -1026,11 +1046,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "ssd1309"
-version = "0.4.0"
-source = "git+https://github.com/antonok-edm/ssd1309?rev=f2f4a60#f2f4a60b118cf1a33a71391e9f0625a1af45a5b0"
+name = "ssd1306"
+version = "0.8.4"
+source = "git+https://github.com/rust-embedded-community/ssd1306?rev=53039a806ffc77bbab0ba150d39b2a7aaa3eae03#53039a806ffc77bbab0ba150d39b2a7aaa3eae03"
 dependencies = [
  "display-interface",
+ "display-interface-i2c",
+ "display-interface-spi",
  "embedded-graphics-core",
  "embedded-hal 1.0.0",
 ]
