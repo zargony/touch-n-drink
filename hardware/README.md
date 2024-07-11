@@ -20,3 +20,15 @@
 - Passive Buzzer Module (optional)
   ([AliExpress](https://www.aliexpress.com/item/1005006316591026.html))
   ([CAD](https://grabcad.com/library/buzzer-module-fc-07-1))
+
+## Hardware Parts
+
+- Nylon Countersunk Screws, 8xM2x10, 6xM3x10, 4xM3x20
+  ([AliExpress](https://www.aliexpress.com/item/1005006757209327.html))
+  ([CAD](https://wiki.freecad.org/Fasteners_Workbench))
+- Nylon Countersunk Nuts, 8xM2, 10xM3
+  ([AliExpress](https://www.aliexpress.com/item/1005006574927453.html))
+  ([CAD](https://wiki.freecad.org/Fasteners_Workbench))
+- USB-C Cable
+  ([AliExpress](https://www.aliexpress.com/w/wholesale-usb%2525252dc-cable.html?spm=a2g0o.home.search.0))
+  ([CAD](https://grabcad.com/library/usb-c-with-flexed-cable-1))
