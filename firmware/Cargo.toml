@@ -9,6 +9,11 @@ repository = "https://github.com/zargony/lsc-touch-n-drink"
 # Rust debug code is slow, so always build with some optimization
 opt-level = "s"
 
+[profile.dev.package.esp-hal]
+# Build esp-hal with release optimizations as it recommends
+debug-assertions = false
+opt-level = 3
+
 [profile.release]
 # LLVM can perform better optimizations using a single thread
 codegen-units = 1
