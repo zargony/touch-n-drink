@@ -14,13 +14,12 @@
 //!
 //! Pinout OLED 2.42" Display
 //!
-//!  CS - 7 |
-//!  DC - 6 |
-//! RES - 5 |
-//! SDA - 4 |
-//! SCL - 3 |
-//! VCC - 2 |
+//!            1   2   3   4
+//!           GND VDD SCL SDA
 //! GND - 1 |
+//! VDD - 2 |
+//! SCL - 3 |
+//! SDA - 4 |
 //!
 
 #![no_std]
@@ -34,10 +33,10 @@ use embassy_time::Timer;
 use esp_backtrace as _;
 use esp_hal::clock::ClockControl;
 use esp_hal::gpio::{Io, Level, Output};
+use esp_hal::i2c::I2C;
 use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
 use esp_hal::rng::Rng;
-use esp_hal::spi::{master::Spi, SpiMode};
 use esp_hal::system::SystemControl;
 use esp_hal::timer::{systimer::SystemTimer, timg::TimerGroup};
 
@@ -58,16 +57,18 @@ async fn main(_spawner: Spawner) {
     // Initialize logging
     esp_println::logger::init_logger_from_env();
 
-    // Initialize SPI controller
-    let spi = Spi::new(peripherals.SPI2, 1.MHz(), SpiMode::Mode0, &clocks)
-        .with_sck(io.pins.gpio4)
-        .with_mosi(io.pins.gpio6)
-        .with_miso(io.pins.gpio5);
+    // Initialize I2C controller
+    let i2c = I2C::new(
+        peripherals.I2C0,
+        io.pins.gpio9,
+        io.pins.gpio10,
+        100.kHz(),
+        &clocks,
+        None,
+    );
 
     // Initialize display
-    let display_reset = Output::new(io.pins.gpio7, Level::High);
-    let display_dc = Output::new(io.pins.gpio9, Level::Low);
-    let mut display = display::Display::new(spi, display_reset, display_dc).unwrap();
+    let mut display = display::Display::new(i2c, 0x3c).unwrap();
 
     // Display hello screen
     display.clear().unwrap();

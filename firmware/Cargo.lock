@@ -187,15 +187,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dummy-pin"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c38a4cc2cb15bb5c6105aa0ff207c478741add66acc8b42df637d7c2f9ba252"
-dependencies = [
- "embedded-hal 1.0.0",
-]
-
-[[package]]
 name = "embassy-executor"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -774,7 +765,6 @@ name = "lsc-touch-n-drink"
 version = "0.0.0"
 dependencies = [
  "display-interface",
- "dummy-pin",
  "embassy-executor",
  "embassy-time",
  "embedded-graphics",

@@ -1,57 +1,39 @@
-use dummy_pin::DummyPin;
-use embassy_time::Delay;
 use embedded_graphics::mono_font::ascii::FONT_6X13;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_graphics::text::Text;
-use embedded_hal::digital::OutputPin;
-use embedded_hal::spi::SpiBus;
-use embedded_hal_bus::spi::ExclusiveDevice;
+use embedded_hal::i2c::I2c;
 use ssd1306::mode::{BufferedGraphicsMode, DisplayConfig};
-use ssd1306::prelude::SPIInterface;
+use ssd1306::prelude::I2CInterface;
 use ssd1306::rotation::DisplayRotation;
 use ssd1306::size::DisplaySize128x64;
 use ssd1306::Ssd1306;
 
 // The `ssd1306` crate unfortunately doesn't support async yet (though `display-interface`,
-// `display-interface-spi` and `embedded-hal-bus` do), so we can't use async here yet.
+// `display-interface-i2c` and `embedded-hal-bus` do), so we can't use async here yet.
 // See also https://github.com/rust-embedded-community/ssd1306/pull/189
 
 /// Display error
 pub use display_interface::DisplayError;
 
-/// Display interface type
-type DisplayInterface<BUS, DC> = SPIInterface<ExclusiveDevice<BUS, DummyPin, Delay>, DC>;
-
 /// Convenient hardware-agnostic display driver
-pub struct Display<BUS: SpiBus, DC: OutputPin> {
-    driver: Ssd1306<
-        DisplayInterface<BUS, DC>,
-        DisplaySize128x64,
-        BufferedGraphicsMode<DisplaySize128x64>,
-    >,
+pub struct Display<I2C: I2c> {
+    driver: Ssd1306<I2CInterface<I2C>, DisplaySize128x64, BufferedGraphicsMode<DisplaySize128x64>>,
 }
 
-impl<BUS: SpiBus, DC: OutputPin> Display<BUS, DC> {
+impl<I2C: I2c> Display<I2C> {
     /// Create display driver and initialize display hardware
-    pub fn new<RES: OutputPin>(bus: BUS, mut reset: RES, dc: DC) -> Result<Self, DisplayError> {
-        // We're exclusively using the SPI bus without CS
-        let cs = DummyPin::new_low();
-        let spi = ExclusiveDevice::new(bus, cs, Delay).map_err(|_| DisplayError::CSError)?;
-
+    pub fn new(i2c: I2C, addr: u8) -> Result<Self, DisplayError> {
         // Build SSD1306 driver and switch to buffered graphics mode
         let mut driver = Ssd1306::new(
-            SPIInterface::new(spi, dc),
+            I2CInterface::new(i2c, addr, 0x40),
             DisplaySize128x64,
             DisplayRotation::Rotate0,
         )
         .into_buffered_graphics_mode();
 
-        // Reset and initialize display
-        driver
-            .reset(&mut reset, &mut Delay)
-            .map_err(|_| DisplayError::RSError)?;
+        // Initialize and clear display
         driver.init()?;
         driver.clear(BinaryColor::Off)?;
         driver.flush()?;

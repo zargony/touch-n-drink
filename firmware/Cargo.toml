@@ -26,7 +26,6 @@ overflow-checks = false
 
 [dependencies]
 display-interface = "0.5"
-dummy-pin = "1.0"
 embassy-executor = { version = "0.5", features = ["log"] }
 embassy-time = { version = "0.3", features = ["generic-queue"] }
 embedded-graphics = "0.8"
