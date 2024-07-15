@@ -1,8 +1,8 @@
-use embedded_graphics::mono_font::ascii::FONT_6X13;
+use embedded_graphics::mono_font::ascii::{FONT_10X20, FONT_6X13};
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
-use embedded_graphics::text::Text;
+use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
 use embedded_hal::i2c::I2c;
 use ssd1306::mode::{BufferedGraphicsMode, DisplayConfig};
 use ssd1306::prelude::I2CInterface;
@@ -52,6 +52,21 @@ impl<I2C: I2c> Display<I2C> {
     pub fn hello(&mut self) -> Result<(), DisplayError> {
         let style = MonoTextStyle::new(&FONT_6X13, BinaryColor::On);
         Text::new("Hello, world!", Point::new(0, 20), style).draw(&mut self.driver)?;
+        self.driver.flush()?;
+        Ok(())
+    }
+
+    /// Display big centered text
+    pub fn big_centered_char(&mut self, ch: char) -> Result<(), DisplayError> {
+        let mut buf = [0; 4];
+        let text = ch.encode_utf8(&mut buf);
+        let character_style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);
+        let text_style = TextStyleBuilder::new()
+            .baseline(Baseline::Middle)
+            .alignment(Alignment::Center)
+            .build();
+        Text::with_text_style(text, Point::new(64, 32), character_style, text_style)
+            .draw(&mut self.driver)?;
         self.driver.flush()?;
         Ok(())
     }

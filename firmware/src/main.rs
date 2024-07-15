@@ -21,24 +21,31 @@
 //! SCL - 3 |
 //! SDA - 4 |
 //!
+//! Pinout 3x4 Matrix Keypad
+//!
+//!  1   2    3    4    5    6    7    8   9
+//!  nc Col2 Row1 Col1 Row4 Col3 Row3 Row2 nc
+//!
 
 #![no_std]
 #![no_main]
 
 mod display;
+mod keypad;
 mod wifi;
 
 use embassy_executor::Spawner;
-use embassy_time::Timer;
+use embassy_time::{with_timeout, Duration};
 use esp_backtrace as _;
 use esp_hal::clock::ClockControl;
-use esp_hal::gpio::{Io, Level, Output};
+use esp_hal::gpio::{AnyInput, AnyOutput, Io, Level, Output, Pull};
 use esp_hal::i2c::I2C;
 use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
 use esp_hal::rng::Rng;
 use esp_hal::system::SystemControl;
 use esp_hal::timer::{systimer::SystemTimer, timg::TimerGroup};
+use log::info;
 
 #[main]
 async fn main(_spawner: Spawner) {
@@ -74,6 +81,21 @@ async fn main(_spawner: Spawner) {
     display.clear().unwrap();
     display.hello().unwrap();
 
+    // Initialize keypad
+    let mut keypad = keypad::Keypad::new(
+        [
+            AnyInput::new(io.pins.gpio5, Pull::Up),
+            AnyInput::new(io.pins.gpio6, Pull::Up),
+            AnyInput::new(io.pins.gpio7, Pull::Up),
+        ],
+        [
+            AnyOutput::new(io.pins.gpio0, Level::High),
+            AnyOutput::new(io.pins.gpio1, Level::High),
+            AnyOutput::new(io.pins.gpio2, Level::High),
+            AnyOutput::new(io.pins.gpio3, Level::High),
+        ],
+    );
+
     // Initialize Wifi
     let wifi_timer = SystemTimer::new(peripherals.SYSTIMER).alarm0;
     let mut wifi = wifi::Wifi::new(
@@ -91,6 +113,18 @@ async fn main(_spawner: Spawner) {
 
     loop {
         led.toggle();
-        Timer::after_millis(500).await;
+
+        match with_timeout(Duration::from_secs(5), keypad.read()).await {
+            Ok(key) => {
+                let key = key.unwrap();
+                info!("Key pressed: {:?}", key);
+                display.clear().unwrap();
+                display.big_centered_char(key.as_char()).unwrap();
+            }
+            Err(_) => {
+                display.clear().unwrap();
+                display.hello().unwrap();
+            }
+        }
     }
 }

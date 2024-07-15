@@ -766,6 +766,7 @@ version = "0.0.0"
 dependencies = [
  "display-interface",
  "embassy-executor",
+ "embassy-futures",
  "embassy-time",
  "embedded-graphics",
  "embedded-hal 1.0.0",
