@@ -111,20 +111,23 @@ async fn main(_spawner: Spawner) {
     // Test Wifi
     wifi.test().await;
 
+    let mut displaying_key = false;
     loop {
         led.toggle();
 
         match with_timeout(Duration::from_secs(5), keypad.read()).await {
-            Ok(key) => {
-                let key = key.unwrap();
+            Ok(Ok(key)) => {
                 info!("Key pressed: {:?}", key);
                 display.clear().unwrap();
                 display.big_centered_char(key.as_char()).unwrap();
+                displaying_key = true;
             }
-            Err(_) => {
+            Err(_) if displaying_key => {
                 display.clear().unwrap();
                 display.hello().unwrap();
+                displaying_key = false;
             }
+            _ => {}
         }
     }
 }
