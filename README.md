@@ -2,6 +2,8 @@
 
 Touch 'n Drink is a small device that reads NFC id cards of club members of the [Aeroclub Hamm](https://flugplatz-hamm.de) and allows to pay for items like cold drinks offered at the clubhouse. Purchases are forwarded to accounting so members pay via their regular monthly invoices. We're located at airfield [EDLH](https://skyvector.com/airport/EDLH/Hamm-Lippewiesen-Airport) in Hamm, Germany.
 
+![Rendered CAD model](images/cad-model.png)
+
 ## Hardware
 
 ESP32-C3, Keypad, OLED Display and NFC reader in a custom acrylic case. See [hardware](./hardware/README.md) folder for details.
