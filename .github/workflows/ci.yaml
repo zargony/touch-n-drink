@@ -27,6 +27,14 @@ jobs:
           components: clippy, rust-src, rustfmt
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Cache cargo data
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/git
+            ~/.cargo/registry
+          # intentionally not caching `target/` here yet
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Check formatting
         run: cargo fmt --all --check
       - name: Clippy
@@ -43,5 +51,13 @@ jobs:
           targets: riscv32imc-unknown-none-elf
       - name: Check out repository
         uses: actions/checkout@v4
+      - name: Cache cargo data
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/git
+            ~/.cargo/registry
+          # intentionally not caching `target/` here yet
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Build everything
         run: cargo build --workspace --all-targets --release
