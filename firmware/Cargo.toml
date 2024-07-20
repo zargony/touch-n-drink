@@ -5,6 +5,11 @@ authors = ["Andreas Neuhaus <git@zargony.com>"]
 edition = "2021"
 repository = "https://github.com/zargony/lsc-touch-n-drink"
 
+[[bin]]
+name = "lsc-touch-n-drink"
+test = false
+bench = false
+
 [profile.dev]
 # Rust debug code is slow, so always build with some optimization
 opt-level = "s"
