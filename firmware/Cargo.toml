@@ -1,12 +1,12 @@
 [package]
-name = "lsc-touch-n-drink"
+name = "touch-n-drink"
 version = "0.0.0"
 authors = ["Andreas Neuhaus <git@zargony.com>"]
 edition = "2021"
-repository = "https://github.com/zargony/lsc-touch-n-drink"
+repository = "https://github.com/zargony/touch-n-drink"
 
 [[bin]]
-name = "lsc-touch-n-drink"
+name = "touch-n-drink"
 test = false
 bench = false
 

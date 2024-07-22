@@ -20,8 +20,8 @@ If you like this project, want to use it at your club, or if you want to discuss
 [hardware]: ./hardware
 [firmware]: ./firmware
 
-[discussions]: https://github.com/zargony/lsc-touch-n-drink/discussions
-[issues]: https://github.com/zargony/lsc-touch-n-drink/issues
+[discussions]: https://github.com/zargony/touch-n-drink/discussions
+[issues]: https://github.com/zargony/touch-n-drink/issues
 
 [Aeroclub Hamm]: https://flugplatz-hamm.de
 [EDLH]: https://skyvector.com/airport/EDLH/Hamm-Lippewiesen-Airport

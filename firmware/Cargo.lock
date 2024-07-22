@@ -761,27 +761,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 
 [[package]]
-name = "lsc-touch-n-drink"
-version = "0.0.0"
-dependencies = [
- "display-interface",
- "embassy-executor",
- "embassy-futures",
- "embassy-time",
- "embedded-graphics",
- "embedded-hal 1.0.0",
- "embedded-hal-async",
- "embedded-hal-bus",
- "esp-backtrace",
- "esp-hal",
- "esp-hal-embassy",
- "esp-println",
- "esp-wifi",
- "log",
- "ssd1306",
-]
-
-[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1189,6 +1168,27 @@ dependencies = [
  "serde_spanned",
  "toml_datetime",
  "winnow 0.6.13",
+]
+
+[[package]]
+name = "touch-n-drink"
+version = "0.0.0"
+dependencies = [
+ "display-interface",
+ "embassy-executor",
+ "embassy-futures",
+ "embassy-time",
+ "embedded-graphics",
+ "embedded-hal 1.0.0",
+ "embedded-hal-async",
+ "embedded-hal-bus",
+ "esp-backtrace",
+ "esp-hal",
+ "esp-hal-embassy",
+ "esp-println",
+ "esp-wifi",
+ "log",
+ "ssd1306",
 ]
 
 [[package]]
