@@ -11,9 +11,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-defaults:
-  run:
-    working-directory: firmware
 
 jobs:
   check:
@@ -37,8 +34,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Check formatting
         run: cargo fmt --all --check
+        working-directory: firmware
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- --deny warnings --allow deprecated
+        working-directory: firmware
 
   build:
     name: Build
@@ -61,3 +60,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Build everything
         run: cargo build --workspace --all-targets --release
+        working-directory: firmware
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: touch-n-drink-elf
+          path: firmware/target/riscv32imc-unknown-none-elf/release/touch-n-drink
+          if-no-files-found: error
