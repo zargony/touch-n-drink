@@ -1,5 +1,7 @@
 # LSC Touch 'n Drink Firmware
 
+Firmware images are automatically build by GitHub actions. They can be downloaded as artifacts of recent [CI][actions] runs <!-- eventually: on the [releases] page --> and flashed [from your browser][esptool-js]. The setup described below is only needed for local development.
+
 ## Requirements
 
 ### Rust Toolchain
@@ -29,3 +31,7 @@ To flash the firmware to a device, connect the device via its USB-C serial port 
 ```sh
 cargo espflash flash --release
 ```
+
+[actions]: https://github.com/zargony/touch-n-drink/actions
+[esptool-js]: https://espressif.github.io/esptool-js/
+[releases]: https://github.com/zargony/touch-n-drink/releases

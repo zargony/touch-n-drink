@@ -67,3 +67,33 @@ jobs:
           name: touch-n-drink-elf
           path: firmware/target/riscv32imc-unknown-none-elf/release/touch-n-drink
           if-no-files-found: error
+
+  image:
+    name: Image
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cache espflash
+        id: cache-espflash
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/espflash
+          key: ${{ runner.os }}-espflash
+      - name: Install dependencies
+        if: steps.cache-espflash.outputs.cache-hit != 'true'
+        run: sudo apt-get update && sudo apt-get install pkg-config libudev-dev
+      - name: Install espflash
+        if: steps.cache-espflash.outputs.cache-hit != 'true'
+        run: cargo install espflash
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: touch-n-drink-elf
+      - name: Generate ESP32 image
+        run: espflash save-image --chip esp32c3 --merge --skip-padding touch-n-drink touch-n-drink-esp32c3.bin
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: touch-n-drink-esp32c3
+          path: touch-n-drink-esp32c3.bin
+          if-no-files-found: error
