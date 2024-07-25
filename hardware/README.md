@@ -3,7 +3,8 @@
 ## Electronics
 
 Prototype circuit on breadboard:
-![Breadboard Prototype][prototype-breadboard]
+
+<img alt="Breadboard Prototype" src="../images/prototype-breadboard.jpeg" style="width: 20em;" />
 
 ### Components
 
@@ -35,13 +36,16 @@ Prototype circuit on breadboard:
 ## Case
 
 Rendered CAD model:
-![Case rendered CAD model][hardware-model]
+
+<img alt="Case rendered CAD model" src="../images/hardware-model.png" style="width: 20em;" />
 
 Prototype cardboard case:
-![Case paper prototype][prototype-case]
+
+<img alt="Case paper prototype" src="../images/prototype-case.jpeg" style="width: 20em;" />
 
 Lasercut acrylic sheets:
-![Case lasercutting][hardware-case]
+
+<img alt="Case lasercutting" src="../images/hardware-case.jpeg" style="width: 20em;" />
 
 ### Hardware Parts
 
@@ -56,8 +60,3 @@ Lasercut acrylic sheets:
   ([Model](https://wiki.freecad.org/Fasteners_Workbench))
 - USB-C Cable
   ([Model](https://grabcad.com/library/usb-c-with-flexed-cable-1))
-
-[hardware-case]: ../images/hardware-case.jpeg
-[hardware-model]: ../images/hardware-model.png
-[prototype-breadboard]: ../images/prototype-breadboard.jpeg
-[prototype-case]: ../images/prototype-case.jpeg
