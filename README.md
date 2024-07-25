@@ -2,7 +2,7 @@
 
 Touch 'n Drink is a small device that reads NFC id cards of club members of the [Aeroclub Hamm] and allows to pay for items like cold drinks offered at the clubhouse. Purchases are forwarded to accounting so members pay via their regular monthly invoices. We're located at airfield [EDLH] in Hamm, Germany.
 
-![Rendered CAD model][cad-model]
+![Rendered CAD model][hardware-model]
 
 ## Hardware
 
@@ -16,8 +16,8 @@ Written in [Rust]. See [firmware] folder for details.
 
 If you like this project, want to use it at your club, or if you want to discuss ideas and suggestions, feel free to start a [discussion][discussions] or open an [issue][issues]. Feel free to fork this repository and base your work upon it. If you implement changes or features that can be useful for everyone, please open a pull request.
 
-[cad-model]: ./images/cad-model.png
 [hardware]: ./hardware
+[hardware-model]: ./images/hardware-model.png
 [firmware]: ./firmware
 
 [discussions]: https://github.com/zargony/touch-n-drink/discussions
