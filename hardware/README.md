@@ -1,6 +1,11 @@
 # LSC Touch 'n Drink Hardware
 
-## Electronic Components
+## Electronics
+
+Prototype circuit on breadboard:
+![Breadboard Prototype][prototype-breadboard]
+
+### Components
 
 - OLED Display 2.42" I2C
   ([AliExpress](https://s.click.aliexpress.com/e/_DCysL8J)) <!-- https://www.aliexpress.com/item/1005006100836064.html -->
@@ -27,8 +32,20 @@
   ([Amazon](https://amzn.to/3Y72Ibw)) <!-- https://www.amazon.de/Jopto-Passives-niedrigstufiges-Lautsprecher-Kompatibel/dp/B096ZWCG7F -->
   ([Model](https://grabcad.com/library/buzzer-module-fc-07-1))
 
-## Hardware Parts
+## Case
 
+Rendered CAD model:
+![Case rendered CAD model][hardware-model]
+
+Prototype cardboard case:
+![Case paper prototype][prototype-case]
+
+Lasercut acrylic sheets:
+![Case lasercutting][hardware-case]
+
+### Hardware Parts
+
+- Acrylic sheets, 3mm
 - Nylon Countersunk Screws, 8x M2x10, 6x M3x10, 4x M3x20
   ([AliExpress](https://s.click.aliexpress.com/e/_Dnqr099)) <!-- https://www.aliexpress.com/item/1005006947644936.html -->
   ([Amazon](https://amzn.to/4bAfO4o)) <!-- https://www.amazon.de/CONPHERON-Kreuzschlitz-Senkschrauben-Kunststoff-Maschinenschrauben/dp/B09NXRQFHX -->
@@ -39,3 +56,8 @@
   ([Model](https://wiki.freecad.org/Fasteners_Workbench))
 - USB-C Cable
   ([Model](https://grabcad.com/library/usb-c-with-flexed-cable-1))
+
+[hardware-case]: ../images/hardware-case.jpeg
+[hardware-model]: ../images/hardware-model.png
+[prototype-breadboard]: ../images/prototype-breadboard.jpeg
+[prototype-case]: ../images/prototype-case.jpeg
