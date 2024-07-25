@@ -37,30 +37,30 @@ pub enum Key {
 impl Key {
     /// Returns digit as number if key is a digit
     #[allow(dead_code)]
-    pub fn digit(&self) -> Option<usize> {
+    pub fn digit(self) -> Option<usize> {
         match self {
-            Self::Digit(n) => Some(*n as usize),
+            Self::Digit(n) => Some(n as usize),
             _ => None,
         }
     }
 
     /// Returns true if key is enter key
     #[allow(dead_code)]
-    pub fn enter(&self) -> bool {
-        *self == Self::Enter
+    pub fn enter(self) -> bool {
+        self == Self::Enter
     }
 
     /// Returns true if key is cancel key
     #[allow(dead_code)]
-    pub fn cancel(&self) -> bool {
-        *self == Self::Cancel
+    pub fn cancel(self) -> bool {
+        self == Self::Cancel
     }
 
     /// Returns key as character
     #[allow(dead_code)]
-    pub fn as_char(&self) -> char {
-        match *self {
-            Self::Digit(n) => char::from_digit(n as u32, 16).unwrap_or('?'),
+    pub fn as_char(self) -> char {
+        match self {
+            Self::Digit(n) => char::from_digit(u32::from(n), 16).unwrap_or('?'),
             Self::Enter => '#',
             Self::Cancel => '*',
             Self::Other(ch) => ch,
@@ -118,14 +118,10 @@ where
             out.set_low().map_err(Error::OutputPin)?;
         }
         // Wait for any input to be pulled low
-        select_array(
-            self.cols
-                .each_mut()
-                .map(|input| input.wait_for_falling_edge()),
-        )
-        .await
-        .0
-        .map_err(Error::InputPin)?;
+        select_array(self.cols.each_mut().map(Wait::wait_for_falling_edge))
+            .await
+            .0
+            .map_err(Error::InputPin)?;
         Ok(())
     }
 
