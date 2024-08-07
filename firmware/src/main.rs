@@ -44,8 +44,20 @@ use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
 use esp_hal::rng::Rng;
 use esp_hal::system::SystemControl;
-use esp_hal::timer::{systimer::SystemTimer, timg::TimerGroup};
+use esp_hal::timer::{
+    systimer::SystemTimer, timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer,
+};
 use log::info;
+
+// When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
+macro_rules! mk_static {
+    ($t:ty, $val:expr) => {{
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        #[deny(unused_attributes)]
+        let x = STATIC_CELL.uninit().write(($val));
+        x
+    }};
+}
 
 #[main]
 async fn main(_spawner: Spawner) {
@@ -58,8 +70,12 @@ async fn main(_spawner: Spawner) {
     let mut led = Output::new(io.pins.gpio8, Level::High);
 
     // Initialize async executor
-    let timg0 = TimerGroup::new_async(peripherals.TIMG0, &clocks);
-    esp_hal_embassy::init(&clocks, timg0);
+    let systimer = SystemTimer::new(peripherals.SYSTIMER);
+    let embassy_timer = OneShotTimer::new(systimer.alarm0.into());
+    esp_hal_embassy::init(
+        &clocks,
+        mk_static!([OneShotTimer<ErasedTimer>; 1], [embassy_timer]),
+    );
 
     // Initialize logging
     esp_println::logger::init_logger_from_env();
@@ -97,7 +113,8 @@ async fn main(_spawner: Spawner) {
     );
 
     // Initialize Wifi
-    let wifi_timer = SystemTimer::new(peripherals.SYSTIMER).alarm0;
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
+    let wifi_timer = PeriodicTimer::new(timg0.timer0.into());
     let mut wifi = wifi::Wifi::new(
         wifi_timer,
         rng,

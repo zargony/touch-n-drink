@@ -1,8 +1,8 @@
 use core::time::Duration;
 use esp_hal::clock::Clocks;
+use esp_hal::peripherals;
 use esp_hal::rng::Rng;
-use esp_hal::timer::systimer::{Alarm, Target};
-use esp_hal::{peripherals, Blocking};
+use esp_hal::timer::{ErasedTimer, PeriodicTimer};
 use esp_wifi::wifi::{self, ScanConfig, ScanTypeConfig, WifiController, WifiDevice, WifiStaDevice};
 use esp_wifi::{EspWifiInitFor, EspWifiInitialization};
 use log::{debug, info};
@@ -22,7 +22,7 @@ pub struct Wifi<'d> {
 impl<'d> Wifi<'d> {
     /// Create and initialize Wifi interface
     pub async fn new(
-        timer: Alarm<Target, Blocking, 0>,
+        timer: PeriodicTimer<ErasedTimer>,
         rng: Rng,
         radio_clocks: peripherals::RADIO_CLK,
         clocks: &Clocks<'d>,

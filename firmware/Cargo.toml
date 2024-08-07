@@ -38,12 +38,13 @@ embedded-graphics = "0.8"
 embedded-hal = "1.0"
 embedded-hal-async = "1.0"
 embedded-hal-bus = { version = "0.2", features = ["async"] }
-esp-backtrace = { version = "0.12", features = ["esp32c3", "panic-handler", "exception-handler", "println"] }
-esp-hal = { version = "0.18", features = ["esp32c3", "async", "log"] }
-esp-hal-embassy = { version = "0.1", features = ["esp32c3", "time-timg0"] }
-esp-println = { version = "0.9", features = ["esp32c3", "log"] }
-esp-wifi = { version = "0.6", features = ["esp32c3", "async", "log", "phy-enable-usb", "wifi"] }
+esp-backtrace = { version = "0.13", features = ["esp32c3", "panic-handler", "exception-handler", "println"] }
+esp-hal = { version = "0.19", features = ["esp32c3", "async", "log"] }
+esp-hal-embassy = { version = "0.2", features = ["esp32c3", "log"] }
+esp-println = { version = "0.10", features = ["esp32c3", "log"] }
+esp-wifi = { version = "0.7", features = ["esp32c3", "async", "log", "phy-enable-usb", "wifi"] }
 log = { version = "0.4", features = ["release_max_level_info"] }
+static_cell = "2.1"
 
 # SSD1306 driver (>0.8.4) with embedded-hal 1.0 and display-interface 0.5 support
 # See https://github.com/rust-embedded-community/ssd1306/pull/213
