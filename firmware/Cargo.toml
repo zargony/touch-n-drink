@@ -19,6 +19,11 @@ opt-level = "s"
 debug-assertions = false
 opt-level = 3
 
+[profile.dev.package.esp-wifi]
+# Build esp-wifi with release optimizations as it recommends
+debug-assertions = false
+opt-level = 3
+
 [profile.release]
 # LLVM can perform better optimizations using a single thread
 codegen-units = 1
