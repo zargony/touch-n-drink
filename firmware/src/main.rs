@@ -115,7 +115,7 @@ async fn main(_spawner: Spawner) {
     // Initialize Wifi
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
     let wifi_timer = PeriodicTimer::new(timg0.timer0.into());
-    let mut wifi = match wifi::Wifi::new(
+    let _wifi = match wifi::Wifi::new(
         wifi_timer,
         rng,
         peripherals.RADIO_CLK,
@@ -132,9 +132,6 @@ async fn main(_spawner: Spawner) {
     // Display hello screen
     display.clear().unwrap();
     display.hello().unwrap();
-
-    // Test Wifi
-    wifi.test().await;
 
     let mut displaying_key = false;
     loop {
