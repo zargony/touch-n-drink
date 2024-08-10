@@ -1,3 +1,4 @@
+use crate::{GIT_SHA_STR, VERSION_STR};
 use embedded_graphics::mono_font::ascii::{FONT_10X20, FONT_5X8, FONT_6X10, FONT_9X18_BOLD};
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::BinaryColor;
@@ -71,14 +72,14 @@ impl<I2C: I2c> Display<I2C> {
         )
         .draw(&mut self.driver)?;
         Text::with_alignment(
-            concat!("v", env!("CARGO_PKG_VERSION")),
+            VERSION_STR,
             Point::new(63, 28 + 12),
             MonoTextStyle::new(&FONT_6X10, BinaryColor::On),
             Alignment::Center,
         )
         .draw(&mut self.driver)?;
         Text::with_alignment(
-            env!("GIT_SHORT_SHA"),
+            GIT_SHA_STR,
             Point::new(127, 63),
             MonoTextStyle::new(&FONT_5X8, BinaryColor::On),
             Alignment::Right,
