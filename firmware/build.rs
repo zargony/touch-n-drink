@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let statuses = repo.statuses(Some(&mut status_options))?;
     let dirty = statuses.iter().any(|st| !st.status().is_ignored());
     let dirty_str = if dirty { "+" } else { "" };
-    println!("cargo::rustc-env=GIT_SHORT_SHA={}{}", short_sha, dirty_str);
+    println!("cargo::rustc-env=GIT_SHORT_SHA={short_sha}{dirty_str}");
 
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-changed=.git/");
