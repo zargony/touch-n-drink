@@ -91,11 +91,11 @@ async fn main(_spawner: Spawner) {
     );
 
     // Initialize display
-    let mut display = display::Display::new(i2c, 0x3c).unwrap();
-
-    // Display hello screen
-    display.clear().unwrap();
-    display.hello().unwrap();
+    let mut display = match display::Display::new(i2c, 0x3c) {
+        Ok(disp) => disp,
+        // Panic on failure since without a display there's no reasonable way to tell the user
+        Err(err) => panic!("Display initialization failed: {:?}", err),
+    };
 
     // Initialize keypad
     let mut keypad = keypad::Keypad::new(
@@ -115,7 +115,7 @@ async fn main(_spawner: Spawner) {
     // Initialize Wifi
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
     let wifi_timer = PeriodicTimer::new(timg0.timer0.into());
-    let mut wifi = wifi::Wifi::new(
+    let mut wifi = match wifi::Wifi::new(
         wifi_timer,
         rng,
         peripherals.RADIO_CLK,
@@ -123,7 +123,15 @@ async fn main(_spawner: Spawner) {
         peripherals.WIFI,
     )
     .await
-    .unwrap();
+    {
+        Ok(wifi) => wifi,
+        // Panic on failure since an initialization error indicates a static configuration error
+        Err(err) => panic!("Wifi initialization failed: {:?}", err),
+    };
+
+    // Display hello screen
+    display.clear().unwrap();
+    display.hello().unwrap();
 
     // Test Wifi
     wifi.test().await;
