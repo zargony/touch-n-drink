@@ -32,13 +32,13 @@
 
 mod display;
 mod keypad;
+mod ui;
 mod wifi;
 
 use embassy_executor::Spawner;
-use embassy_time::{with_timeout, Duration};
 use esp_backtrace as _;
 use esp_hal::clock::ClockControl;
-use esp_hal::gpio::{AnyInput, AnyOutput, Io, Level, Output, Pull};
+use esp_hal::gpio::{AnyInput, AnyOutput, Io, Level, Pull};
 use esp_hal::i2c::I2C;
 use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
@@ -70,7 +70,7 @@ async fn main(_spawner: Spawner) {
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let rng = Rng::new(peripherals.RNG);
-    let mut led = Output::new(io.pins.gpio8, Level::High);
+    let _led = AnyOutput::new(io.pins.gpio8, Level::High);
 
     // Initialize async executor
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
@@ -95,15 +95,14 @@ async fn main(_spawner: Spawner) {
     );
 
     // Initialize display
-    let mut display = match display::Display::new(i2c, 0x3c) {
+    let display = match display::Display::new(i2c, 0x3c) {
         Ok(disp) => disp,
         // Panic on failure since without a display there's no reasonable way to tell the user
         Err(err) => panic!("Display initialization failed: {:?}", err),
     };
-    let _ = display.splash();
 
     // Initialize keypad
-    let mut keypad = keypad::Keypad::new(
+    let keypad = keypad::Keypad::new(
         [
             AnyInput::new(io.pins.gpio5, Pull::Up),
             AnyInput::new(io.pins.gpio6, Pull::Up),
@@ -133,22 +132,12 @@ async fn main(_spawner: Spawner) {
         // Panic on failure since an initialization error indicates a static configuration error
         Err(err) => panic!("Wifi initialization failed: {:?}", err),
     };
-    let mut displaying_key = false;
-    loop {
-        led.toggle();
 
-        match with_timeout(Duration::from_secs(5), keypad.read()).await {
-            Ok(Ok(key)) => {
-                info!("Key pressed: {:?}", key);
-                display.clear().unwrap();
-                display.big_centered_char(key.as_char()).unwrap();
-                displaying_key = true;
-            }
-            Err(_) if displaying_key => {
-                display.splash().unwrap();
-                displaying_key = false;
-            }
-            _ => {}
-        }
+    // Create UI
+    let mut ui = ui::Ui::new(display, keypad);
+    let _ = ui.show_splash_screen().await;
+
+    loop {
+        let _ = ui.test().await;
     }
 }

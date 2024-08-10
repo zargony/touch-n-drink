@@ -46,7 +46,6 @@ impl<I2C: I2c> Display<I2C> {
     }
 
     /// Turn display off
-    #[allow(dead_code)]
     pub fn turn_off(&mut self) -> Result<(), Error> {
         debug!("Display: Power off");
         self.driver.set_display_on(false)?;
@@ -54,6 +53,7 @@ impl<I2C: I2c> Display<I2C> {
     }
 
     /// Clear display
+    #[allow(dead_code)]
     pub fn clear(&mut self) -> Result<(), Error> {
         self.driver.clear(BinaryColor::Off)?;
         self.driver.flush()?;
