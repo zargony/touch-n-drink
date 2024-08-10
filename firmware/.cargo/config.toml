@@ -1,6 +1,8 @@
 [env]
+# Log filters for esp-println to apply at runtime. Also, a feature of the log crate strips all
+# logging above info level from release builds at compile time.
 ESP_LOGLEVEL="debug"
-ESP_LOGTARGETS="lsc_touch_n_drink"
+ESP_LOGTARGETS="touch_n_drink"
 
 [build]
 target = "riscv32imc-unknown-none-elf"
