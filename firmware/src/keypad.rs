@@ -1,4 +1,3 @@
-use core::fmt;
 use embassy_futures::select::select_array;
 use embassy_time::{Duration, Timer};
 use embedded_hal::digital::{InputPin, OutputPin};
@@ -7,24 +6,13 @@ use embedded_hal_async::digital::Wait;
 const DEBOUNCE_TIME: Duration = Duration::from_millis(10);
 
 /// Keypad driver error
+#[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum Error<IN: InputPin, OUT: OutputPin> {
     /// Failed to read keypad input pin
-    InputPin(IN::Error),
+    InputPinError(IN::Error),
     /// Failed to drive keypad output pin
-    OutputPin(OUT::Error),
-}
-
-impl<IN: InputPin, OUT: OutputPin> fmt::Debug for Error<IN, OUT>
-where
-    IN::Error: fmt::Debug,
-    OUT::Error: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InputPin(e) => e.fmt(f),
-            Self::OutputPin(e) => e.fmt(f),
-        }
-    }
+    OutputPinError(OUT::Error),
 }
 
 /// Key that can be pressed
@@ -117,13 +105,13 @@ where
     async fn wait_for_keypress(&mut self) -> Result<(), Error<IN, OUT>> {
         // Assuming inputs have pull up resistors, so keys will pull low when pressed
         for out in &mut self.rows {
-            out.set_low().map_err(Error::OutputPin)?;
+            out.set_low().map_err(Error::OutputPinError)?;
         }
         // Wait for any input to be pulled low
         select_array(self.cols.each_mut().map(Wait::wait_for_falling_edge))
             .await
             .0
-            .map_err(Error::InputPin)?;
+            .map_err(Error::InputPinError)?;
         Ok(())
     }
 
@@ -131,17 +119,17 @@ where
     fn scan(&mut self) -> Result<[[bool; COLS]; ROWS], Error<IN, OUT>> {
         // Assuming inputs have pull up resistors, so keys will pull low when pressed
         for out in &mut self.rows {
-            out.set_high().map_err(Error::OutputPin)?;
+            out.set_high().map_err(Error::OutputPinError)?;
         }
         let mut states = [[false; COLS]; ROWS];
         for (output, states) in self.rows.iter_mut().zip(states.iter_mut()) {
-            output.set_low().map_err(Error::OutputPin)?;
+            output.set_low().map_err(Error::OutputPinError)?;
             // Easier with feature array_try_map (see https://github.com/rust-lang/rust/issues/79711):
             //   `self.cols.each_mut().try_map(|input| input.is_low())?`
             for (input, state) in self.cols.iter_mut().zip(states.iter_mut()) {
-                *state = input.is_low().map_err(Error::InputPin)?;
+                *state = input.is_low().map_err(Error::InputPinError)?;
             }
-            output.set_high().map_err(Error::OutputPin)?;
+            output.set_high().map_err(Error::OutputPinError)?;
         }
         Ok(states)
     }
