@@ -15,16 +15,16 @@ use ssd1306::Ssd1306;
 // See also https://github.com/rust-embedded-community/ssd1306/pull/189
 
 /// Display error
-pub use display_interface::DisplayError;
+pub use display_interface::DisplayError as Error;
 
 /// Convenient hardware-agnostic display driver
-pub struct Display<I2C: I2c> {
+pub struct Display<I2C> {
     driver: Ssd1306<I2CInterface<I2C>, DisplaySize128x64, BufferedGraphicsMode<DisplaySize128x64>>,
 }
 
 impl<I2C: I2c> Display<I2C> {
     /// Create display driver and initialize display hardware
-    pub fn new(i2c: I2C, addr: u8) -> Result<Self, DisplayError> {
+    pub fn new(i2c: I2C, addr: u8) -> Result<Self, Error> {
         // Build SSD1306 driver and switch to buffered graphics mode
         let mut driver = Ssd1306::new(
             I2CInterface::new(i2c, addr, 0x40),
@@ -42,14 +42,14 @@ impl<I2C: I2c> Display<I2C> {
     }
 
     /// Clear display
-    pub fn clear(&mut self) -> Result<(), DisplayError> {
+    pub fn clear(&mut self) -> Result<(), Error> {
         self.driver.clear(BinaryColor::Off)?;
         self.driver.flush()?;
         Ok(())
     }
 
     /// Display hello screen
-    pub fn hello(&mut self) -> Result<(), DisplayError> {
+    pub fn hello(&mut self) -> Result<(), Error> {
         let style = MonoTextStyle::new(&FONT_6X13, BinaryColor::On);
         Text::new("Hello, world!", Point::new(0, 20), style).draw(&mut self.driver)?;
         self.driver.flush()?;
@@ -57,7 +57,7 @@ impl<I2C: I2c> Display<I2C> {
     }
 
     /// Display big centered text
-    pub fn big_centered_char(&mut self, ch: char) -> Result<(), DisplayError> {
+    pub fn big_centered_char(&mut self, ch: char) -> Result<(), Error> {
         let mut buf = [0; 4];
         let text = ch.encode_utf8(&mut buf);
         let character_style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);

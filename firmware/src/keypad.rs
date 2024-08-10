@@ -8,7 +8,9 @@ const DEBOUNCE_TIME: Duration = Duration::from_millis(10);
 
 /// Keypad driver error
 pub enum Error<IN: InputPin, OUT: OutputPin> {
+    /// Failed to read keypad input pin
     InputPin(IN::Error),
+    /// Failed to drive keypad output pin
     OutputPin(OUT::Error),
 }
 

@@ -8,7 +8,7 @@ use esp_wifi::{EspWifiInitFor, EspWifiInitialization};
 use log::{debug, info};
 
 /// Wifi error
-pub use esp_wifi::wifi::WifiError;
+pub use esp_wifi::wifi::WifiError as Error;
 
 /// Wifi interface
 pub struct Wifi<'d> {
@@ -27,9 +27,9 @@ impl<'d> Wifi<'d> {
         radio_clocks: peripherals::RADIO_CLK,
         clocks: &Clocks<'d>,
         wifi: peripherals::WIFI,
-    ) -> Result<Self, WifiError> {
+    ) -> Result<Self, Error> {
         let inited = esp_wifi::initialize(EspWifiInitFor::Wifi, timer, rng, radio_clocks, clocks)
-            .map_err(|_| WifiError::NotInitialized)?;
+            .map_err(|_| Error::NotInitialized)?;
 
         let (device, mut controller) = wifi::new_with_mode(&inited, wifi, WifiStaDevice)?;
         debug!("Wifi configuration: {:?}", controller.get_configuration());
