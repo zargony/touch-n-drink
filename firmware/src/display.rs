@@ -2,7 +2,7 @@ use embedded_graphics::mono_font::ascii::{FONT_10X20, FONT_5X8, FONT_6X10, FONT_
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
-use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
+use embedded_graphics::text::{Alignment, Text};
 use embedded_hal::i2c::I2c;
 use log::info;
 use ssd1306::mode::{BufferedGraphicsMode, DisplayConfig};
@@ -56,14 +56,14 @@ impl<I2C: I2c> Display<I2C> {
         self.driver.clear(BinaryColor::Off)?;
         Text::with_alignment(
             "Touch 'n Drink",
-            Point::new(64, 28),
+            Point::new(63, 28),
             MonoTextStyle::new(&FONT_9X18_BOLD, BinaryColor::On),
             Alignment::Center,
         )
         .draw(&mut self.driver)?;
         Text::with_alignment(
             concat!("v", env!("CARGO_PKG_VERSION")),
-            Point::new(64, 28 + 12),
+            Point::new(63, 28 + 12),
             MonoTextStyle::new(&FONT_6X10, BinaryColor::On),
             Alignment::Center,
         )
@@ -81,15 +81,16 @@ impl<I2C: I2c> Display<I2C> {
 
     /// Display big centered text
     pub fn big_centered_char(&mut self, ch: char) -> Result<(), Error> {
+        self.driver.clear(BinaryColor::Off)?;
         let mut buf = [0; 4];
         let text = ch.encode_utf8(&mut buf);
-        let character_style = MonoTextStyle::new(&FONT_10X20, BinaryColor::On);
-        let text_style = TextStyleBuilder::new()
-            .baseline(Baseline::Middle)
-            .alignment(Alignment::Center)
-            .build();
-        Text::with_text_style(text, Point::new(64, 32), character_style, text_style)
-            .draw(&mut self.driver)?;
+        Text::with_alignment(
+            text,
+            Point::new(63, 42),
+            MonoTextStyle::new(&FONT_10X20, BinaryColor::On),
+            Alignment::Center,
+        )
+        .draw(&mut self.driver)?;
         self.driver.flush()?;
         Ok(())
     }
