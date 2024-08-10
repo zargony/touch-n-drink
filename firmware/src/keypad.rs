@@ -2,6 +2,7 @@ use embassy_futures::select::select_array;
 use embassy_time::{Duration, Timer};
 use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_hal_async::digital::Wait;
+use log::info;
 
 const DEBOUNCE_TIME: Duration = Duration::from_millis(10);
 
@@ -71,6 +72,8 @@ where
 {
     /// Create matrix keypad from given input columns and output rows
     pub fn new(cols: [IN; COLS], rows: [OUT; ROWS]) -> Self {
+        info!("Keypad: {}x{} matrix initialized", ROWS, COLS);
+
         Self { cols, rows }
     }
 

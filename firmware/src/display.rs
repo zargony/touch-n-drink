@@ -4,6 +4,7 @@ use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
 use embedded_hal::i2c::I2c;
+use log::info;
 use ssd1306::mode::{BufferedGraphicsMode, DisplayConfig};
 use ssd1306::prelude::I2CInterface;
 use ssd1306::rotation::DisplayRotation;
@@ -37,6 +38,8 @@ impl<I2C: I2c> Display<I2C> {
         driver.init()?;
         driver.clear(BinaryColor::Off)?;
         driver.flush()?;
+
+        info!("Display: SSD1306 initialized");
 
         Ok(Display { driver })
     }

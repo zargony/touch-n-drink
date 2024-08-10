@@ -31,13 +31,15 @@ impl<'d> Wifi<'d> {
         let init = esp_wifi::initialize(EspWifiInitFor::Wifi, timer, rng, radio_clocks, clocks)?;
 
         let (device, mut controller) = wifi::new_with_mode(&init, wifi, WifiStaDevice)?;
-        debug!("Static Wifi configuration: {:?}", esp_wifi::CONFIG);
+        debug!("Wifi static configuration: {:?}", esp_wifi::CONFIG);
         debug!("Wifi configuration: {:?}", controller.get_configuration());
         debug!("Wifi capabilities: {:?}", controller.get_capabilities());
         debug!("Wifi state: {:?}", wifi::get_wifi_state());
 
-        info!("Starting Wifi controller...");
+        debug!("Wifi: Starting controller...");
         controller.start().await?;
+
+        info!("Wifi: Controller initialized");
         debug!("Wifi state: {:?}", wifi::get_wifi_state());
 
         Ok(Wifi {
