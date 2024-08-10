@@ -4,7 +4,7 @@ use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_graphics::text::{Alignment, Text};
 use embedded_hal::i2c::I2c;
-use log::info;
+use log::{debug, info};
 use ssd1306::mode::{BufferedGraphicsMode, DisplayConfig};
 use ssd1306::prelude::I2CInterface;
 use ssd1306::rotation::DisplayRotation;
@@ -44,10 +44,19 @@ impl<I2C: I2c> Display<I2C> {
         Ok(Display { driver })
     }
 
+    /// Turn display off
+    #[allow(dead_code)]
+    pub fn turn_off(&mut self) -> Result<(), Error> {
+        debug!("Display: Power off");
+        self.driver.set_display_on(false)?;
+        Ok(())
+    }
+
     /// Clear display
     pub fn clear(&mut self) -> Result<(), Error> {
         self.driver.clear(BinaryColor::Off)?;
         self.driver.flush()?;
+        self.driver.set_display_on(true)?;
         Ok(())
     }
 
@@ -76,6 +85,7 @@ impl<I2C: I2c> Display<I2C> {
         )
         .draw(&mut self.driver)?;
         self.driver.flush()?;
+        self.driver.set_display_on(true)?;
         Ok(())
     }
 
@@ -92,6 +102,7 @@ impl<I2C: I2c> Display<I2C> {
         )
         .draw(&mut self.driver)?;
         self.driver.flush()?;
+        self.driver.set_display_on(true)?;
         Ok(())
     }
 }
