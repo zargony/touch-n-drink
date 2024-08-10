@@ -6,8 +6,11 @@ use esp_wifi::wifi::{self, WifiController, WifiDevice, WifiStaDevice};
 use esp_wifi::{EspWifiInitFor, EspWifiInitialization};
 use log::{debug, info};
 
-/// Wifi error
-pub use esp_wifi::wifi::WifiError as Error;
+/// Wifi initialization error
+pub use esp_wifi::InitializationError;
+
+// /// Wifi error
+// pub use esp_wifi::wifi::WifiError as Error;
 
 /// Wifi interface
 pub struct Wifi<'d> {
@@ -24,9 +27,8 @@ impl<'d> Wifi<'d> {
         radio_clocks: peripherals::RADIO_CLK,
         clocks: &Clocks<'d>,
         wifi: peripherals::WIFI,
-    ) -> Result<Self, Error> {
-        let init = esp_wifi::initialize(EspWifiInitFor::Wifi, timer, rng, radio_clocks, clocks)
-            .map_err(|_| Error::NotInitialized)?;
+    ) -> Result<Self, InitializationError> {
+        let init = esp_wifi::initialize(EspWifiInitFor::Wifi, timer, rng, radio_clocks, clocks)?;
 
         let (device, mut controller) = wifi::new_with_mode(&init, wifi, WifiStaDevice)?;
         debug!("Static Wifi configuration: {:?}", esp_wifi::CONFIG);
