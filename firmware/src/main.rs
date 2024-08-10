@@ -44,9 +44,9 @@ use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
 use esp_hal::rng::Rng;
 use esp_hal::system::SystemControl;
-use esp_hal::timer::{
-    systimer::SystemTimer, timg::TimerGroup, ErasedTimer, OneShotTimer, PeriodicTimer,
-};
+use esp_hal::timer::systimer::SystemTimer;
+use esp_hal::timer::timg::TimerGroup;
+use esp_hal::timer::{ErasedTimer, OneShotTimer, PeriodicTimer};
 use log::info;
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
@@ -96,6 +96,7 @@ async fn main(_spawner: Spawner) {
         // Panic on failure since without a display there's no reasonable way to tell the user
         Err(err) => panic!("Display initialization failed: {:?}", err),
     };
+    let _ = display.splash();
 
     // Initialize keypad
     let mut keypad = keypad::Keypad::new(
@@ -128,11 +129,6 @@ async fn main(_spawner: Spawner) {
         // Panic on failure since an initialization error indicates a static configuration error
         Err(err) => panic!("Wifi initialization failed: {:?}", err),
     };
-
-    // Display hello screen
-    display.clear().unwrap();
-    display.hello().unwrap();
-
     let mut displaying_key = false;
     loop {
         led.toggle();
@@ -145,8 +141,7 @@ async fn main(_spawner: Spawner) {
                 displaying_key = true;
             }
             Err(_) if displaying_key => {
-                display.clear().unwrap();
-                display.hello().unwrap();
+                display.splash().unwrap();
                 displaying_key = false;
             }
             _ => {}

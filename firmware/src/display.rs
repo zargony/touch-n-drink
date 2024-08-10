@@ -1,4 +1,4 @@
-use embedded_graphics::mono_font::ascii::{FONT_10X20, FONT_6X13};
+use embedded_graphics::mono_font::ascii::{FONT_10X20, FONT_6X10, FONT_9X18_BOLD};
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
@@ -48,10 +48,23 @@ impl<I2C: I2c> Display<I2C> {
         Ok(())
     }
 
-    /// Display hello screen
-    pub fn hello(&mut self) -> Result<(), Error> {
-        let style = MonoTextStyle::new(&FONT_6X13, BinaryColor::On);
-        Text::new("Hello, world!", Point::new(0, 20), style).draw(&mut self.driver)?;
+    /// Display splash screen
+    pub fn splash(&mut self) -> Result<(), Error> {
+        self.driver.clear(BinaryColor::Off)?;
+        Text::with_alignment(
+            "Touch 'n Drink",
+            Point::new(64, 28),
+            MonoTextStyle::new(&FONT_9X18_BOLD, BinaryColor::On),
+            Alignment::Center,
+        )
+        .draw(&mut self.driver)?;
+        Text::with_alignment(
+            concat!("v", env!("CARGO_PKG_VERSION")),
+            Point::new(64, 28 + 12),
+            MonoTextStyle::new(&FONT_6X10, BinaryColor::On),
+            Alignment::Center,
+        )
+        .draw(&mut self.driver)?;
         self.driver.flush()?;
         Ok(())
     }
