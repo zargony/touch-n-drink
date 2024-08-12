@@ -60,6 +60,7 @@ where
     }
 
     /// Save power by turning off devices not needed during idle
+    #[allow(dead_code)]
     pub fn power_save(&mut self) -> Result<(), Error<IN, OUT>> {
         info!("UI: Power saving...");
         self.display.turn_off()?;
@@ -73,41 +74,25 @@ where
         Ok(())
     }
 
-    /// Wait for input of a single digit and show it on screen
+    /// Wait for input of a single digit
     pub async fn get_single_digit(&mut self) -> Result<Key, Error<IN, OUT>> {
         let key = with_timeout(USER_TIMEOUT, self.keypad.read()).await??;
-        let ch = key.as_char();
-        self.display.screen(screen::BigCenteredChar(ch))?;
         Ok(key)
     }
 
     /// Testing user interface flow
     pub async fn test(&mut self) -> Result<(), Error<IN, OUT>> {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-        enum Displaying {
-            Splash,
-            Key,
-            Off,
-        }
-
-        let mut displaying = Displaying::Splash;
         loop {
-            match self.get_single_digit().await {
-                Ok(key) => {
-                    info!("UI: Key pressed: {:?}", key);
-                    displaying = Displaying::Key;
-                }
-                Err(Error::Timeout) if displaying == Displaying::Key => {
-                    self.show_splash_screen().await?;
-                    displaying = Displaying::Splash;
-                }
-                Err(Error::Timeout) if displaying == Displaying::Splash => {
-                    self.power_save()?;
-                    displaying = Displaying::Off;
-                }
-                Err(Error::Timeout) => (),
-                Err(err) => return Err(err),
-            }
+            self.display.screen(screen::ScanId)?;
+            let _key = self.get_single_digit().await?;
+            self.display.screen(screen::NumberOfDrinks)?;
+            let _key = self.get_single_digit().await?;
+            self.display.screen(screen::Checkout::new(3, 2.97))?;
+            let _key = self.get_single_digit().await?;
+            self.display.screen(screen::Success::new(3))?;
+            let _key = self.get_single_digit().await?;
+            self.display.screen(screen::Failure::new("Test-Fehler"))?;
+            let _key = self.get_single_digit().await?;
         }
     }
 }
