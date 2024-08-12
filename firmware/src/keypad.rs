@@ -7,7 +7,7 @@ use log::info;
 const DEBOUNCE_TIME: Duration = Duration::from_millis(10);
 
 /// Keypad driver error
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum Error<IN: InputPin, OUT: OutputPin> {
     /// Failed to read keypad input pin

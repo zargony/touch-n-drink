@@ -1353,6 +1353,16 @@ dependencies = [
  "log",
  "ssd1306",
  "static_cell",
+ "u8g2-fonts",
+]
+
+[[package]]
+name = "u8g2-fonts"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a68775e2131c88974e3cc1da37060559090319ea140746cc1e7e7797646415c0"
+dependencies = [
+ "embedded-graphics-core",
 ]
 
 [[package]]

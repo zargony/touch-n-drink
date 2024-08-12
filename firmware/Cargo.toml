@@ -53,6 +53,7 @@ esp-println = { version = "0.10", features = ["esp32c3", "log"] }
 esp-wifi = { version = "0.7", features = ["esp32c3", "async", "log", "phy-enable-usb", "wifi"] }
 log = { version = "0.4", features = ["release_max_level_info"] }
 static_cell = "2.1"
+u8g2-fonts = "0.4"
 
 # SSD1306 driver (>0.8.4) with embedded-hal 1.0 and display-interface 0.5 support
 # See https://github.com/rust-embedded-community/ssd1306/pull/213

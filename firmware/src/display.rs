@@ -1,9 +1,6 @@
 use crate::{GIT_SHA_STR, VERSION_STR};
-use embedded_graphics::mono_font::ascii::{FONT_10X20, FONT_5X8, FONT_6X10, FONT_9X18_BOLD};
-use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
-use embedded_graphics::text::{Alignment, Text};
 use embedded_hal::i2c::I2c;
 use log::{debug, info};
 use ssd1306::mode::{BufferedGraphicsMode, DisplayConfig};
@@ -11,13 +8,41 @@ use ssd1306::prelude::I2CInterface;
 use ssd1306::rotation::DisplayRotation;
 use ssd1306::size::DisplaySize128x64;
 use ssd1306::Ssd1306;
+use u8g2_fonts::types::{FontColor, HorizontalAlignment, VerticalPosition};
+use u8g2_fonts::{fonts, FontRenderer};
 
 // The `ssd1306` crate unfortunately doesn't support async yet (though `display-interface`,
 // `display-interface-i2c` and `embedded-hal-bus` do), so we can't use async here yet.
 // See also https://github.com/rust-embedded-community/ssd1306/pull/189
 
+const SPLASH_TITLE_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_logisoso16_tr>();
+const SPLASH_VERSION_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_profont12_tr>();
+const SPLASH_FOOTER_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_profont11_tr>();
+const BIG_CHAR_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_luBS24_tr>();
+
 /// Display error
-pub use display_interface::DisplayError as Error;
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum Error {
+    /// Display driver error
+    #[allow(dead_code)]
+    DriverError(display_interface::DisplayError),
+    /// Font render error
+    #[allow(dead_code)]
+    FontRenderError(u8g2_fonts::Error<display_interface::DisplayError>),
+}
+
+impl From<display_interface::DisplayError> for Error {
+    fn from(err: display_interface::DisplayError) -> Self {
+        Self::DriverError(err)
+    }
+}
+
+impl From<u8g2_fonts::Error<display_interface::DisplayError>> for Error {
+    fn from(err: u8g2_fonts::Error<display_interface::DisplayError>) -> Self {
+        Self::FontRenderError(err)
+    }
+}
 
 /// Convenient hardware-agnostic display driver
 pub struct Display<I2C> {
@@ -64,27 +89,31 @@ impl<I2C: I2c> Display<I2C> {
     /// Display splash screen
     pub fn splash(&mut self) -> Result<(), Error> {
         self.driver.clear(BinaryColor::Off)?;
-        Text::with_alignment(
-            "Touch 'n Drink",
+        // TODO: Temporary title, replace with proper bitmap logo
+        SPLASH_TITLE_FONT.render_aligned(
+            "Touch'n Drink",
             Point::new(63, 28),
-            MonoTextStyle::new(&FONT_9X18_BOLD, BinaryColor::On),
-            Alignment::Center,
-        )
-        .draw(&mut self.driver)?;
-        Text::with_alignment(
+            VerticalPosition::Baseline,
+            HorizontalAlignment::Center,
+            FontColor::Transparent(BinaryColor::On),
+            &mut self.driver,
+        )?;
+        SPLASH_VERSION_FONT.render_aligned(
             VERSION_STR,
             Point::new(63, 28 + 12),
-            MonoTextStyle::new(&FONT_6X10, BinaryColor::On),
-            Alignment::Center,
-        )
-        .draw(&mut self.driver)?;
-        Text::with_alignment(
+            VerticalPosition::Baseline,
+            HorizontalAlignment::Center,
+            FontColor::Transparent(BinaryColor::On),
+            &mut self.driver,
+        )?;
+        SPLASH_FOOTER_FONT.render_aligned(
             GIT_SHA_STR,
             Point::new(127, 63),
-            MonoTextStyle::new(&FONT_5X8, BinaryColor::On),
-            Alignment::Right,
-        )
-        .draw(&mut self.driver)?;
+            VerticalPosition::Baseline,
+            HorizontalAlignment::Right,
+            FontColor::Transparent(BinaryColor::On),
+            &mut self.driver,
+        )?;
         self.driver.flush()?;
         self.driver.set_display_on(true)?;
         Ok(())
@@ -93,15 +122,14 @@ impl<I2C: I2c> Display<I2C> {
     /// Display big centered text
     pub fn big_centered_char(&mut self, ch: char) -> Result<(), Error> {
         self.driver.clear(BinaryColor::Off)?;
-        let mut buf = [0; 4];
-        let text = ch.encode_utf8(&mut buf);
-        Text::with_alignment(
-            text,
+        BIG_CHAR_FONT.render_aligned(
+            ch,
             Point::new(63, 42),
-            MonoTextStyle::new(&FONT_10X20, BinaryColor::On),
-            Alignment::Center,
-        )
-        .draw(&mut self.driver)?;
+            VerticalPosition::Baseline,
+            HorizontalAlignment::Center,
+            FontColor::Transparent(BinaryColor::On),
+            &mut self.driver,
+        )?;
         self.driver.flush()?;
         self.driver.set_display_on(true)?;
         Ok(())
