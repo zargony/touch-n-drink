@@ -1,5 +1,4 @@
 use crate::screen::{self, Screen};
-use core::any;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_hal::i2c::I2c;
@@ -53,7 +52,6 @@ impl<I2C: I2c> Display<I2C> {
     /// Clear display
     #[allow(dead_code)]
     pub fn clear(&mut self) -> Result<(), Error> {
-        debug!("Display: Clearing");
         self.driver.clear(BinaryColor::Off)?;
         self.driver.flush()?;
         self.driver.set_display_on(true)?;
@@ -62,7 +60,6 @@ impl<I2C: I2c> Display<I2C> {
 
     /// Show screen
     pub fn screen<S: Screen>(&mut self, screen: S) -> Result<(), Error> {
-        debug!("Display: Showing screen `{}`", any::type_name::<S>());
         self.driver.clear(BinaryColor::Off)?;
         screen.draw(&mut self.driver)?;
         self.driver.flush()?;
