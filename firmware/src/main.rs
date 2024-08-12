@@ -32,6 +32,7 @@
 
 mod display;
 mod keypad;
+mod screen;
 mod ui;
 mod wifi;
 

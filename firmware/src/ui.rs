@@ -1,5 +1,6 @@
 use crate::display::{self, Display};
 use crate::keypad::{self, Key, Keypad};
+use crate::screen;
 use embassy_time::{with_timeout, Duration, TimeoutError};
 use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_hal::i2c::I2c;
@@ -65,17 +66,18 @@ where
         Ok(())
     }
 
-    /// Show splash screen
+    /// Show splash screen and wait for keypress or timeout
     pub async fn show_splash_screen(&mut self) -> Result<(), Error<IN, OUT>> {
-        self.display.splash()?;
+        self.display.screen(screen::Splash)?;
         let _key = with_timeout(SPLASH_TIMEOUT, self.keypad.read()).await??;
         Ok(())
     }
 
-    /// Wait for input of a single digit
+    /// Wait for input of a single digit and show it on screen
     pub async fn get_single_digit(&mut self) -> Result<Key, Error<IN, OUT>> {
         let key = with_timeout(USER_TIMEOUT, self.keypad.read()).await??;
-        self.display.big_centered_char(key.as_char())?;
+        let ch = key.as_char();
+        self.display.screen(screen::BigCenteredChar(ch))?;
         Ok(key)
     }
 
