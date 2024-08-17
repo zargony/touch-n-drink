@@ -231,7 +231,7 @@ impl<'a> Screen for Failure<'a> {
             FontColor::Transparent(BinaryColor::On),
             target,
         )?;
-        Footer::new("* Abbruch", "# Nochmal").draw(target)?;
+        Footer::new("* Abbruch", "").draw(target)?;
         Ok(())
     }
 }

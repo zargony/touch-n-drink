@@ -7,8 +7,20 @@ use embedded_hal::i2c::I2c;
 use embedded_hal_async::digital::Wait;
 use log::info;
 
+/// How long to display the splash screen if no key is pressed
 const SPLASH_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Timeout for user input. Actions are cancelled if the user does nothing for this duration.
+#[cfg(not(debug_assertions))]
+const USER_TIMEOUT: Duration = Duration::from_secs(60);
+#[cfg(debug_assertions)]
 const USER_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Timeout for initial screen. Power saving is activated if no action is taken for this duration.
+#[cfg(not(debug_assertions))]
+const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
+#[cfg(debug_assertions)]
+const IDLE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// User interface error
 #[derive(Debug)]
@@ -20,6 +32,8 @@ pub enum Error<IN: InputPin, OUT: OutputPin> {
     DisplayError(display::Error),
     /// Failed to read keypad
     KeypadError(keypad::Error<IN, OUT>),
+    /// User cancel request
+    Cancel,
     /// User interaction timeout
     Timeout,
 }
@@ -60,7 +74,6 @@ where
     }
 
     /// Save power by turning off devices not needed during idle
-    #[allow(dead_code)]
     pub fn power_save(&mut self) -> Result<(), Error<IN, OUT>> {
         info!("UI: Power saving...");
         self.display.turn_off()?;
@@ -74,25 +87,76 @@ where
         Ok(())
     }
 
-    /// Wait for input of a single digit
-    pub async fn get_single_digit(&mut self) -> Result<Key, Error<IN, OUT>> {
-        let key = with_timeout(USER_TIMEOUT, self.keypad.read()).await??;
-        Ok(key)
+    /// Wait for id card and verify identification
+    pub async fn read_id_card(&mut self) -> Result<Key, Error<IN, OUT>> {
+        self.display.screen(screen::ScanId)?;
+        let mut saving_power = false;
+        loop {
+            // TODO: Poll card reader here
+            let id = match with_timeout(IDLE_TIMEOUT, self.keypad.read()).await {
+                Ok(res) => res,
+                // On idle timeout, enter power saving
+                Err(TimeoutError) if !saving_power => {
+                    self.power_save()?;
+                    saving_power = true;
+                    continue;
+                }
+                Err(TimeoutError) => continue,
+            }?;
+            // TODO: Verify identification and return user information
+            return Ok(id);
+        }
     }
 
-    /// Testing user interface flow
-    pub async fn test(&mut self) -> Result<(), Error<IN, OUT>> {
+    /// Ask for number of drinks
+    pub async fn get_number_of_drinks(&mut self) -> Result<usize, Error<IN, OUT>> {
+        self.display.screen(screen::NumberOfDrinks)?;
         loop {
-            self.display.screen(screen::ScanId)?;
-            let _key = self.get_single_digit().await?;
-            self.display.screen(screen::NumberOfDrinks)?;
-            let _key = self.get_single_digit().await?;
-            self.display.screen(screen::Checkout::new(3, 2.97))?;
-            let _key = self.get_single_digit().await?;
-            self.display.screen(screen::Success::new(3))?;
-            let _key = self.get_single_digit().await?;
-            self.display.screen(screen::Failure::new("Test-Fehler"))?;
-            let _key = self.get_single_digit().await?;
+            match with_timeout(USER_TIMEOUT, self.keypad.read()).await?? {
+                // Any digit 1..=9 selects number of drinks
+                Key::Digit(n) if (1..=9).contains(&n) => return Ok(n as usize),
+                // Ignore any other digit
+                Key::Digit(_) => (),
+                // Cancel key cancels
+                Key::Cancel => return Err(Error::Cancel),
+                // Ignore any other key
+                _ => (),
+            }
         }
+    }
+
+    /// Confirm purchase
+    pub async fn checkout(
+        &mut self,
+        num_drinks: usize,
+        total_price: f32,
+    ) -> Result<(), Error<IN, OUT>> {
+        self.display
+            .screen(screen::Checkout::new(num_drinks, total_price))?;
+        loop {
+            match with_timeout(USER_TIMEOUT, self.keypad.read()).await?? {
+                // Enter key confirms purchase
+                Key::Enter => return Ok(()),
+                // Cancel key cancels
+                Key::Cancel => return Err(Error::Cancel),
+                // Ignore any other key
+                _ => (),
+            }
+        }
+    }
+
+    /// Run the user interface flow
+    pub async fn run(&mut self) -> Result<(), Error<IN, OUT>> {
+        let _id = self.read_id_card().await?;
+        let num_drinks = self.get_number_of_drinks().await?;
+        let total_price = 1.0 * num_drinks as f32;
+        self.checkout(num_drinks, total_price).await?;
+
+        // TODO: Process payment
+        let _ = screen::Success::new(num_drinks);
+        self.display
+            .screen(screen::Failure::new("Not implemented yet"))?;
+        let _key = self.keypad.read().await?;
+        Ok(())
     }
 }

@@ -139,6 +139,13 @@ async fn main(_spawner: Spawner) {
     let _ = ui.show_splash_screen().await;
 
     loop {
-        let _ = ui.test().await;
+        match ui.run().await {
+            // Success: start over again
+            Ok(()) => (),
+            // Timeout or cancel: start over again
+            Err(ui::Error::Cancel | ui::Error::Timeout) => (),
+            // TODO: Handle errors
+            Err(_err) => panic!("Unhandled ERROR"),
+        }
     }
 }
