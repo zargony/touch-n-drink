@@ -26,12 +26,22 @@
 //!  1   2    3    4    5    6    7    8   9
 //!  nc Col2 Row1 Col1 Row4 Col3 Row3 Row2 nc
 //!
+//! Pinout PN532 NFC Module
+//!
+//!             SCK MISO MOSI SS VCC GND IRQ RSTO
+//!              1   2    3   4   5   6   7   8
+//! GND - 1 |
+//! VCC - 2 |
+//! SDA - 3 |
+//! SCL - 4 |
+//!
 
 #![no_std]
 #![no_main]
 
 mod display;
 mod keypad;
+mod nfc;
 mod screen;
 mod ui;
 mod wifi;
@@ -144,6 +154,14 @@ async fn main(_spawner: Spawner) {
         ],
     );
 
+    // Initialize NFC reader
+    let nfc_irq = AnyInput::new(io.pins.gpio20, Pull::Up);
+    let nfc = match nfc::Nfc::new(RefCellDevice::new(&i2c), nfc_irq).await {
+        Ok(nfc) => nfc,
+        // Panic on failure since an initialization error indicates a serious error
+        Err(err) => panic!("NFC reader initialization failed: {:?}", err),
+    };
+
     // Initialize Wifi
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
     let wifi_timer = PeriodicTimer::new(timg0.timer0.into());
@@ -162,7 +180,7 @@ async fn main(_spawner: Spawner) {
     };
 
     // Create UI
-    let mut ui = ui::Ui::new(display, keypad);
+    let mut ui = ui::Ui::new(display, keypad, nfc);
     let _ = ui.show_splash_screen().await;
 
     loop {

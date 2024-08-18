@@ -52,6 +52,7 @@ esp-hal-embassy = { version = "0.2", features = ["esp32c3", "log"] }
 esp-println = { version = "0.10", features = ["esp32c3", "log"] }
 esp-wifi = { version = "0.7", features = ["esp32c3", "async", "log", "phy-enable-usb", "wifi"] }
 log = { version = "0.4", features = ["release_max_level_info"] }
+pn532 = "0.4"
 static_cell = "2.1"
 u8g2-fonts = "0.4"
 

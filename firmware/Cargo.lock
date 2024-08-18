@@ -979,6 +979,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231b230927b5e4ad203db57bbcbee2802f6bce620b1e4a9024a07d94e2907ec"
 
 [[package]]
+name = "pn532"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5dc479202885c22ce6be2d367f4dc5ea9abb49278f2d3c026d71bc6f579bc3c3"
+dependencies = [
+ "embedded-hal 0.2.7",
+ "nb 1.1.0",
+ "void",
+]
+
+[[package]]
 name = "portable-atomic"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1351,6 +1362,7 @@ dependencies = [
  "esp-wifi",
  "git2",
  "log",
+ "pn532",
  "ssd1306",
  "static_cell",
  "u8g2-fonts",
