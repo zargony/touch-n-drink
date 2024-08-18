@@ -73,7 +73,6 @@ where
     /// Create matrix keypad from given input columns and output rows
     pub fn new(cols: [IN; COLS], rows: [OUT; ROWS]) -> Self {
         info!("Keypad: {ROWS}x{COLS} matrix initialized");
-
         Self { cols, rows }
     }
 

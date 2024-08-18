@@ -24,6 +24,8 @@ pub struct Display<I2C> {
 impl<I2C: I2c> Display<I2C> {
     /// Create display driver and initialize display hardware
     pub fn new(i2c: I2C, addr: u8) -> Result<Self, Error> {
+        debug!("Display: Initializing SSD1306...");
+
         // Build SSD1306 driver and switch to buffered graphics mode
         let mut driver = Ssd1306::new(
             I2CInterface::new(i2c, addr, 0x40),
@@ -38,7 +40,6 @@ impl<I2C: I2c> Display<I2C> {
         driver.flush()?;
 
         info!("Display: SSD1306 initialized");
-
         Ok(Display { driver })
     }
 

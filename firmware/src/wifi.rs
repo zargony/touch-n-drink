@@ -28,6 +28,8 @@ impl<'d> Wifi<'d> {
         clocks: &Clocks<'d>,
         wifi: peripherals::WIFI,
     ) -> Result<Self, InitializationError> {
+        debug!("Wifi: Initializing controller...");
+
         let init = esp_wifi::initialize(EspWifiInitFor::Wifi, timer, rng, radio_clocks, clocks)?;
 
         let (device, mut controller) = wifi::new_with_mode(&init, wifi, WifiStaDevice)?;
