@@ -39,7 +39,7 @@ mod wifi;
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::clock::ClockControl;
-use esp_hal::gpio::{AnyInput, AnyOutput, Io, Level, Pull};
+use esp_hal::gpio::{AnyInput, AnyOutput, AnyOutputOpenDrain, Io, Level, Pull};
 use esp_hal::i2c::I2C;
 use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
@@ -110,10 +110,10 @@ async fn main(_spawner: Spawner) {
             AnyInput::new(io.pins.gpio7, Pull::Up),
         ],
         [
-            AnyOutput::new(io.pins.gpio0, Level::High),
-            AnyOutput::new(io.pins.gpio1, Level::High),
-            AnyOutput::new(io.pins.gpio2, Level::High),
-            AnyOutput::new(io.pins.gpio3, Level::High),
+            AnyOutputOpenDrain::new(io.pins.gpio0, Level::High, Pull::None),
+            AnyOutputOpenDrain::new(io.pins.gpio1, Level::High, Pull::None),
+            AnyOutputOpenDrain::new(io.pins.gpio2, Level::High, Pull::None),
+            AnyOutputOpenDrain::new(io.pins.gpio3, Level::High, Pull::None),
         ],
     );
 
