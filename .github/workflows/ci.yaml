@@ -3,11 +3,11 @@ on:
   push:
     paths:
       - .github/workflows/ci.yaml
-      - 'firmware/**'
+      - "firmware/**"
   pull_request:
     paths:
       - .github/workflows/ci.yaml
-      - 'firmware/**'
+      - "firmware/**"
 
 env:
   CARGO_TERM_COLOR: always
@@ -91,9 +91,11 @@ jobs:
           name: touch-n-drink-elf
       - name: Generate ESP32 image
         run: espflash save-image --chip esp32c3 --merge --skip-padding touch-n-drink touch-n-drink-esp32c3.bin
+      - name: Generate SHA-256 checksum
+        run: shasum -a 256 touch-n-drink-esp32c3.bin >touch-n-drink-esp32c3.sha256
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
           name: touch-n-drink-esp32c3
-          path: touch-n-drink-esp32c3.bin
+          path: touch-n-drink-esp32c3*
           if-no-files-found: error
