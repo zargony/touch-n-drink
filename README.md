@@ -1,8 +1,8 @@
-# LSC Touch 'n Drink
+# Touch 'n Drink
 
-Touch 'n Drink is a small device that reads NFC id cards of club members of the [Aeroclub Hamm] and allows to pay for items like cold drinks offered at the clubhouse. Purchases are forwarded to accounting so members pay via their regular monthly invoices. We're located at airfield [EDLH] in Hamm, Germany.
+Touch 'n Drink is a small device that reads NFC id cards of club members of the [Aeroclub (LSC) Hamm][LSC Hamm] and allows to pay for items like cold drinks offered at the clubhouse. Purchases are forwarded to accounting so members pay via their regular monthly invoices. We're located at airfield [EDLH] in Hamm, Germany.
 
-<img alt="Rendered CAD model" src="images/hardware-model.png" style="width: 20em;" />
+<img alt="Assembled device" src="images/hardware-assembled.jpeg" style="width: 20em;" />
 
 ## Hardware
 
@@ -22,6 +22,6 @@ If you like this project, want to use it at your club, or if you want to discuss
 [discussions]: https://github.com/zargony/touch-n-drink/discussions
 [issues]: https://github.com/zargony/touch-n-drink/issues
 
-[Aeroclub Hamm]: https://flugplatz-hamm.de
+[LSC Hamm]: https://flugplatz-hamm.de
 [EDLH]: https://skyvector.com/airport/EDLH/Hamm-Lippewiesen-Airport
 [Rust]: https://rust-lang.org

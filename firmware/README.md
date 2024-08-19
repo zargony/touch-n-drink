@@ -1,4 +1,4 @@
-# LSC Touch 'n Drink Firmware
+# Touch 'n Drink Firmware
 
 Firmware images are automatically build by GitHub actions. They can be downloaded as artifacts of recent [CI][actions] runs <!-- eventually: on the [releases] page --> and flashed [from your browser][esptool-js]. The setup described below is only needed for local development.
 

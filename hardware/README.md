@@ -1,4 +1,8 @@
-# LSC Touch 'n Drink Hardware
+# Touch 'n Drink Hardware
+
+Assembled device:
+
+<img alt="Assembled device" src="../images/hardware-assembled.jpeg" style="width: 20em;" />
 
 ## Electronics
 
