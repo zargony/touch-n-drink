@@ -44,7 +44,7 @@ impl<'d> Wifi<'d> {
         info!("Wifi: Controller initialized");
         debug!("Wifi state: {:?}", wifi::get_wifi_state());
 
-        Ok(Wifi {
+        Ok(Self {
             _init: init,
             _device: device,
             _controller: controller,

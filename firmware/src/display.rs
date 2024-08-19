@@ -40,7 +40,7 @@ impl<I2C: I2c> Display<I2C> {
         driver.flush()?;
 
         info!("Display: SSD1306 initialized");
-        Ok(Display { driver })
+        Ok(Self { driver })
     }
 
     /// Turn display off
