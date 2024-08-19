@@ -1,16 +1,16 @@
-//! LSC Touch 'n Drink Firmware
+//! Touch 'n Drink Firmware
 //!
 //! Pinout ESP32-C3 Super Mini board
 //!
-//!                 | USB |
-//! A5/MISO/GPIO5 -  5 | 5V - 5V
-//!    MOSI/GPIO6 -  6 | G  - GND
-//!      SS/GPIO7 -  7 | 33 - 3V3
-//!     SDA/GPIO8 -  8 | 4  - GPIO4/A4/SCK
-//!     SCL/GPIO9 -  9 | 3  - GPIO3/A3
-//!        GPIO10 - 10 | 2  - GPIO2/A2
-//!     RX/GPIO20 - 20 | 1  - GPIO1/A1
-//!     TX/GPIO21 - 21 | 0  - GPIO0/A0
+//!                               | USB |
+//! (Keypad Col1) A5/MISO/GPIO5 -  5 | 5V - 5V
+//! (Keypad Col1)    MOSI/GPIO6 -  6 | G  - GND
+//! (Keypad Col1)      SS/GPIO7 -  7 | 33 - 3V3
+//!   (Board LED)     SDA/GPIO8 -  8 | 4  - GPIO4/A4/SCK (Buzzer)
+//!     (I2C SDA)     SCL/GPIO9 -  9 | 3  - GPIO3/A3     (Keypad Row4)
+//!     (I2C SCL)        GPIO10 - 10 | 2  - GPIO2/A2     (Keypad Row3)
+//!     (NFC IRQ)     RX/GPIO20 - 20 | 1  - GPIO1/A1     (Keypad Row2)
+//!                   TX/GPIO21 - 21 | 0  - GPIO0/A0     (Keypad Row1)
 //!
 //! Pinout OLED 2.42" Display
 //!
