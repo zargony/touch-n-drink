@@ -36,7 +36,9 @@ mod screen;
 mod ui;
 mod wifi;
 
+use core::cell::RefCell;
 use embassy_executor::Spawner;
+use embedded_hal_bus::i2c::RefCellDevice;
 use esp_backtrace as _;
 use esp_hal::clock::ClockControl;
 use esp_hal::gpio::{AnyInput, AnyOutput, AnyOutputOpenDrain, Io, Level, Pull};
@@ -86,17 +88,17 @@ async fn main(_spawner: Spawner) {
     info!("Touch 'n Drink {VERSION_STR} ({GIT_SHA_STR})");
 
     // Initialize I2C controller
-    let i2c = I2C::new(
+    let i2c = RefCell::new(I2C::new(
         peripherals.I2C0,
         io.pins.gpio9,
         io.pins.gpio10,
-        100.kHz(),
+        100.kHz(), // Standard-Mode: 100 kHz, Fast-Mode: 400 kHz
         &clocks,
         None,
-    );
+    ));
 
     // Initialize display
-    let display = match display::Display::new(i2c, 0x3c) {
+    let display = match display::Display::new(RefCellDevice::new(&i2c), 0x3c) {
         Ok(disp) => disp,
         // Panic on failure since without a display there's no reasonable way to tell the user
         Err(err) => panic!("Display initialization failed: {:?}", err),
