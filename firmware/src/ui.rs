@@ -67,14 +67,14 @@ impl<'a, I2C: I2c> Ui<'a, I2C> {
 
     /// Show splash screen and wait for keypress or timeout
     pub async fn show_splash_screen(&mut self) -> Result<(), Error> {
-        self.display.screen(screen::Splash)?;
+        self.display.screen(&screen::Splash)?;
         let _key = with_timeout(SPLASH_TIMEOUT, self.keypad.read()).await?;
         Ok(())
     }
 
     /// Wait for id card and verify identification
     pub async fn read_id_card(&mut self) -> Result<Key, Error> {
-        self.display.screen(screen::ScanId)?;
+        self.display.screen(&screen::ScanId)?;
         let mut saving_power = false;
         loop {
             // TODO: Poll card reader here
@@ -95,7 +95,7 @@ impl<'a, I2C: I2c> Ui<'a, I2C> {
 
     /// Ask for number of drinks
     pub async fn get_number_of_drinks(&mut self) -> Result<usize, Error> {
-        self.display.screen(screen::NumberOfDrinks)?;
+        self.display.screen(&screen::NumberOfDrinks)?;
         loop {
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await? {
                 // Any digit 1..=9 selects number of drinks
@@ -113,7 +113,7 @@ impl<'a, I2C: I2c> Ui<'a, I2C> {
     /// Confirm purchase
     pub async fn checkout(&mut self, num_drinks: usize, total_price: f32) -> Result<(), Error> {
         self.display
-            .screen(screen::Checkout::new(num_drinks, total_price))?;
+            .screen(&screen::Checkout::new(num_drinks, total_price))?;
         loop {
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await? {
                 // Enter key confirms purchase
@@ -136,7 +136,7 @@ impl<'a, I2C: I2c> Ui<'a, I2C> {
         // TODO: Process payment
         let _ = screen::Success::new(num_drinks);
         self.display
-            .screen(screen::Failure::new("Not implemented yet"))?;
+            .screen(&screen::Failure::new("Not implemented yet"))?;
         let _key = self.keypad.read().await;
         Ok(())
     }

@@ -60,7 +60,7 @@ impl<I2C: I2c> Display<I2C> {
     }
 
     /// Show screen
-    pub fn screen<S: Screen>(&mut self, screen: S) -> Result<(), Error> {
+    pub fn screen<S: Screen>(&mut self, screen: &S) -> Result<(), Error> {
         self.driver.clear(BinaryColor::Off)?;
         screen.draw(&mut self.driver)?;
         self.driver.flush()?;
