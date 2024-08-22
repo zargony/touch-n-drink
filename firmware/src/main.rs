@@ -69,7 +69,7 @@ static GIT_SHA_STR: &str = env!("GIT_SHORT_SHA");
 async fn main(_spawner: Spawner) {
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::max(system.clock_control).freeze();
+    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
 
     let rng = Rng::new(peripherals.RNG);
