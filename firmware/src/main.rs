@@ -46,10 +46,12 @@ use esp_hal::i2c::I2C;
 use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
 use esp_hal::rng::Rng;
+use esp_hal::rtc_cntl::Rtc;
 use esp_hal::system::SystemControl;
 use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::timer::timg::TimerGroup;
 use esp_hal::timer::{ErasedTimer, OneShotTimer, PeriodicTimer};
+use esp_println::println;
 use log::info;
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
@@ -64,6 +66,28 @@ macro_rules! mk_static {
 
 static VERSION_STR: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 static GIT_SHA_STR: &str = env!("GIT_SHORT_SHA");
+
+/// Custom halt function for esp-backtrace. Called after panic was handled and should halt
+/// or restart the system.
+#[export_name = "custom_halt"]
+unsafe fn halt() -> ! {
+    // System may be in any state at this time, thus everything is unsafe here. Stealing the
+    // peripherals handle allows us to try to notify the user about this abnormal state and
+    // restart the system. Any error should be ignored.
+    let peripherals = Peripherals::steal();
+
+    // TODO: Steal display driver and show a panic message to the user
+
+    // Restart automatically after a delay
+    println!("Restarting in 10 seconds...");
+    let mut rtc = Rtc::new(peripherals.LPWR, None);
+    rtc.rwdt.set_timeout(10_000.millis());
+    rtc.rwdt.unlisten();
+    rtc.rwdt.enable();
+    loop {
+        esp_hal::riscv::asm::wfi();
+    }
+}
 
 #[main]
 async fn main(_spawner: Spawner) {

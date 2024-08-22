@@ -46,7 +46,7 @@ embedded-graphics = "0.8"
 embedded-hal = "1.0"
 embedded-hal-async = "1.0"
 embedded-hal-bus = { version = "0.2", features = ["async"] }
-esp-backtrace = { version = "0.13", features = ["esp32c3", "panic-handler", "exception-handler", "println"] }
+esp-backtrace = { version = "0.13", features = ["esp32c3", "custom-halt", "panic-handler", "exception-handler", "println"] }
 esp-hal = { version = "0.19", features = ["esp32c3", "async", "log"] }
 esp-hal-embassy = { version = "0.2", features = ["esp32c3", "log"] }
 esp-println = { version = "0.10", features = ["esp32c3", "log"] }
