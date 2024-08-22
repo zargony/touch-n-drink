@@ -98,7 +98,8 @@ async fn main(_spawner: Spawner) {
     ));
 
     // Initialize display
-    let display = match display::Display::new(RefCellDevice::new(&i2c), 0x3c) {
+    let display_i2c = RefCellDevice::new(&i2c);
+    let display = match display::Display::new(display_i2c, 0x3c) {
         Ok(disp) => disp,
         // Panic on failure since without a display there's no reasonable way to tell the user
         Err(err) => panic!("Display initialization failed: {:?}", err),
