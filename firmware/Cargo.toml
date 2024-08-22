@@ -39,7 +39,7 @@ git2 = "0.19"
 
 [dependencies]
 display-interface = "0.5"
-embassy-executor = { version = "0.5", features = ["log"] }
+embassy-executor = "0.5"
 embassy-futures = "0.1"
 embassy-time = { version = "0.3", features = ["generic-queue"] }
 embedded-graphics = "0.8"
@@ -47,10 +47,10 @@ embedded-hal = "1.0"
 embedded-hal-async = "1.0"
 embedded-hal-bus = { version = "0.2", features = ["async"] }
 esp-backtrace = { version = "0.13", features = ["esp32c3", "custom-halt", "panic-handler", "exception-handler", "println"] }
-esp-hal = { version = "0.19", features = ["esp32c3", "async", "log"] }
-esp-hal-embassy = { version = "0.2", features = ["esp32c3", "log"] }
+esp-hal = { version = "0.19", features = ["esp32c3", "async"] }
+esp-hal-embassy = { version = "0.2", features = ["esp32c3"] }
 esp-println = { version = "0.10", features = ["esp32c3", "log"] }
-esp-wifi = { version = "0.7", features = ["esp32c3", "async", "log", "phy-enable-usb", "wifi"] }
+esp-wifi = { version = "0.7", default-features = false, features = ["esp32c3", "async", "phy-enable-usb", "wifi"] }
 log = { version = "0.4", features = ["release_max_level_info"] }
 pn532 = "0.4"
 static_cell = "2.1"

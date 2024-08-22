@@ -211,7 +211,6 @@ dependencies = [
  "critical-section",
  "document-features",
  "embassy-executor-macros",
- "log",
 ]
 
 [[package]]
@@ -503,7 +502,6 @@ dependencies = [
  "esp-riscv-rt",
  "esp32c3",
  "fugit",
- "log",
  "nb 1.1.0",
  "paste",
  "portable-atomic",
@@ -529,7 +527,6 @@ dependencies = [
  "esp-build",
  "esp-hal",
  "esp-metadata",
- "log",
  "portable-atomic",
 ]
 
@@ -607,7 +604,6 @@ dependencies = [
  "heapless",
  "libm",
  "linked_list_allocator",
- "log",
  "no-std-net",
  "num-derive",
  "num-traits",
