@@ -39,6 +39,7 @@
 #![no_std]
 #![no_main]
 
+mod buzzer;
 mod display;
 mod keypad;
 mod nfc;
@@ -51,6 +52,7 @@ use embassy_executor::Spawner;
 use embedded_hal_bus::i2c::RefCellDevice;
 use esp_backtrace as _;
 use esp_hal::clock::ClockControl;
+use esp_hal::gpio::any_pin::AnyPin;
 use esp_hal::gpio::{AnyInput, AnyOutput, AnyOutputOpenDrain, Io, Level, Pull};
 use esp_hal::i2c::I2C;
 use esp_hal::peripherals::Peripherals;
@@ -179,8 +181,15 @@ async fn main(_spawner: Spawner) {
         Err(err) => panic!("Wifi initialization failed: {:?}", err),
     };
 
+    // Initialize buzzer
+    let buzzer_pin = AnyPin::new(io.pins.gpio4);
+    let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, &clocks, buzzer_pin);
+    let _ = buzzer.startup().await;
+
     // Create UI
-    let mut ui = ui::Ui::new(display, keypad, nfc);
+    let mut ui = ui::Ui::new(display, keypad, nfc, buzzer);
+
+    // Show splash screen for a while, ignore any error
     let _ = ui.show_splash_screen().await;
 
     loop {

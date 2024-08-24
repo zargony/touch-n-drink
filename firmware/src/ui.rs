@@ -1,3 +1,4 @@
+use crate::buzzer::Buzzer;
 use crate::display::{self, Display};
 use crate::keypad::{Key, Keypad};
 use crate::nfc::{self, Nfc, Uid};
@@ -63,15 +64,22 @@ pub struct Ui<'a, I2C, IRQ> {
     display: Display<I2C>,
     keypad: Keypad<'a, 3, 4>,
     nfc: Nfc<I2C, IRQ>,
+    buzzer: Buzzer<'a>,
 }
 
 impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     /// Create user interface with given human interface devices
-    pub fn new(display: Display<I2C>, keypad: Keypad<'a, 3, 4>, nfc: Nfc<I2C, IRQ>) -> Self {
+    pub fn new(
+        display: Display<I2C>,
+        keypad: Keypad<'a, 3, 4>,
+        nfc: Nfc<I2C, IRQ>,
+        buzzer: Buzzer<'a>,
+    ) -> Self {
         Self {
             display,
             keypad,
             nfc,
+            buzzer,
         }
     }
 
@@ -105,6 +113,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
                 Err(TimeoutError) => continue,
             };
             info!("UI: Detected NFC UID: {}", uid);
+            let _ = self.buzzer.short_confirmation().await;
             // TODO: Verify identification and return user information
             return Ok(uid);
         }
@@ -154,6 +163,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         let _ = screen::Success::new(num_drinks);
         self.display
             .screen(&screen::Failure::new("Not implemented yet"))?;
+        let _ = self.buzzer.error().await;
         let _key = self.keypad.read().await;
         Ok(())
     }
