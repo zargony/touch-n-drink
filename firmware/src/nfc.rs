@@ -31,6 +31,7 @@ const PN532_TO_HOST: u8 = 0xD5;
 
 /// NFC reader error
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// PN532 error (with static interface error type)
     #[allow(dead_code)]
