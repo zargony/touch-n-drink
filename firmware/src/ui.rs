@@ -86,6 +86,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     /// Save power by turning off devices not needed during idle
     pub fn power_save(&mut self) -> Result<(), Error> {
         info!("UI: Power saving...");
+
         self.display.turn_off()?;
         Ok(())
     }
@@ -99,6 +100,8 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
 
     /// Wait for id card and verify identification
     pub async fn read_id_card(&mut self) -> Result<Uid, Error> {
+        info!("UI: Waiting for NFC card...");
+
         self.display.screen(&screen::ScanId)?;
         let mut saving_power = false;
         loop {
@@ -112,7 +115,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
                 }
                 Err(TimeoutError) => continue,
             };
-            info!("UI: Detected NFC UID: {}", uid);
+            info!("UI: Detected NFC card: {}", uid);
             let _ = self.buzzer.short_confirmation().await;
             // TODO: Verify identification and return user information
             return Ok(uid);
@@ -121,6 +124,8 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
 
     /// Ask for number of drinks
     pub async fn get_number_of_drinks(&mut self) -> Result<usize, Error> {
+        info!("UI: Asking for number of drinks...");
+
         self.display.screen(&screen::NumberOfDrinks)?;
         loop {
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await? {
@@ -138,6 +143,11 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
 
     /// Confirm purchase
     pub async fn checkout(&mut self, num_drinks: usize, total_price: f32) -> Result<(), Error> {
+        info!(
+            "UI: Asking for checkout of {} drinks, {:.02} EUR...",
+            num_drinks, total_price
+        );
+
         self.display
             .screen(&screen::Checkout::new(num_drinks, total_price))?;
         loop {

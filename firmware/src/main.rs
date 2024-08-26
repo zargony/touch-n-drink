@@ -197,10 +197,12 @@ async fn main(_spawner: Spawner) {
         match ui.run().await {
             // Success: start over again
             Ok(()) => (),
-            // Timeout or cancel: start over again
-            Err(ui::Error::Cancel | ui::Error::Timeout) => (),
-            // TODO: Handle errors
-            Err(_err) => panic!("Unhandled ERROR"),
+            // Cancel: start over again
+            Err(ui::Error::Cancel) => info!("User cancelled, starting over..."),
+            // Timeout: start over again
+            Err(ui::Error::Timeout) => info!("Timeout waiting for user, starting over..."),
+            // TODO: Display error to user and start over again
+            Err(err) => panic!("Unhandled Error: {:?}", err),
         }
     }
 }
