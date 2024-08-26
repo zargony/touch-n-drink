@@ -21,7 +21,7 @@ const COMMAND_TIMEOUT: Duration = Duration::from_millis(50);
 const READ_TIMEOUT: Duration = Duration::from_millis(100);
 
 /// NFC reader read loop sleep
-const READ_SLEEP: Duration = Duration::from_millis(900);
+const READ_SLEEP: Duration = Duration::from_millis(400);
 
 const PREAMBLE: [u8; 3] = [0x00, 0x00, 0xFF];
 const POSTAMBLE: u8 = 0x00;
