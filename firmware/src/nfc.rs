@@ -1,8 +1,8 @@
 use core::convert::Infallible;
 use core::fmt::{self, Debug};
 use embassy_time::{with_timeout, Duration, Timer};
-use embedded_hal::i2c::I2c;
 use embedded_hal_async::digital::Wait;
+use embedded_hal_async::i2c::I2c;
 use log::{debug, info, warn};
 use pn532::i2c::{I2C_ADDRESS, PN532_I2C_READY};
 use pn532::requests::{BorrowedRequest, Command, SAMMode};
@@ -35,10 +35,10 @@ const PN532_TO_HOST: u8 = 0xD5;
 pub enum Error {
     /// PN532 error (with static interface error type)
     #[allow(dead_code)]
-    Pn532(Pn532Error<embedded_hal::i2c::ErrorKind>),
+    Pn532(Pn532Error<embedded_hal_async::i2c::ErrorKind>),
 }
 
-impl<E: embedded_hal::i2c::Error> From<Pn532Error<E>> for Error {
+impl<E: embedded_hal_async::i2c::Error> From<Pn532Error<E>> for Error {
     fn from(err: Pn532Error<E>) -> Self {
         // Convert generic Pn532Error::InterfaceError(E: embedded_hal::i2c::Error) to non-generic
         // Pn532Error::InterfaceError(embedded_hal::i2c::ErrorKind) to avoid generics in this type
@@ -85,7 +85,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Interface for I2CInterfaceWithIrq<
     type Error = I2C::Error;
 
     async fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
-        self.i2c.write(I2C_ADDRESS, frame)
+        self.i2c.write(I2C_ADDRESS, frame).await
     }
 
     async fn wait_ready(&mut self) -> Result<(), Self::Error> {
@@ -103,7 +103,9 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Interface for I2CInterfaceWithIrq<
         // self.i2c.transaction(I2C_ADDRESS, &mut [Operation::Read(&mut buf), Operation::Read(frame)])?;
         let mut buf = [0; BUFFER_SIZE + 1];
         // TODO: I2C communication should be asynchronous as well
-        self.i2c.read(I2C_ADDRESS, &mut buf[..frame.len() + 1])?;
+        self.i2c
+            .read(I2C_ADDRESS, &mut buf[..frame.len() + 1])
+            .await?;
         debug_assert_eq!(buf[0], PN532_I2C_READY, "PN532 read while not ready");
         frame.copy_from_slice(&buf[1..frame.len() + 1]);
         Ok(())

@@ -5,8 +5,8 @@ use crate::nfc::{self, Nfc, Uid};
 use crate::screen;
 use core::convert::Infallible;
 use embassy_time::{with_timeout, Duration, TimeoutError};
-use embedded_hal::i2c::I2c;
 use embedded_hal_async::digital::Wait;
+use embedded_hal_async::i2c::I2c;
 use log::info;
 
 /// How long to display the splash screen if no key is pressed
@@ -84,16 +84,16 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     }
 
     /// Save power by turning off devices not needed during idle
-    pub fn power_save(&mut self) -> Result<(), Error> {
+    pub async fn power_save(&mut self) -> Result<(), Error> {
         info!("UI: Power saving...");
 
-        self.display.turn_off()?;
+        self.display.turn_off().await?;
         Ok(())
     }
 
     /// Show splash screen and wait for keypress or timeout
     pub async fn show_splash_screen(&mut self) -> Result<(), Error> {
-        self.display.screen(&screen::Splash)?;
+        self.display.screen(&screen::Splash).await?;
         let _key = with_timeout(SPLASH_TIMEOUT, self.keypad.read()).await?;
         Ok(())
     }
@@ -102,14 +102,14 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     pub async fn read_id_card(&mut self) -> Result<Uid, Error> {
         info!("UI: Waiting for NFC card...");
 
-        self.display.screen(&screen::ScanId)?;
+        self.display.screen(&screen::ScanId).await?;
         let mut saving_power = false;
         loop {
             let uid = match with_timeout(IDLE_TIMEOUT, self.nfc.read()).await {
                 Ok(res) => res?,
                 // On idle timeout, enter power saving
                 Err(TimeoutError) if !saving_power => {
-                    self.power_save()?;
+                    self.power_save().await?;
                     saving_power = true;
                     continue;
                 }
@@ -126,7 +126,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     pub async fn get_number_of_drinks(&mut self) -> Result<usize, Error> {
         info!("UI: Asking for number of drinks...");
 
-        self.display.screen(&screen::NumberOfDrinks)?;
+        self.display.screen(&screen::NumberOfDrinks).await?;
         loop {
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await? {
                 // Any digit 1..=9 selects number of drinks
@@ -149,7 +149,8 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         );
 
         self.display
-            .screen(&screen::Checkout::new(num_drinks, total_price))?;
+            .screen(&screen::Checkout::new(num_drinks, total_price))
+            .await?;
         loop {
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await? {
                 // Enter key confirms purchase
@@ -172,7 +173,8 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         // TODO: Process payment
         let _ = screen::Success::new(num_drinks);
         self.display
-            .screen(&screen::Failure::new("Not implemented yet"))?;
+            .screen(&screen::Failure::new("Not implemented yet"))
+            .await?;
         let _ = self.buzzer.error().await;
         let _key = self.keypad.read().await;
         Ok(())

@@ -47,9 +47,9 @@ mod screen;
 mod ui;
 mod wifi;
 
-use core::cell::RefCell;
+use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
-use embedded_hal_bus::i2c::RefCellDevice;
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use esp_backtrace as _;
 use esp_hal::clock::ClockControl;
 use esp_hal::gpio::any_pin::AnyPin;
@@ -124,23 +124,24 @@ async fn main(_spawner: Spawner) {
     info!("Touch 'n Drink {VERSION_STR} ({GIT_SHA_STR})");
 
     // Initialize I2C controller
-    let i2c = RefCell::new(I2C::new(
+    let i2c = I2C::new_async(
         peripherals.I2C0,
         io.pins.gpio9,
         io.pins.gpio10,
         100.kHz(), // Standard-Mode: 100 kHz, Fast-Mode: 400 kHz
         &clocks,
-        None,
-    ));
+    );
+    // Share I2C bus. Since the mcu is single-core and I2C is not used in interrupts, I2C access
+    // cannot be preempted and we can safely use a NoopMutex for shared access.
+    let i2c: Mutex<NoopRawMutex, _> = Mutex::new(i2c);
 
     // Initialize display
-    let display_i2c = RefCellDevice::new(&i2c);
-    let mut display = match display::Display::new(display_i2c, 0x3c) {
+    let mut display = match display::Display::new(I2cDevice::new(&i2c)).await {
         Ok(disp) => disp,
         // Panic on failure since without a display there's no reasonable way to tell the user
         Err(err) => panic!("Display initialization failed: {:?}", err),
     };
-    let _ = display.screen(&screen::Splash);
+    let _ = display.screen(&screen::Splash).await;
 
     // Initialize keypad
     let keypad = keypad::Keypad::new(
@@ -159,7 +160,7 @@ async fn main(_spawner: Spawner) {
 
     // Initialize NFC reader
     let nfc_irq = AnyInput::new(io.pins.gpio20, Pull::Up);
-    let nfc = match nfc::Nfc::new(RefCellDevice::new(&i2c), nfc_irq).await {
+    let nfc = match nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq).await {
         Ok(nfc) => nfc,
         // Panic on failure since an initialization error indicates a serious error
         Err(err) => panic!("NFC reader initialization failed: {:?}", err),
