@@ -4,12 +4,13 @@ use crate::keypad::{Key, Keypad};
 use crate::nfc::{self, Nfc, Uid};
 use crate::screen;
 use core::convert::Infallible;
+use embassy_futures::select::{select, Either};
 use embassy_time::{with_timeout, Duration, TimeoutError};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
 use log::info;
 
-/// How long to display the splash screen if no key is pressed
+/// How long to show the splash screen if no key is pressed
 const SPLASH_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Timeout for user input. Actions are cancelled if the user does nothing for this duration.
@@ -102,11 +103,23 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     pub async fn read_id_card(&mut self) -> Result<Uid, Error> {
         info!("UI: Waiting for NFC card...");
 
-        self.display.screen(&screen::ScanId).await?;
         let mut saving_power = false;
         loop {
-            let uid = match with_timeout(IDLE_TIMEOUT, self.nfc.read()).await {
-                Ok(res) => res?,
+            // Show scan prompt unless power saving is active
+            if !saving_power {
+                self.display.screen(&screen::ScanId).await?;
+            }
+            // Wait for id card read, keypress or timeout
+            let uid = match with_timeout(IDLE_TIMEOUT, select(self.nfc.read(), self.keypad.read()))
+                .await
+            {
+                // Id card read
+                Ok(Either::First(res)) => res?,
+                // Key pressed, leave power saving
+                Ok(Either::Second(_key)) => {
+                    saving_power = false;
+                    continue;
+                }
                 // On idle timeout, enter power saving
                 Err(TimeoutError) if !saving_power => {
                     self.power_save().await?;
