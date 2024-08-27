@@ -115,18 +115,19 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
             {
                 // Id card read
                 Ok(Either::First(res)) => res?,
-                // Key pressed, leave power saving
-                Ok(Either::Second(_key)) => {
+                // Key pressed while saving power, leave power saving
+                Ok(Either::Second(_key)) if saving_power => {
                     saving_power = false;
                     continue;
                 }
-                // On idle timeout, enter power saving
+                // Idle timeout, enter power saving
                 Err(TimeoutError) if !saving_power => {
                     self.power_save().await?;
                     saving_power = true;
                     continue;
                 }
-                Err(TimeoutError) => continue,
+                // Otherwise, do nothing
+                _ => continue,
             };
             info!("UI: Detected NFC card: {}", uid);
             let _ = self.buzzer.short_confirmation().await;
