@@ -16,6 +16,12 @@ Written in [Rust]. See [firmware] folder for details.
 
 If you like this project, want to use it at your club, or if you want to discuss ideas and suggestions, feel free to start a [discussion][discussions] or open an [issue][issues]. Feel free to fork this repository and base your work upon it. If you implement changes or features that can be useful for everyone, please open a pull request.
 
+## License
+
+Hardware licensed under [CERN Open Hardware License Version 2 (Permissive)]. Software licensed under either of [Apache License 2.0] or [MIT License], at your option.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be licensed as above, without any additional terms or conditions.
+
 [hardware]: ./hardware
 [firmware]: ./firmware
 
@@ -25,3 +31,7 @@ If you like this project, want to use it at your club, or if you want to discuss
 [LSC Hamm]: https://flugplatz-hamm.de
 [EDLH]: https://skyvector.com/airport/EDLH/Hamm-Lippewiesen-Airport
 [Rust]: https://rust-lang.org
+
+[Apache License 2.0]: https://opensource.org/license/apache-2-0
+[CERN Open Hardware License Version 2 (Permissive)]: https://opensource.org/license/cern-ohl-p
+[MIT License]: https://opensource.org/license/mit

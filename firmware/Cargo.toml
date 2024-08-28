@@ -3,7 +3,9 @@ name = "touch-n-drink"
 version = "0.0.0"
 authors = ["Andreas Neuhaus <git@zargony.com>"]
 edition = "2021"
+description = "Firmware for cashless payment device for cold drinks at the aeroclub at EDLH"
 repository = "https://github.com/zargony/touch-n-drink"
+license = "MIT OR Apache-2.0"
 
 [[bin]]
 name = "touch-n-drink"
