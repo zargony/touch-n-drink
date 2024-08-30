@@ -55,10 +55,6 @@ esp-println = { version = "0.10", features = ["esp32c3", "log"] }
 esp-wifi = { version = "0.7", default-features = false, features = ["esp32c3", "async", "phy-enable-usb", "wifi"] }
 log = { version = "0.4", features = ["release_max_level_info"] }
 pn532 = "0.4"
+ssd1306 = { version = "0.9", features = ["async"] }
 static_cell = "2.1"
 u8g2-fonts = "0.4"
-
-# SSD1306 driver (>0.8.4) with embedded-hal-async 1.0 and display-interface 0.5 support
-# See https://github.com/rust-embedded-community/ssd1306/pull/213
-# and https://github.com/rust-embedded-community/ssd1306/pull/214
-ssd1306 = { git = "https://github.com/rust-embedded-community/ssd1306", rev = "35ec056c11f2889dd519e554d710a70b37ccf682", features = ["async"] }
