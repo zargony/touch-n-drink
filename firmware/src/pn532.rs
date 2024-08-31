@@ -15,6 +15,9 @@ pub const BUFFER_SIZE: usize = 32;
 /// Command ACK timeout
 const ACK_TIMEOUT: Duration = Duration::from_millis(50);
 
+/// Command response timeout
+const RESPONSE_TIMEOUT: Duration = Duration::from_millis(50);
+
 const PREAMBLE: [u8; 3] = [0x00, 0x00, 0xFF];
 const POSTAMBLE: u8 = 0x00;
 const ACK: [u8; 6] = [0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00];
@@ -163,8 +166,19 @@ impl<I: Interface, const N: usize> Pn532<I, N> {
     }
 
     /// Send PN532 request and wait for ack and response.
-    /// Like `pn532::Pn532::process`, but fully asynchronous and with timeout
+    /// Like `pn532::Pn532::process`, but fully asynchronous
     pub async fn process<'a>(
+        &mut self,
+        request: impl Into<BorrowedRequest<'a>>,
+        response_len: usize,
+    ) -> Result<&[u8], Error<I::Error>> {
+        self.process_timeout(request, response_len, RESPONSE_TIMEOUT)
+            .await
+    }
+
+    /// Send PN532 request and wait for ack and response.
+    /// Like `pn532::Pn532::process`, but fully asynchronous and with timeout
+    pub async fn process_timeout<'a>(
         &mut self,
         request: impl Into<BorrowedRequest<'a>>,
         response_len: usize,

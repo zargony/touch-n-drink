@@ -9,9 +9,6 @@ use embedded_hal_async::i2c::I2c;
 use log::{debug, info, warn};
 use pn532::{Error as Pn532Error, I2CInterfaceWithIrq, Pn532, Request, SAMMode};
 
-/// NFC reader default command timeout
-const COMMAND_TIMEOUT: Duration = Duration::from_millis(50);
-
 /// NFC reader read loop timeout
 const READ_TIMEOUT: Duration = Duration::from_millis(100);
 
@@ -66,7 +63,6 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
                 // SAMConfiguration request (PN532 §7.2.10)
                 &Request::sam_configuration(SAMMode::Normal, true),
                 0,
-                COMMAND_TIMEOUT,
             )
             .await?;
 
@@ -76,7 +72,6 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
                 // GetFirmwareVersion request (PN532 §7.2.2)
                 &Request::GET_FIRMWARE_VERSION,
                 4,
-                COMMAND_TIMEOUT,
             )
             .await?;
         // GetFirmwareVersion response (PN532 §7.2.2)
@@ -108,7 +103,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
             // Detect any ISO/IEC14443 Type A target in passive mode
             let list_response = match self
                 .driver
-                .process(
+                .process_timeout(
                     // InListPassiveTarget request (PN532 §7.3.5)
                     &Request::INLIST_ONE_ISO_A_TARGET,
                     pn532::BUFFER_SIZE - 9, // max response length
@@ -167,7 +162,6 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
                     // InRelease request (PN532 §7.3.11)
                     &Request::RELEASE_TAG_1,
                     1,
-                    COMMAND_TIMEOUT,
                 )
                 .await
             {
