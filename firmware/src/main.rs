@@ -43,6 +43,7 @@ mod buzzer;
 mod display;
 mod keypad;
 mod nfc;
+mod pn532;
 mod screen;
 mod ui;
 mod wifi;

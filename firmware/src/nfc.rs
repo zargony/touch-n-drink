@@ -1,18 +1,13 @@
+// Use custom pn532 driver instead of pn532 crate
+use crate::pn532;
+
 use core::convert::Infallible;
 use core::fmt::{self, Debug};
-use embassy_time::{with_timeout, Duration, Timer};
+use embassy_time::{Duration, Timer};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
 use log::{debug, info, warn};
-use pn532::i2c::{I2C_ADDRESS, PN532_I2C_READY};
-use pn532::requests::{BorrowedRequest, Command, SAMMode};
-use pn532::{Error as Pn532Error, Request};
-
-/// NFC reader buffer size (32 is the PN532 default)
-const BUFFER_SIZE: usize = 32;
-
-/// NFC reader ACK timeout
-const ACK_TIMEOUT: Duration = Duration::from_millis(50);
+use pn532::{Error as Pn532Error, I2CInterfaceWithIrq, Pn532, Request, SAMMode};
 
 /// NFC reader default command timeout
 const COMMAND_TIMEOUT: Duration = Duration::from_millis(50);
@@ -22,12 +17,6 @@ const READ_TIMEOUT: Duration = Duration::from_millis(100);
 
 /// NFC reader read loop sleep
 const READ_SLEEP: Duration = Duration::from_millis(400);
-
-const PREAMBLE: [u8; 3] = [0x00, 0x00, 0xFF];
-const POSTAMBLE: u8 = 0x00;
-const ACK: [u8; 6] = [0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00];
-const HOST_TO_PN532: u8 = 0xD4;
-const PN532_TO_HOST: u8 = 0xD5;
 
 /// NFC reader error
 #[derive(Debug)]
@@ -52,209 +41,6 @@ impl<E: embedded_hal_async::i2c::Error> From<Pn532Error<E>> for Error {
             Pn532Error::TimeoutResponse => Self::Pn532(Pn532Error::TimeoutResponse),
             Pn532Error::InterfaceError(e) => Self::Pn532(Pn532Error::InterfaceError(e.kind())),
         }
-    }
-}
-
-/// PN532 interface
-/// This is mostly a re-implementation of `pn532::Interface`, but with fully asynchronous handling
-// TODO: Switch to `pn532::Interface` once the pn532 crate supports embedded-hal-async 1.0
-trait Interface {
-    type Error: Debug;
-    async fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error>;
-    async fn wait_ready(&mut self) -> Result<(), Self::Error>;
-    async fn read(&mut self, buf: &mut [u8]) -> Result<(), Self::Error>;
-}
-
-/// PN532 I2C interface with ready status interrupt
-/// This is mostly a re-implementation of `pn532::i2c::I2CInterfaceWithIrq`, but with fully
-/// asynchronous handling
-// TODO: Switch to `pn532::i2c::I2CInterfaceWithIrq` once the pn532 crate supports embedded-hal-async 1.0
-#[derive(Debug)]
-struct I2CInterfaceWithIrq<I2C, IRQ> {
-    i2c: I2C,
-    irq: IRQ,
-}
-
-impl<I2C: I2c, IRQ: Wait> I2CInterfaceWithIrq<I2C, IRQ> {
-    fn new(i2c: I2C, irq: IRQ) -> Self {
-        Self { i2c, irq }
-    }
-}
-
-impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Interface for I2CInterfaceWithIrq<I2C, IRQ> {
-    type Error = I2C::Error;
-
-    async fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
-        self.i2c.write(I2C_ADDRESS, frame).await
-    }
-
-    async fn wait_ready(&mut self) -> Result<(), Self::Error> {
-        // Wait for IRQ line to become low (ready). Instead of busy waiting, we use hardware
-        // interrupt driven asynchronous waiting.
-        // Note: Always safe to unwrap because of `IRQ: Wait<Error=Infallible>` bound
-        self.irq.wait_for_low().await.unwrap();
-        Ok(())
-    }
-
-    async fn read(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
-        // FIXME: Find a way to drop the first byte (ready status) without copying
-        // It would be more efficient to use a transaction with separate read operations for status
-        // and frame, but somehow this results in AckCheckFailed errors with embedded-hal 1.0
-        // self.i2c.transaction(I2C_ADDRESS, &mut [Operation::Read(&mut buf), Operation::Read(frame)])?;
-        let mut buf = [0; BUFFER_SIZE + 1];
-        // TODO: I2C communication should be asynchronous as well
-        self.i2c
-            .read(I2C_ADDRESS, &mut buf[..frame.len() + 1])
-            .await?;
-        debug_assert_eq!(buf[0], PN532_I2C_READY, "PN532 read while not ready");
-        frame.copy_from_slice(&buf[1..frame.len() + 1]);
-        Ok(())
-    }
-}
-
-/// PN532 driver
-/// This is mostly a re-implementation of `pn532::Pn532`, but with fully asynchronous handling
-// TODO: Switch to `pn532::Pn532` once the pn532 crate supports embedded-hal-async 1.0
-#[derive(Debug)]
-struct Pn532<I> {
-    interface: I,
-    buf: [u8; BUFFER_SIZE],
-}
-
-impl<I: Interface> Pn532<I> {
-    /// Create PN532 driver
-    /// Like `pn532::Pn532::new`
-    fn new(interface: I) -> Self {
-        Self {
-            interface,
-            buf: [0; BUFFER_SIZE],
-        }
-    }
-
-    /// Send PN532 command
-    /// Like `pn532::Pn532::send`, but fully asynchronous
-    async fn send(&mut self, request: BorrowedRequest<'_>) -> Result<(), Pn532Error<I::Error>> {
-        let data_len = request.data.len();
-        let frame_len = 2 + data_len as u8;
-
-        let mut data_sum = HOST_TO_PN532.wrapping_add(request.command as u8);
-        for &byte in request.data {
-            data_sum = data_sum.wrapping_add(byte);
-        }
-
-        const fn to_checksum(sum: u8) -> u8 {
-            (!sum).wrapping_add(1)
-        }
-
-        self.buf[0] = PREAMBLE[0];
-        self.buf[1] = PREAMBLE[1];
-        self.buf[2] = PREAMBLE[2];
-        self.buf[3] = frame_len;
-        self.buf[4] = to_checksum(frame_len);
-        self.buf[5] = HOST_TO_PN532;
-        self.buf[6] = request.command as u8;
-
-        self.buf[7..7 + data_len].copy_from_slice(request.data);
-
-        self.buf[7 + data_len] = to_checksum(data_sum);
-        self.buf[8 + data_len] = POSTAMBLE;
-
-        self.interface.write(&self.buf[..9 + data_len]).await?;
-        Ok(())
-    }
-
-    /// Receive PN532 ACK
-    /// Like `pn532::Pn532::receive_ack`, but fully asynchronous
-    async fn receive_ack(&mut self) -> Result<(), Pn532Error<I::Error>> {
-        let mut ack_buf = [0; 6];
-        self.interface.read(&mut ack_buf).await?;
-        if ack_buf != ACK {
-            return Err(Pn532Error::BadAck);
-        }
-        Ok(())
-    }
-
-    /// Receive PN532 response
-    /// Like `pn532::Pn532::receive_response`, but fully asynchronous
-    async fn receive_response(
-        &mut self,
-        sent_command: Command,
-        response_len: usize,
-    ) -> Result<&[u8], Pn532Error<I::Error>> {
-        let response_buf = &mut self.buf[..response_len + 9];
-        response_buf.fill(0);
-        self.interface.read(response_buf).await?;
-        let expected_response_command = sent_command as u8 + 1;
-        Self::parse_response(response_buf, expected_response_command)
-    }
-
-    /// Send PN532 ACK frame to abort the current process
-    /// Like `pn532::Pn532::abort`, but fully asynchronous
-    async fn abort(&mut self) -> Result<(), Pn532Error<I::Error>> {
-        self.interface.write(&ACK).await?;
-        Ok(())
-    }
-
-    /// Parse PN532 response
-    /// Like `pn532::protocol::parse_response`
-    fn parse_response<E: Debug>(
-        response_buf: &[u8],
-        expected_response_command: u8,
-    ) -> Result<&[u8], Pn532Error<E>> {
-        if response_buf[0..3] != PREAMBLE {
-            return Err(Pn532Error::BadResponseFrame);
-        }
-        let frame_len = response_buf[3];
-        if (frame_len.wrapping_add(response_buf[4])) != 0 {
-            return Err(Pn532Error::CrcError);
-        }
-        if frame_len == 0 {
-            return Err(Pn532Error::BadResponseFrame);
-        }
-        if frame_len == 1 {
-            return Err(Pn532Error::Syntax);
-        }
-        match response_buf.get(5 + frame_len as usize + 1) {
-            None => return Err(Pn532Error::BufTooSmall),
-            Some(&POSTAMBLE) => (),
-            Some(_) => return Err(Pn532Error::BadResponseFrame),
-        }
-
-        if response_buf[5] != PN532_TO_HOST || response_buf[6] != expected_response_command {
-            return Err(Pn532Error::BadResponseFrame);
-        }
-        let checksum = response_buf[5..5 + frame_len as usize + 1]
-            .iter()
-            .fold(0u8, |s, &b| s.wrapping_add(b));
-        if checksum != 0 {
-            return Err(Pn532Error::CrcError);
-        }
-        Ok(&response_buf[7..5 + frame_len as usize])
-    }
-
-    /// Send PN532 request and wait for ack and response.
-    /// Like `pn532::Pn532::process`, but fully asynchronous and with timeout
-    async fn process<'a>(
-        &mut self,
-        request: impl Into<BorrowedRequest<'a>>,
-        response_len: usize,
-        timeout: Duration,
-    ) -> Result<&[u8], Pn532Error<I::Error>> {
-        let request = request.into();
-        let sent_command = request.command;
-        with_timeout(ACK_TIMEOUT, async {
-            self.send(request).await?;
-            self.interface.wait_ready().await?;
-            self.receive_ack().await
-        })
-        .await
-        .map_err(|_| Pn532Error::TimeoutAck)??;
-        with_timeout(timeout, async {
-            self.interface.wait_ready().await?;
-            self.receive_response(sent_command, response_len).await
-        })
-        .await
-        .map_err(|_| Pn532Error::TimeoutResponse)?
     }
 }
 
@@ -325,7 +111,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
                 .process(
                     // InListPassiveTarget request (PN532 §7.3.5)
                     &Request::INLIST_ONE_ISO_A_TARGET,
-                    BUFFER_SIZE - 9, // max response length
+                    pn532::BUFFER_SIZE - 9, // max response length
                     READ_TIMEOUT,
                 )
                 .await
