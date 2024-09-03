@@ -10,6 +10,18 @@ Prototype circuit on breadboard:
 
 <img alt="Breadboard Prototype" src="../images/prototype-breadboard.jpeg" style="width: 20em;" />
 
+ESP32 breakout perfboard:
+
+<img alt="Breakout perfboard" src="../images/hardware-pcb.jpeg" style="width: 20em;" />
+
+Front components and connectors:
+
+<img alt="Front components" src="../images/hardware-connectors.jpeg" style="width: 20em;" />
+
+Wiring of components:
+
+<img alt="Wiring of components" src="../images/hardware-wiring.jpeg" style="width: 20em;" />
+
 ### Components
 
 - OLED Display 2.42" I2C
