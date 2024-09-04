@@ -42,7 +42,7 @@ git2 = "0.19"
 [dependencies]
 display-interface = "0.5"
 embassy-embedded-hal = "0.2"
-embassy-executor = "0.5"
+embassy-executor = { version = "0.5", features = ["task-arena-size-6144"] }
 embassy-futures = "0.1"
 embassy-sync = "0.6"
 embassy-time = { version = "0.3", features = ["generic-queue"] }
