@@ -71,7 +71,6 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Interface for I2CInterfaceWithIrq<
         // and frame, but somehow this results in AckCheckFailed errors with embedded-hal 1.0
         // self.i2c.transaction(I2C_ADDRESS, &mut [Operation::Read(&mut buf), Operation::Read(frame)])?;
         let mut buf = [0; BUFFER_SIZE + 1];
-        // TODO: I2C communication should be asynchronous as well
         self.i2c
             .read(I2C_ADDRESS, &mut buf[..frame.len() + 1])
             .await?;
