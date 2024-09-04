@@ -53,29 +53,17 @@ use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use esp_backtrace as _;
 use esp_hal::clock::ClockControl;
-use esp_hal::gpio::any_pin::AnyPin;
-use esp_hal::gpio::{AnyInput, AnyOutput, AnyOutputOpenDrain, Io, Level, Pull};
+use esp_hal::gpio::{AnyInput, AnyOutput, AnyOutputOpenDrain, AnyPin, Io, Level, Pull};
 use esp_hal::i2c::I2C;
 use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::system::SystemControl;
-use esp_hal::timer::systimer::SystemTimer;
+use esp_hal::timer::systimer::{SystemTimer, Target};
 use esp_hal::timer::timg::TimerGroup;
-use esp_hal::timer::{ErasedTimer, OneShotTimer, PeriodicTimer};
 use esp_println::println;
 use log::info;
-
-// When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
-macro_rules! mk_static {
-    ($t:ty, $val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
-}
 
 static VERSION_STR: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 static GIT_SHA_STR: &str = env!("GIT_SHORT_SHA");
@@ -93,7 +81,7 @@ unsafe fn halt() -> ! {
 
     // Restart automatically after a delay
     println!("Restarting in 10 seconds...");
-    let mut rtc = Rtc::new(peripherals.LPWR, None);
+    let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.rwdt.set_timeout(10_000.millis());
     rtc.rwdt.unlisten();
     rtc.rwdt.enable();
@@ -108,17 +96,13 @@ async fn main(_spawner: Spawner) {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-
     let rng = Rng::new(peripherals.RNG);
     let _led = AnyOutput::new(io.pins.gpio8, Level::High);
 
     // Initialize async executor
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
-    let embassy_timer = OneShotTimer::new(systimer.alarm0.into());
-    esp_hal_embassy::init(
-        &clocks,
-        mk_static!([OneShotTimer<ErasedTimer>; 1], [embassy_timer]),
-    );
+    let systimer_alarms = systimer.split::<Target>();
+    esp_hal_embassy::init(&clocks, systimer_alarms.alarm0);
 
     // Initialize logging
     esp_println::logger::init_logger_from_env();
@@ -168,10 +152,9 @@ async fn main(_spawner: Spawner) {
     };
 
     // Initialize Wifi
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks, None);
-    let wifi_timer = PeriodicTimer::new(timg0.timer0.into());
+    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
     let _wifi = match wifi::Wifi::new(
-        wifi_timer,
+        timg0.timer0,
         rng,
         peripherals.RADIO_CLK,
         &clocks,

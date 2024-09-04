@@ -1,6 +1,6 @@
 use embassy_time::{Duration, Timer};
 use esp_hal::clock::Clocks;
-use esp_hal::gpio::any_pin::AnyPin;
+use esp_hal::gpio::AnyPin;
 use esp_hal::ledc::{channel, timer, LSGlobalClkSource, Ledc, LowSpeed};
 use esp_hal::peripheral::Peripheral;
 use esp_hal::peripherals::LEDC;

@@ -1,9 +1,8 @@
 use esp_hal::clock::Clocks;
 use esp_hal::peripherals;
 use esp_hal::rng::Rng;
-use esp_hal::timer::{ErasedTimer, PeriodicTimer};
 use esp_wifi::wifi::{self, WifiController, WifiDevice, WifiStaDevice};
-use esp_wifi::{EspWifiInitFor, EspWifiInitialization};
+use esp_wifi::{EspWifiInitFor, EspWifiInitialization, EspWifiTimerSource};
 use log::{debug, info};
 
 /// Wifi initialization error
@@ -22,7 +21,7 @@ pub struct Wifi<'d> {
 impl<'d> Wifi<'d> {
     /// Create and initialize Wifi interface
     pub async fn new(
-        timer: PeriodicTimer<ErasedTimer>,
+        timer: impl EspWifiTimerSource,
         rng: Rng,
         radio_clocks: peripherals::RADIO_CLK,
         clocks: &Clocks<'d>,
