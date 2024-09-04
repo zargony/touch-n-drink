@@ -109,12 +109,13 @@ async fn main(_spawner: Spawner) {
     info!("Touch 'n Drink {VERSION_STR} ({GIT_SHA_STR})");
 
     // Initialize I2C controller
-    let i2c = I2C::new_async(
+    let i2c = I2C::new_with_timeout_async(
         peripherals.I2C0,
         io.pins.gpio9,
         io.pins.gpio10,
-        100.kHz(), // Standard-Mode: 100 kHz, Fast-Mode: 400 kHz
+        400.kHz(), // Standard-Mode: 100 kHz, Fast-Mode: 400 kHz
         &clocks,
+        Some(20),
     );
     // Share I2C bus. Since the mcu is single-core and I2C is not used in interrupts, I2C access
     // cannot be preempted and we can safely use a NoopMutex for shared access.
