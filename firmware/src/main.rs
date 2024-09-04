@@ -4,8 +4,8 @@
 //!
 //!                               | USB |
 //! (Keypad Col1) A5/MISO/GPIO5 -  5 | 5V - 5V
-//! (Keypad Col1)    MOSI/GPIO6 -  6 | G  - GND
-//! (Keypad Col1)      SS/GPIO7 -  7 | 33 - 3V3
+//! (Keypad Col2)    MOSI/GPIO6 -  6 | G  - GND
+//! (Keypad Col3)      SS/GPIO7 -  7 | 33 - 3V3
 //!   (Board LED)     SDA/GPIO8 -  8 | 4  - GPIO4/A4/SCK (Buzzer)
 //!     (I2C SDA)     SCL/GPIO9 -  9 | 3  - GPIO3/A3     (Keypad Row4)
 //!     (I2C SCL)        GPIO10 - 10 | 2  - GPIO2/A2     (Keypad Row3)
