@@ -14,7 +14,7 @@ Written in [Rust]. See [firmware] folder for details.
 
 ## Contributions
 
-If you like this project, want to use it at your club, or if you want to discuss ideas and suggestions, feel free to start a [discussion][discussions] or open an [issue][issues]. Feel free to fork this repository and base your work upon it. If you implement changes or features that can be useful for everyone, please open a pull request.
+If you like this project, want to use it at your club, or if you want to discuss ideas and suggestions, feel free to start a [discussion][discussions] or open an [issue][issues]. Feel free to fork this repository and base your work upon it. Please open a pull request if your changes or features are useful to a broad audience.
 
 ## License
 
@@ -28,10 +28,9 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 [discussions]: https://github.com/zargony/touch-n-drink/discussions
 [issues]: https://github.com/zargony/touch-n-drink/issues
 
-[LSC Hamm]: https://flugplatz-hamm.de
-[EDLH]: https://skyvector.com/airport/EDLH/Hamm-Lippewiesen-Airport
-[Rust]: https://rust-lang.org
-
 [Apache License 2.0]: https://opensource.org/license/apache-2-0
 [CERN Open Hardware License Version 2 (Permissive)]: https://opensource.org/license/cern-ohl-p
+[EDLH]: https://skyvector.com/airport/EDLH/Hamm-Lippewiesen-Airport
+[LSC Hamm]: https://flugplatz-hamm.de
 [MIT License]: https://opensource.org/license/mit
+[Rust]: https://www.rust-lang.org
