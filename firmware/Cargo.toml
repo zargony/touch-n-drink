@@ -37,7 +37,7 @@ opt-level = "s"
 overflow-checks = false
 
 [build-dependencies]
-git2 = "0.19"
+git2 = { version = "0.19", default-features = false }
 
 [dependencies]
 display-interface = "0.5"
