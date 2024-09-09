@@ -3,7 +3,9 @@ use embassy_time::{Duration, Timer};
 use esp_hal::clock::Clocks;
 use esp_hal::peripherals;
 use esp_hal::rng::Rng;
-use esp_wifi::wifi::{self, WifiController, WifiDevice, WifiEvent, WifiStaDevice, WifiState};
+use esp_wifi::wifi::{
+    self, ClientConfiguration, WifiController, WifiDevice, WifiEvent, WifiStaDevice, WifiState,
+};
 use esp_wifi::{EspWifiInitFor, EspWifiInitialization, EspWifiTimerSource};
 use log::{debug, info, warn};
 
@@ -36,7 +38,9 @@ impl<'d> Wifi<'d> {
 
         debug!("Wifi: Static configuration: {:?}", esp_wifi::CONFIG);
         let init = esp_wifi::initialize(EspWifiInitFor::Wifi, timer, rng, radio_clocks, clocks)?;
-        let client_config = Default::default();
+        let client_config = ClientConfiguration {
+            ..Default::default()
+        };
         let (device, mut controller) = wifi::new_with_config(&init, wifi, client_config)?;
 
         debug!("Wifi: Starting controller...");

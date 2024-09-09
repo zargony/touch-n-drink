@@ -1,3 +1,11 @@
+// Mute pedantic clippy warnings caused by original code copied from pn532 crate
+#![allow(
+    clippy::cast_possible_truncation,
+    clippy::if_not_else,
+    clippy::items_after_statements,
+    clippy::range_plus_one
+)]
+
 use core::convert::Infallible;
 use core::fmt::Debug;
 use embassy_time::{with_timeout, Duration};

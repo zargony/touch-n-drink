@@ -10,6 +10,9 @@ use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
 use log::info;
 
+/// Price for a drink
+const PRICE: f32 = 1.0;
+
 /// How long to show the splash screen if no key is pressed
 const SPLASH_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -142,6 +145,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
 
         self.display.screen(&screen::NumberOfDrinks).await?;
         loop {
+            #[allow(clippy::match_same_arms)]
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await? {
                 // Any digit 1..=9 selects number of drinks
                 Key::Digit(n) if (1..=9).contains(&n) => return Ok(n as usize),
@@ -181,7 +185,9 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     pub async fn run(&mut self) -> Result<(), Error> {
         let _uid = self.read_id_card().await?;
         let num_drinks = self.get_number_of_drinks().await?;
-        let total_price = 1.0 * num_drinks as f32;
+        // It's ok to cast num_drinks to f32 as it's always a small number
+        #[allow(clippy::cast_precision_loss)]
+        let total_price = PRICE * num_drinks as f32;
         self.checkout(num_drinks, total_price).await?;
 
         // TODO: Process payment

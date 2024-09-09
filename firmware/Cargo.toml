@@ -12,6 +12,9 @@ name = "touch-n-drink"
 test = false
 bench = false
 
+[lints.clippy]
+pedantic = "warn"
+
 [profile.dev]
 # Rust debug code is slow, so always build with some optimization
 opt-level = "s"
