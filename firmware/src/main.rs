@@ -91,7 +91,7 @@ unsafe fn halt() -> ! {
 }
 
 #[main]
-async fn main(_spawner: Spawner) {
+async fn main(spawner: Spawner) {
     let peripherals = Peripherals::take();
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
@@ -160,6 +160,7 @@ async fn main(_spawner: Spawner) {
         peripherals.RADIO_CLK,
         &clocks,
         peripherals.WIFI,
+        spawner,
     )
     .await
     {
