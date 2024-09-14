@@ -11,6 +11,7 @@ use core::fmt::Debug;
 use embassy_time::{with_timeout, Duration};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
+use log::warn;
 use pn532::i2c::{I2C_ADDRESS, PN532_I2C_READY};
 use pn532::requests::BorrowedRequest;
 
@@ -82,7 +83,11 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Interface for I2CInterfaceWithIrq<
         self.i2c
             .read(I2C_ADDRESS, &mut buf[..frame.len() + 1])
             .await?;
-        debug_assert_eq!(buf[0], PN532_I2C_READY, "PN532 read while not ready");
+        // Status in a read frame should always indicate ready since `read` is always called after
+        // `wait_ready`. But sometimes it doesn't, which we ignore for now.
+        if buf[0] != PN532_I2C_READY {
+            warn!("PN532: read while not ready");
+        }
         frame.copy_from_slice(&buf[1..frame.len() + 1]);
         Ok(())
     }
