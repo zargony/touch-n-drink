@@ -93,6 +93,35 @@ impl Screen for Splash {
     }
 }
 
+/// Wait for network to become available
+pub struct WifiConnecting;
+
+impl Screen for WifiConnecting {
+    fn draw<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), Error<D::Error>> {
+        TITLE_FONT.render_aligned(
+            "Stand By...",
+            Point::new(63, 26),
+            VerticalPosition::Baseline,
+            HorizontalAlignment::Center,
+            FontColor::Transparent(BinaryColor::On),
+            target,
+        )?;
+        SMALL_FONT.render_aligned(
+            "WLAN Verbindung\nwird aufgebaut",
+            Point::new(63, 27 + 12),
+            VerticalPosition::Baseline,
+            HorizontalAlignment::Center,
+            FontColor::Transparent(BinaryColor::On),
+            target,
+        )?;
+        Footer::new("* Abbruch", "").draw(target)?;
+        Ok(())
+    }
+}
+
 /// Prompt to scan id card
 pub struct ScanId;
 

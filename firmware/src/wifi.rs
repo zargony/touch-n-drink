@@ -168,10 +168,14 @@ impl Wifi {
         Ok(Self { stack })
     }
 
+    /// Returns whether network stack is up (Wifi connected and IP address obtained)
+    pub fn is_up(&self) -> bool {
+        self.stack.is_link_up() && self.stack.is_config_up()
+    }
+
     /// Wait for network stack to come up (Wifi connected and IP address obtained)
-    #[allow(dead_code)]
     pub async fn wait_up(&self) {
-        if self.stack.is_link_up() && self.stack.is_config_up() {
+        if self.is_up() {
             return;
         }
 

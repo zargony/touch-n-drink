@@ -44,7 +44,7 @@ git2 = { version = "0.19", default-features = false }
 [dependencies]
 display-interface = "0.5"
 embassy-embedded-hal = "0.2"
-embassy-executor = { version = "0.6", features = ["task-arena-size-6144"] }
+embassy-executor = { version = "0.6", features = ["task-arena-size-20480"] }
 embassy-futures = "0.1"
 embassy-net = { version = "0.4", features = ["dhcpv4", "dns", "proto-ipv4", "tcp"] }
 embassy-sync = "0.6"

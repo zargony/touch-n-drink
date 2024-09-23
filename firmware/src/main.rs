@@ -154,7 +154,7 @@ async fn main(spawner: Spawner) {
 
     // Initialize Wifi
     let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
-    let _wifi = match wifi::Wifi::new(
+    let wifi = match wifi::Wifi::new(
         timg0.timer0,
         rng,
         peripherals.RADIO_CLK,
@@ -175,10 +175,13 @@ async fn main(spawner: Spawner) {
     let _ = buzzer.startup().await;
 
     // Create UI
-    let mut ui = ui::Ui::new(display, keypad, nfc, buzzer);
+    let mut ui = ui::Ui::new(display, keypad, nfc, buzzer, wifi);
 
     // Show splash screen for a while, ignore any error
     let _ = ui.show_splash_screen().await;
+
+    // Wait for network to become available (if not already), ignore any error
+    let _ = ui.wait_network_up().await;
 
     loop {
         match ui.run().await {

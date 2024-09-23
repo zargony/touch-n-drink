@@ -3,6 +3,7 @@ use crate::display::{self, Display};
 use crate::keypad::{Key, Keypad};
 use crate::nfc::{self, Nfc, Uid};
 use crate::screen;
+use crate::wifi::Wifi;
 use core::convert::Infallible;
 use embassy_futures::select::{select, Either};
 use embassy_time::{with_timeout, Duration, TimeoutError};
@@ -15,6 +16,9 @@ const PRICE: f32 = 1.0;
 
 /// How long to show the splash screen if no key is pressed
 const SPLASH_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// How long to wait for network to become available
+const NETWORK_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Timeout for user input. Actions are cancelled if the user does nothing for this duration.
 #[cfg(not(debug_assertions))]
@@ -43,6 +47,8 @@ pub enum Error {
     Cancel,
     /// User interaction timeout
     UserTimeout,
+    /// No network connection
+    NoNetwork,
 }
 
 impl From<display::Error> for Error {
@@ -69,6 +75,7 @@ pub struct Ui<'a, I2C, IRQ> {
     keypad: Keypad<'a, 3, 4>,
     nfc: Nfc<I2C, IRQ>,
     buzzer: Buzzer<'a>,
+    wifi: Wifi,
 }
 
 impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
@@ -78,12 +85,14 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         keypad: Keypad<'a, 3, 4>,
         nfc: Nfc<I2C, IRQ>,
         buzzer: Buzzer<'a>,
+        wifi: Wifi,
     ) -> Self {
         Self {
             display,
             keypad,
             nfc,
             buzzer,
+            wifi,
         }
     }
 
@@ -102,6 +111,26 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         Ok(())
     }
 
+    /// Wait for network to become available (if not already). Show a waiting screen and allow to
+    /// cancel
+    pub async fn wait_network_up(&mut self) -> Result<(), Error> {
+        if self.wifi.is_up() {
+            return Ok(());
+        }
+
+        self.display.screen(&screen::WifiConnecting).await?;
+
+        let wait_cancel = async { while self.keypad.read().await != Key::Cancel {} };
+        match with_timeout(NETWORK_TIMEOUT, select(self.wifi.wait_up(), wait_cancel)).await {
+            // Network has become available
+            Ok(Either::First(())) => Ok(()),
+            // Cancel key cancels
+            Ok(Either::Second(())) => Err(Error::Cancel),
+            // Timeout waiting for network
+            Err(TimeoutError) => Err(Error::NoNetwork),
+        }
+    }
+
     /// Run the user interface flow
     pub async fn run(&mut self) -> Result<(), Error> {
         // Wait for id card and verify identification
@@ -113,6 +142,8 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         let total_price = PRICE * num_drinks as f32;
         // Show total price and ask for confirmation
         self.confirm_purchase(num_drinks, total_price).await?;
+        // Wait for network to become available (if not already)
+        self.wait_network_up().await?;
 
         // TODO: Process payment
         let _ = screen::Success::new(num_drinks);
