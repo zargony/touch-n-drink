@@ -42,7 +42,7 @@ pub enum Error {
     /// User cancel request
     Cancel,
     /// User interaction timeout
-    Timeout,
+    UserTimeout,
 }
 
 impl From<display::Error> for Error {
@@ -59,7 +59,7 @@ impl From<nfc::Error> for Error {
 
 impl From<TimeoutError> for Error {
     fn from(_err: TimeoutError) -> Self {
-        Self::Timeout
+        Self::UserTimeout
     }
 }
 
@@ -102,8 +102,32 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         Ok(())
     }
 
+    /// Run the user interface flow
+    pub async fn run(&mut self) -> Result<(), Error> {
+        // Wait for id card and verify identification
+        let _uid = self.read_id_card().await?;
+        // Ask for number of drinks
+        let num_drinks = self.get_number_of_drinks().await?;
+        // Calculate total price. It's ok to cast num_drinks to f32 as it's always a small number.
+        #[allow(clippy::cast_precision_loss)]
+        let total_price = PRICE * num_drinks as f32;
+        // Show total price and ask for confirmation
+        self.confirm_purchase(num_drinks, total_price).await?;
+
+        // TODO: Process payment
+        let _ = screen::Success::new(num_drinks);
+        self.display
+            .screen(&screen::Failure::new("Not implemented yet"))
+            .await?;
+        let _ = self.buzzer.error().await;
+        let _key = self.keypad.read().await;
+        Ok(())
+    }
+}
+
+impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     /// Wait for id card and verify identification
-    pub async fn read_id_card(&mut self) -> Result<Uid, Error> {
+    async fn read_id_card(&mut self) -> Result<Uid, Error> {
         info!("UI: Waiting for NFC card...");
 
         let mut saving_power = false;
@@ -140,7 +164,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     }
 
     /// Ask for number of drinks
-    pub async fn get_number_of_drinks(&mut self) -> Result<usize, Error> {
+    async fn get_number_of_drinks(&mut self) -> Result<usize, Error> {
         info!("UI: Asking for number of drinks...");
 
         self.display.screen(&screen::NumberOfDrinks).await?;
@@ -159,10 +183,10 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         }
     }
 
-    /// Confirm purchase
-    pub async fn checkout(&mut self, num_drinks: usize, total_price: f32) -> Result<(), Error> {
+    /// Show total price and ask for confirmation
+    async fn confirm_purchase(&mut self, num_drinks: usize, total_price: f32) -> Result<(), Error> {
         info!(
-            "UI: Asking for checkout of {} drinks, {:.02} EUR...",
+            "UI: Asking for purchase confirmation of {} drinks, {:.02} EUR...",
             num_drinks, total_price
         );
 
@@ -179,24 +203,5 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
                 _ => (),
             }
         }
-    }
-
-    /// Run the user interface flow
-    pub async fn run(&mut self) -> Result<(), Error> {
-        let _uid = self.read_id_card().await?;
-        let num_drinks = self.get_number_of_drinks().await?;
-        // It's ok to cast num_drinks to f32 as it's always a small number
-        #[allow(clippy::cast_precision_loss)]
-        let total_price = PRICE * num_drinks as f32;
-        self.checkout(num_drinks, total_price).await?;
-
-        // TODO: Process payment
-        let _ = screen::Success::new(num_drinks);
-        self.display
-            .screen(&screen::Failure::new("Not implemented yet"))
-            .await?;
-        let _ = self.buzzer.error().await;
-        let _key = self.keypad.read().await;
-        Ok(())
     }
 }

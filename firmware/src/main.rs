@@ -187,7 +187,7 @@ async fn main(spawner: Spawner) {
             // Cancel: start over again
             Err(ui::Error::Cancel) => info!("User cancelled, starting over..."),
             // Timeout: start over again
-            Err(ui::Error::Timeout) => info!("Timeout waiting for user, starting over..."),
+            Err(ui::Error::UserTimeout) => info!("Timeout waiting for user, starting over..."),
             // TODO: Display error to user and start over again
             Err(err) => panic!("Unhandled Error: {:?}", err),
         }
