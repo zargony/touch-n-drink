@@ -85,7 +85,10 @@ impl Screen for Splash {
             FontColor::Transparent(BinaryColor::On),
             target,
         )?;
+        #[cfg(not(debug_assertions))]
         Footer::new("", GIT_SHA_STR).draw(target)?;
+        #[cfg(debug_assertions)]
+        Footer::new("(DEBUG)", GIT_SHA_STR).draw(target)?;
         Ok(())
     }
 }
