@@ -33,8 +33,8 @@ static LOGO: ImageRaw<BinaryColor> = ImageRaw::new(&[
 ], 128);
 
 const SPLASH_VERSION_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_profont10_tr>();
-const DEFAULT_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_8x13_tf>();
-const BOLD_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_8x13B_tf>();
+const TOTAL_PRICE_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_8x13B_tf>();
+const TITLE_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_8x13_tf>();
 const SMALL_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_5x7_tf>();
 const FOOTER_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_5x7_tf>();
 
@@ -101,7 +101,7 @@ impl Screen for ScanId {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        DEFAULT_FONT.render_aligned(
+        TITLE_FONT.render_aligned(
             "Mitgliedsausweis\nscannen",
             Point::new(63, 26),
             VerticalPosition::Baseline,
@@ -121,7 +121,7 @@ impl Screen for NumberOfDrinks {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        DEFAULT_FONT.render_aligned(
+        TITLE_FONT.render_aligned(
             "Anzahl Getränke\nwählen",
             Point::new(63, 26),
             VerticalPosition::Baseline,
@@ -154,7 +154,7 @@ impl Screen for Checkout {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        DEFAULT_FONT.render_aligned(
+        TITLE_FONT.render_aligned(
             format_args!(
                 "{} {}",
                 self.num_drinks,
@@ -170,7 +170,7 @@ impl Screen for Checkout {
             FontColor::Transparent(BinaryColor::On),
             target,
         )?;
-        BOLD_FONT.render_aligned(
+        TOTAL_PRICE_FONT.render_aligned(
             format_args!("{:.02} EUR", self.total_price),
             Point::new(63, 25 + 16),
             VerticalPosition::Baseline,
@@ -199,7 +199,7 @@ impl Screen for Success {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        DEFAULT_FONT.render_aligned(
+        TITLE_FONT.render_aligned(
             "Affirm!",
             Point::new(63, 27),
             VerticalPosition::Baseline,
@@ -236,7 +236,7 @@ impl<'a> Screen for Failure<'a> {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        DEFAULT_FONT.render_aligned(
+        TITLE_FONT.render_aligned(
             "FEHLER!",
             Point::new(63, 27),
             VerticalPosition::Baseline,
