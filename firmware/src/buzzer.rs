@@ -1,3 +1,4 @@
+use core::fmt;
 use embassy_time::{Duration, Timer};
 use esp_hal::clock::Clocks;
 use esp_hal::gpio::AnyPin;
@@ -9,12 +10,10 @@ use log::{debug, info};
 
 /// Buzzer error
 #[derive(Debug)]
-#[non_exhaustive]
 pub enum Error {
     /// PWM timer error
     Timer(timer::Error),
     /// PWM channel error
-    #[allow(dead_code)]
     Channel(channel::Error),
 }
 
@@ -27,6 +26,15 @@ impl From<timer::Error> for Error {
 impl From<channel::Error> for Error {
     fn from(err: channel::Error) -> Self {
         Self::Channel(err)
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Timer(_err) => write!(f, "PWM timer error"),
+            Self::Channel(_err) => write!(f, "PWM channel error"),
+        }
     }
 }
 

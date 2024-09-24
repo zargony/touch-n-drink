@@ -39,26 +39,7 @@ const SMALL_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_5x7_tf>();
 const FOOTER_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_5x7_tf>();
 
 /// Screen display error
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum Error<E> {
-    /// Display error
-    DisplayError(E),
-    /// Font render error
-    FontRenderError(u8g2_fonts::Error<E>),
-}
-
-impl<E> From<E> for Error<E> {
-    fn from(err: E) -> Self {
-        Self::DisplayError(err)
-    }
-}
-
-impl<E> From<u8g2_fonts::Error<E>> for Error<E> {
-    fn from(err: u8g2_fonts::Error<E>) -> Self {
-        Self::FontRenderError(err)
-    }
-}
+pub type Error<E> = u8g2_fonts::Error<E>;
 
 /// Generic screen that can be displayed
 pub trait Screen {
@@ -76,7 +57,9 @@ impl Screen for Splash {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        Image::new(&LOGO, Point::new(0, 13)).draw(target)?;
+        Image::new(&LOGO, Point::new(0, 13))
+            .draw(target)
+            .map_err(Error::DisplayError)?;
         SPLASH_VERSION_FONT.render_aligned(
             VERSION_STR,
             Point::new(63, 30 + 12),

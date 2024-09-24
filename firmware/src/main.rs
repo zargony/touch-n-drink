@@ -41,6 +41,7 @@
 
 mod buzzer;
 mod display;
+mod error;
 mod keypad;
 mod nfc;
 mod pn532;
@@ -188,9 +189,9 @@ async fn main(spawner: Spawner) {
             // Success: start over again
             Ok(()) => (),
             // Cancel: start over again
-            Err(ui::Error::Cancel) => info!("User cancelled, starting over..."),
+            Err(error::Error::Cancel) => info!("User cancelled, starting over..."),
             // Timeout: start over again
-            Err(ui::Error::UserTimeout) => info!("Timeout waiting for user, starting over..."),
+            Err(error::Error::UserTimeout) => info!("Timeout waiting for user, starting over..."),
             // TODO: Display error to user and start over again
             Err(err) => panic!("Unhandled Error: {:?}", err),
         }

@@ -1,7 +1,8 @@
 use crate::buzzer::Buzzer;
-use crate::display::{self, Display};
+use crate::display::Display;
+use crate::error::Error;
 use crate::keypad::{Key, Keypad};
-use crate::nfc::{self, Nfc, Uid};
+use crate::nfc::{Nfc, Uid};
 use crate::screen;
 use crate::wifi::Wifi;
 use core::convert::Infallible;
@@ -31,43 +32,6 @@ const USER_TIMEOUT: Duration = Duration::from_secs(5);
 const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
 #[cfg(debug_assertions)]
 const IDLE_TIMEOUT: Duration = Duration::from_secs(10);
-
-/// User interface error
-#[derive(Debug)]
-#[non_exhaustive]
-#[allow(clippy::enum_variant_names)]
-pub enum Error {
-    /// Failed to output to display
-    #[allow(dead_code)]
-    DisplayError(display::Error),
-    /// NFC reader error
-    #[allow(dead_code)]
-    NFCError(nfc::Error),
-    /// User cancel request
-    Cancel,
-    /// User interaction timeout
-    UserTimeout,
-    /// No network connection
-    NoNetwork,
-}
-
-impl From<display::Error> for Error {
-    fn from(err: display::Error) -> Self {
-        Self::DisplayError(err)
-    }
-}
-
-impl From<nfc::Error> for Error {
-    fn from(err: nfc::Error) -> Self {
-        Self::NFCError(err)
-    }
-}
-
-impl From<TimeoutError> for Error {
-    fn from(_err: TimeoutError) -> Self {
-        Self::UserTimeout
-    }
-}
 
 /// User interface
 pub struct Ui<'a, I2C, IRQ> {
@@ -107,8 +71,12 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     /// Show splash screen and wait for keypress or timeout
     pub async fn show_splash_screen(&mut self) -> Result<(), Error> {
         self.display.screen(&screen::Splash).await?;
-        let _key = with_timeout(SPLASH_TIMEOUT, self.keypad.read()).await?;
-        Ok(())
+        match with_timeout(SPLASH_TIMEOUT, self.keypad.read()).await {
+            // Key pressed
+            Ok(_key) => Ok(()),
+            // User interaction timeout
+            Err(TimeoutError) => Err(Error::UserTimeout),
+        }
     }
 
     /// Wait for network to become available (if not already). Show a waiting screen and allow to
@@ -159,7 +127,8 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
 }
 
 impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
-    /// Wait for id card and verify identification
+    /// Wait for id card and read it. On idle timeout, enter power saving (turn off display).
+    /// Any key pressed leaves power saving (turn on display).
     async fn read_id_card(&mut self) -> Result<Uid, Error> {
         info!("UI: Waiting for NFC card...");
 
@@ -203,15 +172,17 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         self.display.screen(&screen::NumberOfDrinks).await?;
         loop {
             #[allow(clippy::match_same_arms)]
-            match with_timeout(USER_TIMEOUT, self.keypad.read()).await? {
+            match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
                 // Any digit 1..=9 selects number of drinks
-                Key::Digit(n) if (1..=9).contains(&n) => return Ok(n as usize),
+                Ok(Key::Digit(n)) if (1..=9).contains(&n) => return Ok(n as usize),
                 // Ignore any other digit
-                Key::Digit(_) => (),
+                Ok(Key::Digit(_)) => (),
                 // Cancel key cancels
-                Key::Cancel => return Err(Error::Cancel),
+                Ok(Key::Cancel) => return Err(Error::Cancel),
                 // Ignore any other key
-                _ => (),
+                Ok(_) => (),
+                // User interaction timeout
+                Err(TimeoutError) => return Err(Error::UserTimeout),
             }
         }
     }
@@ -227,13 +198,15 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
             .screen(&screen::Checkout::new(num_drinks, total_price))
             .await?;
         loop {
-            match with_timeout(USER_TIMEOUT, self.keypad.read()).await? {
+            match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
                 // Enter key confirms purchase
-                Key::Enter => return Ok(()),
+                Ok(Key::Enter) => return Ok(()),
                 // Cancel key cancels
-                Key::Cancel => return Err(Error::Cancel),
+                Ok(Key::Cancel) => return Err(Error::Cancel),
                 // Ignore any other key
-                _ => (),
+                Ok(_) => (),
+                // User interaction timeout
+                Err(TimeoutError) => return Err(Error::UserTimeout),
             }
         }
     }

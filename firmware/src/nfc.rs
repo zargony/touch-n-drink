@@ -16,27 +16,38 @@ const READ_TIMEOUT: Duration = Duration::from_millis(100);
 const READ_SLEEP: Duration = Duration::from_millis(400);
 
 /// NFC reader error
+// Basically a PN532 error with static interface error type to avoid generics in this type
 #[derive(Debug)]
-#[non_exhaustive]
-pub enum Error {
-    /// PN532 error (with static interface error type)
-    #[allow(dead_code)]
-    Pn532(Pn532Error<embedded_hal_async::i2c::ErrorKind>),
-}
+pub struct Error(Pn532Error<embedded_hal_async::i2c::ErrorKind>);
 
 impl<E: embedded_hal_async::i2c::Error> From<Pn532Error<E>> for Error {
     fn from(err: Pn532Error<E>) -> Self {
         // Convert generic Pn532Error::InterfaceError(E: embedded_hal::i2c::Error) to non-generic
         // Pn532Error::InterfaceError(embedded_hal::i2c::ErrorKind) to avoid generics in this type
         match err {
-            Pn532Error::BadAck => Self::Pn532(Pn532Error::BadAck),
-            Pn532Error::BadResponseFrame => Self::Pn532(Pn532Error::BadResponseFrame),
-            Pn532Error::Syntax => Self::Pn532(Pn532Error::Syntax),
-            Pn532Error::CrcError => Self::Pn532(Pn532Error::CrcError),
-            Pn532Error::BufTooSmall => Self::Pn532(Pn532Error::BufTooSmall),
-            Pn532Error::TimeoutAck => Self::Pn532(Pn532Error::TimeoutAck),
-            Pn532Error::TimeoutResponse => Self::Pn532(Pn532Error::TimeoutResponse),
-            Pn532Error::InterfaceError(e) => Self::Pn532(Pn532Error::InterfaceError(e.kind())),
+            Pn532Error::BadAck => Self(Pn532Error::BadAck),
+            Pn532Error::BadResponseFrame => Self(Pn532Error::BadResponseFrame),
+            Pn532Error::Syntax => Self(Pn532Error::Syntax),
+            Pn532Error::CrcError => Self(Pn532Error::CrcError),
+            Pn532Error::BufTooSmall => Self(Pn532Error::BufTooSmall),
+            Pn532Error::TimeoutAck => Self(Pn532Error::TimeoutAck),
+            Pn532Error::TimeoutResponse => Self(Pn532Error::TimeoutResponse),
+            Pn532Error::InterfaceError(e) => Self(Pn532Error::InterfaceError(e.kind())),
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            Pn532Error::BadAck => write!(f, "Bad ACK"),
+            Pn532Error::BadResponseFrame => write!(f, "Bad response frame"),
+            Pn532Error::Syntax => write!(f, "Syntax error"),
+            Pn532Error::CrcError => write!(f, "CRC error"),
+            Pn532Error::BufTooSmall => write!(f, "Buffer too small"),
+            Pn532Error::TimeoutAck => write!(f, "ACK timeout"),
+            Pn532Error::TimeoutResponse => write!(f, "Response timeout"),
+            Pn532Error::InterfaceError(_err) => write!(f, "Bus error"),
         }
     }
 }

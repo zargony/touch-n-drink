@@ -1,4 +1,5 @@
 use crate::screen::{self, Screen};
+use core::fmt;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_hal_async::i2c::I2c;
@@ -10,7 +11,53 @@ use ssd1306::size::DisplaySize128x64;
 use ssd1306::Ssd1306Async;
 
 /// Display error
-pub type Error = screen::Error<display_interface::DisplayError>;
+#[derive(Debug)]
+pub enum Error {
+    /// Display interface error
+    InterfaceError(display_interface::DisplayError),
+    /// Font render error
+    FontRenderError(screen::Error<()>),
+}
+
+impl From<display_interface::DisplayError> for Error {
+    fn from(err: display_interface::DisplayError) -> Self {
+        Self::InterfaceError(err)
+    }
+}
+
+impl From<screen::Error<display_interface::DisplayError>> for Error {
+    fn from(err: screen::Error<display_interface::DisplayError>) -> Self {
+        use screen::Error;
+
+        match err {
+            Error::BackgroundColorNotSupported => {
+                Self::FontRenderError(Error::BackgroundColorNotSupported)
+            }
+            Error::GlyphNotFound(ch) => Self::FontRenderError(Error::GlyphNotFound(ch)),
+            Error::DisplayError(err) => Self::InterfaceError(err),
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use display_interface::DisplayError;
+
+        match self {
+            Self::InterfaceError(err) => match err {
+                DisplayError::InvalidFormatError => write!(f, "Invalid format"),
+                DisplayError::BusWriteError => write!(f, "Bus write error"),
+                DisplayError::DCError => write!(f, "DC error"),
+                DisplayError::CSError => write!(f, "CS error"),
+                DisplayError::DataFormatNotImplemented => write!(f, "Format not implemented"),
+                DisplayError::RSError => write!(f, "Reset error"),
+                DisplayError::OutOfBoundsError => write!(f, "Out of bounds"),
+                _ => write!(f, "Interface error"),
+            },
+            Self::FontRenderError(_err) => write!(f, "Font render error"),
+        }
+    }
+}
 
 /// Convenient hardware-agnostic display driver
 pub struct Display<I2C> {
