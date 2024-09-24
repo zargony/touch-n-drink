@@ -93,10 +93,12 @@ impl Screen for Splash {
     }
 }
 
-/// Wait for network to become available
-pub struct WifiConnecting;
+/// Wait while a lengthy action is in progress
+pub enum PleaseWait {
+    WifiConnecting,
+}
 
-impl Screen for WifiConnecting {
+impl Screen for PleaseWait {
     fn draw<D: DrawTarget<Color = BinaryColor>>(
         &self,
         target: &mut D,
@@ -110,7 +112,9 @@ impl Screen for WifiConnecting {
             target,
         )?;
         SMALL_FONT.render_aligned(
-            "WLAN Verbindung\nwird aufgebaut",
+            match *self {
+                Self::WifiConnecting => "WLAN Verbindung\nwird aufgebaut",
+            },
             Point::new(63, 27 + 12),
             VerticalPosition::Baseline,
             HorizontalAlignment::Center,

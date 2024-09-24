@@ -118,7 +118,9 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
             return Ok(());
         }
 
-        self.display.screen(&screen::WifiConnecting).await?;
+        self.display
+            .screen(&screen::PleaseWait::WifiConnecting)
+            .await?;
 
         let wait_cancel = async { while self.keypad.read().await != Key::Cancel {} };
         match with_timeout(NETWORK_TIMEOUT, select(self.wifi.wait_up(), wait_cancel)).await {
