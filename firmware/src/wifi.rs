@@ -1,6 +1,7 @@
 use core::fmt;
 use embassy_executor::{task, Spawner};
-use embassy_net::{Config, DhcpConfig, Stack, StackResources, StaticConfigV4};
+use embassy_net::dns::{self, DnsQueryType};
+use embassy_net::{Config, DhcpConfig, IpAddress, Stack, StackResources, StaticConfigV4};
 use embassy_time::{Duration, Timer};
 use esp_hal::clock::Clocks;
 use esp_hal::peripherals;
@@ -173,7 +174,8 @@ impl Wifi {
         self.stack.is_link_up() && self.stack.is_config_up()
     }
 
-    /// Wait for network stack to come up (Wifi connected and IP address obtained)
+    /// Wait for network stack to come up (Wifi connected and IP address obtained). This function
+    /// can potentially take forever, e.g. if Wifi credentials are wrong or DHCP doesn't work.
     pub async fn wait_up(&self) {
         if self.is_up() {
             return;
@@ -193,6 +195,25 @@ impl Wifi {
             }
             // Panic on failure since no IPv4 indicates a serious error
             None => panic!("Failed to retrieve IPv4 network configuration"),
+        }
+    }
+
+    /// Query DNS for IP address of given name
+    #[allow(dead_code)]
+    pub async fn dns_query(&self, name: &str) -> Result<IpAddress, dns::Error> {
+        match self.stack.dns_query(name, DnsQueryType::A).await {
+            Ok(addrs) if addrs.is_empty() => {
+                warn!("Wifi: DNS query {} returned empty result", name);
+                Err(dns::Error::Failed)
+            }
+            Ok(addrs) => {
+                debug!("Wifi: DNS query {}: {}", name, DisplayList(&addrs));
+                Ok(addrs[0])
+            }
+            Err(err) => {
+                warn!("Wifi: DNS query {} error: {:?}", name, err);
+                Err(err)
+            }
         }
     }
 }
