@@ -214,20 +214,20 @@ fn write_hex_bytes(f: &mut fmt::Formatter<'_>, bytes: &[u8]) -> fmt::Result {
 
 impl fmt::Display for Uid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            Self::Single(ref bytes) => write_hex_bytes(f, bytes),
-            Self::Double(ref bytes) => write_hex_bytes(f, bytes),
-            Self::Triple(ref bytes) => write_hex_bytes(f, bytes),
+        match self {
+            Self::Single(bytes) => write_hex_bytes(f, bytes),
+            Self::Double(bytes) => write_hex_bytes(f, bytes),
+            Self::Triple(bytes) => write_hex_bytes(f, bytes),
         }
     }
 }
 
 impl AsRef<[u8]> for Uid {
     fn as_ref(&self) -> &[u8] {
-        match *self {
-            Self::Single(ref bytes) => bytes,
-            Self::Double(ref bytes) => bytes,
-            Self::Triple(ref bytes) => bytes,
+        match self {
+            Self::Single(bytes) => bytes,
+            Self::Double(bytes) => bytes,
+            Self::Triple(bytes) => bytes,
         }
     }
 }

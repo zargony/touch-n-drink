@@ -112,7 +112,7 @@ impl Screen for PleaseWait {
             target,
         )?;
         SMALL_FONT.render_aligned(
-            match *self {
+            match self {
                 Self::WifiConnecting => "WLAN Verbindung\nwird aufgebaut",
             },
             Point::new(63, 27 + 12),
