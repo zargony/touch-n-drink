@@ -6,6 +6,7 @@ use crate::nfc::{Nfc, Uid};
 use crate::screen;
 use crate::wifi::Wifi;
 use core::convert::Infallible;
+use core::fmt;
 use embassy_futures::select::{select, Either};
 use embassy_time::{with_timeout, Duration, TimeoutError};
 use embedded_hal_async::digital::Wait;
@@ -69,11 +70,30 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     }
 
     /// Show splash screen and wait for keypress or timeout
-    pub async fn show_splash_screen(&mut self) -> Result<(), Error> {
+    pub async fn show_splash(&mut self) -> Result<(), Error> {
+        info!("UI: Displaying splash screen");
+
         self.display.screen(&screen::Splash).await?;
+
         match with_timeout(SPLASH_TIMEOUT, self.keypad.read()).await {
             // Key pressed
             Ok(_key) => Ok(()),
+            // User interaction timeout
+            Err(TimeoutError) => Err(Error::UserTimeout),
+        }
+    }
+
+    /// Show error screen and wait for keypress or timeout
+    pub async fn show_error<M: fmt::Display>(&mut self, message: M) -> Result<(), Error> {
+        info!("UI: Displaying error: {}", message);
+
+        self.display.screen(&screen::Failure::new(message)).await?;
+        let _ = self.buzzer.error().await;
+
+        let wait_cancel = async { while self.keypad.read().await != Key::Cancel {} };
+        match with_timeout(USER_TIMEOUT, wait_cancel).await {
+            // Cancel key cancels
+            Ok(()) => Ok(()),
             // User interaction timeout
             Err(TimeoutError) => Err(Error::UserTimeout),
         }
@@ -85,6 +105,8 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         if self.wifi.is_up() {
             return Ok(());
         }
+
+        info!("UI: Waiting for network to become available...");
 
         self.display
             .screen(&screen::PleaseWait::WifiConnecting)
@@ -117,10 +139,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
 
         // TODO: Process payment
         let _ = screen::Success::new(num_drinks);
-        self.display
-            .screen(&screen::Failure::new("Not implemented yet"))
-            .await?;
-        let _ = self.buzzer.error().await;
+        let _ = self.show_error("Not implemented yet").await;
         let _key = self.keypad.read().await;
         Ok(())
     }

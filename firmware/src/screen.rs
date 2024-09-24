@@ -1,4 +1,5 @@
 use crate::{GIT_SHA_STR, VERSION_STR};
+use core::fmt;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::image::{Image, ImageRaw};
 use embedded_graphics::pixelcolor::BinaryColor;
@@ -72,6 +73,43 @@ impl Screen for Splash {
         Footer::new("", GIT_SHA_STR).draw(target)?;
         #[cfg(debug_assertions)]
         Footer::new("(DEBUG)", GIT_SHA_STR).draw(target)?;
+        Ok(())
+    }
+}
+
+/// Failure screen
+pub struct Failure<M> {
+    message: M,
+}
+
+impl<M: fmt::Display> Failure<M> {
+    pub fn new(message: M) -> Self {
+        Self { message }
+    }
+}
+
+impl<M: fmt::Display> Screen for Failure<M> {
+    fn draw<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), Error<D::Error>> {
+        TITLE_FONT.render_aligned(
+            "FEHLER!",
+            Point::new(63, 27),
+            VerticalPosition::Baseline,
+            HorizontalAlignment::Center,
+            FontColor::Transparent(BinaryColor::On),
+            target,
+        )?;
+        SMALL_FONT.render_aligned(
+            format_args!("{}", self.message),
+            Point::new(63, 27 + 12),
+            VerticalPosition::Baseline,
+            HorizontalAlignment::Center,
+            FontColor::Transparent(BinaryColor::On),
+            target,
+        )?;
+        Footer::new("* Abbruch", "").draw(target)?;
         Ok(())
     }
 }
@@ -224,7 +262,7 @@ impl Screen for Success {
             target,
         )?;
         SMALL_FONT.render_aligned(
-            format_args!("{} Getränke entnehmen", self.num_drinks),
+            format_args!("{} Getränke genehmigt", self.num_drinks),
             Point::new(63, 27 + 12),
             VerticalPosition::Baseline,
             HorizontalAlignment::Center,
@@ -232,43 +270,6 @@ impl Screen for Success {
             target,
         )?;
         Footer::new("", "# Ok").draw(target)?;
-        Ok(())
-    }
-}
-
-/// Error screen
-pub struct Failure<'a> {
-    message: &'a str,
-}
-
-impl<'a> Failure<'a> {
-    pub fn new(message: &'a str) -> Self {
-        Self { message }
-    }
-}
-
-impl<'a> Screen for Failure<'a> {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(
-        &self,
-        target: &mut D,
-    ) -> Result<(), Error<D::Error>> {
-        TITLE_FONT.render_aligned(
-            "FEHLER!",
-            Point::new(63, 27),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
-            target,
-        )?;
-        SMALL_FONT.render_aligned(
-            self.message,
-            Point::new(63, 27 + 12),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
-            target,
-        )?;
-        Footer::new("* Abbruch", "").draw(target)?;
         Ok(())
     }
 }

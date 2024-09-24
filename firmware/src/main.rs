@@ -64,7 +64,7 @@ use esp_hal::system::SystemControl;
 use esp_hal::timer::systimer::{SystemTimer, Target};
 use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
-use log::info;
+use log::{error, info};
 
 static VERSION_STR: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 static GIT_SHA_STR: &str = env!("GIT_SHORT_SHA");
@@ -179,7 +179,7 @@ async fn main(spawner: Spawner) {
     let mut ui = ui::Ui::new(display, keypad, nfc, buzzer, wifi);
 
     // Show splash screen for a while, ignore any error
-    let _ = ui.show_splash_screen().await;
+    let _ = ui.show_splash().await;
 
     // Wait for network to become available (if not already), ignore any error
     let _ = ui.wait_network_up().await;
@@ -192,8 +192,11 @@ async fn main(spawner: Spawner) {
             Err(error::Error::Cancel) => info!("User cancelled, starting over..."),
             // Timeout: start over again
             Err(error::Error::UserTimeout) => info!("Timeout waiting for user, starting over..."),
-            // TODO: Display error to user and start over again
-            Err(err) => panic!("Unhandled Error: {:?}", err),
+            // Display error to user and start over again
+            Err(err) => {
+                error!("Unhandled Error: {:?}", err);
+                let _ = ui.show_error(&err).await;
+            }
         }
     }
 }
