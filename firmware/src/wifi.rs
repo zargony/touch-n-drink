@@ -1,8 +1,10 @@
 use core::fmt;
 use embassy_executor::{task, Spawner};
-use embassy_net::dns::{self, DnsQueryType};
+use embassy_net::dns::{self, DnsQueryType, DnsSocket};
+use embassy_net::tcp::client::{TcpClient, TcpClientState};
 use embassy_net::{Config, DhcpConfig, IpAddress, Stack, StackResources, StaticConfigV4};
 use embassy_time::{Duration, Timer};
+use embedded_nal_async::{Dns, TcpConnect};
 use esp_hal::clock::Clocks;
 use esp_hal::peripherals;
 use esp_hal::rng::Rng;
@@ -18,14 +20,21 @@ use static_cell::StaticCell;
 /// Delay after Wifi disconnect or connection failure before trying to reconnect
 const CONNECT_RETRY_DELAY: Duration = Duration::from_millis(5000);
 
+/// Number of TCP sockets
+const NUM_TCP_SOCKETS: usize = 4;
+
+/// Size of receive buffer (per TCP socket)
+const RX_BUFFER_SIZE: usize = 2048;
+
+/// Size of transmit buffer (per TCP socket)
+const TX_BUFFER_SIZE: usize = 1024;
+
 /// Wifi initialization error
 pub use esp_wifi::InitializationError;
 
-// /// Wifi error
-// pub use esp_wifi::wifi::WifiError as Error;
-
 /// Static network stack resources (sockets, inflight dns queries)
-static RESOURCES: StaticCell<StackResources<4>> = StaticCell::new();
+// Needs at least one socket for DHCP, one socket for DNS, plus additional sockets for connections
+static RESOURCES: StaticCell<StackResources<{ 2 + NUM_TCP_SOCKETS }>> = StaticCell::new();
 
 /// Static network stack
 static STACK: StaticCell<Stack<WifiDevice<'_, WifiStaDevice>>> = StaticCell::new();
@@ -117,6 +126,7 @@ impl fmt::Display for DisplayNetworkConfig {
 /// Wifi interface
 pub struct Wifi {
     stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>,
+    tcp_client_state: TcpClientState<NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>,
 }
 
 impl Wifi {
@@ -165,8 +175,14 @@ impl Wifi {
             Err(err) => panic!("Failed to spawn Wifi network task: {:?}", err),
         }
 
+        // Initialize TCP client state (reserves sockets and rx/tx buffers)
+        let tcp_client_state = TcpClientState::new();
+
         info!("Wifi: Controller initialized");
-        Ok(Self { stack })
+        Ok(Self {
+            stack,
+            tcp_client_state,
+        })
     }
 
     /// Returns whether network stack is up (Wifi connected and IP address obtained)
@@ -215,6 +231,18 @@ impl Wifi {
                 Err(err)
             }
         }
+    }
+
+    /// Provide an embedded-nal-async compatible DNS socket
+    #[allow(dead_code)]
+    pub fn dns(&self) -> impl Dns + '_ {
+        DnsSocket::new(self.stack)
+    }
+
+    /// Provide an embedded-nal-async compatible TCP client
+    #[allow(dead_code)]
+    pub fn tcp(&self) -> impl TcpConnect + '_ {
+        TcpClient::new(self.stack, &self.tcp_client_state)
     }
 }
 
