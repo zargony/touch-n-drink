@@ -32,12 +32,17 @@ const TX_BUFFER_SIZE: usize = 1024;
 /// Wifi initialization error
 pub use esp_wifi::InitializationError;
 
+/// Static network stack
+static STACK: StaticCell<Stack<WifiDevice<'_, WifiStaDevice>>> = StaticCell::new();
+
 /// Static network stack resources (sockets, inflight dns queries)
 // Needs at least one socket for DHCP, one socket for DNS, plus additional sockets for connections
 static RESOURCES: StaticCell<StackResources<{ 2 + NUM_TCP_SOCKETS }>> = StaticCell::new();
 
-/// Static network stack
-static STACK: StaticCell<Stack<WifiDevice<'_, WifiStaDevice>>> = StaticCell::new();
+/// Static TCP client state
+static TCP_CLIENT_STATE: StaticCell<
+    TcpClientState<NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>,
+> = StaticCell::new();
 
 /// Option display helper
 struct DisplayOption<T: fmt::Display>(Option<T>);
@@ -126,7 +131,7 @@ impl fmt::Display for DisplayNetworkConfig {
 /// Wifi interface
 pub struct Wifi {
     stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>,
-    tcp_client_state: TcpClientState<NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>,
+    tcp_client_state: &'static TcpClientState<NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>,
 }
 
 impl Wifi {
@@ -175,8 +180,8 @@ impl Wifi {
             Err(err) => panic!("Failed to spawn Wifi network task: {:?}", err),
         }
 
-        // Initialize TCP client state (reserves sockets and rx/tx buffers)
-        let tcp_client_state = TcpClientState::new();
+        // Initialize TCP client state (reserves tx/rx buffers for TCP sockets)
+        let tcp_client_state = TCP_CLIENT_STATE.init(TcpClientState::new());
 
         info!("Wifi: Controller initialized");
         Ok(Self {
@@ -235,14 +240,14 @@ impl Wifi {
 
     /// Provide an embedded-nal-async compatible DNS socket
     #[allow(dead_code)]
-    pub fn dns(&self) -> impl Dns + '_ {
+    pub fn dns(&self) -> impl Dns {
         DnsSocket::new(self.stack)
     }
 
     /// Provide an embedded-nal-async compatible TCP client
     #[allow(dead_code)]
-    pub fn tcp(&self) -> impl TcpConnect + '_ {
-        TcpClient::new(self.stack, &self.tcp_client_state)
+    pub fn tcp(&self) -> impl TcpConnect {
+        TcpClient::new(self.stack, self.tcp_client_state)
     }
 }
 
