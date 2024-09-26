@@ -8,7 +8,7 @@ use crate::wifi::Wifi;
 use core::convert::Infallible;
 use core::fmt;
 use embassy_futures::select::{select, Either};
-use embassy_time::{with_timeout, Duration, TimeoutError};
+use embassy_time::{with_timeout, Duration, TimeoutError, Timer};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
 use log::info;
@@ -90,8 +90,12 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         self.display.screen(&screen::Failure::new(message)).await?;
         let _ = self.buzzer.error().await;
 
+        // Wait at least 1s without responding to keypad
+        let min_time = Duration::from_secs(1);
+        Timer::after(min_time).await;
+
         let wait_cancel = async { while self.keypad.read().await != Key::Cancel {} };
-        match with_timeout(USER_TIMEOUT, wait_cancel).await {
+        match with_timeout(USER_TIMEOUT - min_time, wait_cancel).await {
             // Cancel key cancels
             Ok(()) => Ok(()),
             // User interaction timeout
