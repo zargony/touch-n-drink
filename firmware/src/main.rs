@@ -100,6 +100,9 @@ async fn main(spawner: Spawner) {
     let rng = Rng::new(peripherals.RNG);
     let _led = AnyOutput::new(io.pins.gpio8, Level::High);
 
+    // Initialize global allocator
+    esp_alloc::heap_allocator!(128 * 1024);
+
     // Initialize async executor
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
     let systimer_alarms = systimer.split::<Target>();
