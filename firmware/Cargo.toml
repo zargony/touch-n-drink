@@ -46,13 +46,14 @@ git2 = { version = "0.19", default-features = false }
 [dependencies]
 display-interface = "0.5"
 embassy-embedded-hal = "0.2"
-embassy-executor = { version = "0.6", features = ["task-arena-size-20480"] }
+embassy-executor = { version = "0.6", features = ["task-arena-size-32768"] }
 embassy-futures = "0.1"
 embassy-net = { version = "0.4", features = ["dhcpv4", "dns", "proto-ipv4", "tcp"] }
 embassy-sync = "0.6"
 embassy-time = { version = "0.3", features = ["generic-queue"] }
 embedded-graphics = "0.8"
 embedded-hal-async = "1.0"
+embedded-io-async = "0.6"
 embedded-nal-async = "0.7"
 esp-alloc = "0.4"
 esp-backtrace = { version = "0.14", features = ["esp32c3", "custom-halt", "panic-handler", "exception-handler", "println"] }
@@ -63,6 +64,9 @@ esp-wifi = { version = "0.9", default-features = false, features = ["esp32c3", "
 log = { version = "0.4", features = ["release_max_level_info"] }
 pn532 = "0.4"
 rand_core = "0.6"
+reqwless = { version = "0.12", default-features = false, features = ["alloc", "embedded-tls"] }
+serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 ssd1306 = { version = "0.9", features = ["async"] }
 static_cell = "2.1"
 u8g2-fonts = "0.4"

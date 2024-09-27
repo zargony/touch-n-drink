@@ -42,6 +42,7 @@
 mod buzzer;
 mod display;
 mod error;
+mod http;
 mod keypad;
 mod nfc;
 mod pn532;
