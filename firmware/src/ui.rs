@@ -4,6 +4,7 @@ use crate::error::Error;
 use crate::keypad::{Key, Keypad};
 use crate::nfc::{Nfc, Uid};
 use crate::screen;
+use crate::vereinsflieger::Vereinsflieger;
 use crate::wifi::Wifi;
 use core::convert::Infallible;
 use core::fmt;
@@ -41,6 +42,7 @@ pub struct Ui<'a, I2C, IRQ> {
     nfc: &'a mut Nfc<I2C, IRQ>,
     buzzer: &'a mut Buzzer<'a>,
     wifi: &'a Wifi,
+    _vereinsflieger: &'a mut Vereinsflieger<'a>,
 }
 
 impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
@@ -51,6 +53,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         nfc: &'a mut Nfc<I2C, IRQ>,
         buzzer: &'a mut Buzzer<'a>,
         wifi: &'a Wifi,
+        vereinsflieger: &'a mut Vereinsflieger<'a>,
     ) -> Self {
         Self {
             display,
@@ -58,6 +61,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
             nfc,
             buzzer,
             wifi,
+            _vereinsflieger: vereinsflieger,
         }
     }
 

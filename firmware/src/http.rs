@@ -15,7 +15,7 @@ use reqwless::response::{Response, StatusCode};
 const MAX_RESPONSE_SIZE: usize = 4096;
 
 /// TLS read buffer size
-const READ_BUFFER_SIZE: usize = 4096;
+const READ_BUFFER_SIZE: usize = 16640;
 
 /// TLS write buffer size
 const WRITE_BUFFER_SIZE: usize = 2048;
@@ -65,7 +65,6 @@ pub struct Resources {
 
 impl Resources {
     /// Create new HTTP client resources
-    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             read_buffer: [0; READ_BUFFER_SIZE],
@@ -90,7 +89,6 @@ impl<'a> fmt::Debug for Http<'a> {
 
 impl<'a> Http<'a> {
     /// Create new HTTP client using the given resources
-    #[allow(dead_code)]
     pub fn new(wifi: &'a Wifi, seed: u64, resources: &'a mut Resources, base_url: &'a str) -> Self {
         // FIXME: embedded-tls can't verify TLS certificates (though pinning is supported)
         // This is bad since it makes communication vulnerable to mitm attacks. esp-mbedtls would
@@ -107,7 +105,6 @@ impl<'a> Http<'a> {
     }
 
     /// Send GET request, deserialize JSON response
-    #[allow(dead_code)]
     pub async fn get<T: FromJson>(&mut self, path: &str) -> Result<T, Error> {
         let base_url = self.base_url;
 
@@ -122,7 +119,6 @@ impl<'a> Http<'a> {
     }
 
     /// Serialize data to JSON, send POST request, deserialize JSON response
-    #[allow(dead_code)]
     pub async fn post<T: ToJson, U: FromJson>(&mut self, path: &str, data: &T) -> Result<U, Error> {
         let base_url = self.base_url;
 

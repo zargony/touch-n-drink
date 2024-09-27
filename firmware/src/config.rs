@@ -65,6 +65,16 @@ pub struct Config {
     pub wifi_ssid: String,
     /// Wifi password
     pub wifi_password: SensitiveString,
+    /// Vereinsflieger API username
+    pub vf_username: String,
+    /// MD5 (hex) of Vereinsflieger API password
+    pub vf_password_md5: SensitiveString,
+    /// Vereinsflieger API appkey
+    pub vf_appkey: SensitiveString,
+    /// Vereinsflieger API cid (optional)
+    pub vf_cid: Option<u32>,
+    /// Vereinsflieger article id for purchase
+    pub vf_article_id: u32,
 }
 
 impl FromJsonObject for Config {
@@ -76,6 +86,11 @@ impl FromJsonObject for Config {
         match &*key {
             "wifi-ssid" => self.wifi_ssid = reader.read().await?,
             "wifi-password" => self.wifi_password = reader.read().await?,
+            "vf-username" => self.vf_username = reader.read().await?,
+            "vf-password-md5" => self.vf_password_md5 = reader.read().await?,
+            "vf-appkey" => self.vf_appkey = reader.read().await?,
+            "vf-cid" => self.vf_cid = Some(reader.read().await?),
+            "vf-article-id" => self.vf_article_id = reader.read().await?,
             _ => _ = reader.read_any().await?,
         }
         Ok(())
