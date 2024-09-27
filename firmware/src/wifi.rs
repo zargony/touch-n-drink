@@ -1,3 +1,4 @@
+use core::cell::Cell;
 use core::fmt;
 use embassy_executor::{task, Spawner};
 use embassy_net::dns::{self, DnsQueryType, DnsSocket};
@@ -132,6 +133,7 @@ impl fmt::Display for DisplayNetworkConfig {
 pub struct Wifi {
     stack: &'static Stack<WifiDevice<'static, WifiStaDevice>>,
     tcp_client_state: &'static TcpClientState<NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>,
+    last_up_state: Cell<bool>,
 }
 
 impl Wifi {
@@ -187,12 +189,31 @@ impl Wifi {
         Ok(Self {
             stack,
             tcp_client_state,
+            last_up_state: Cell::new(false),
         })
     }
 
     /// Returns whether network stack is up (Wifi connected and IP address obtained)
     pub fn is_up(&self) -> bool {
-        self.stack.is_link_up() && self.stack.is_config_up()
+        let up = self.stack.is_link_up() && self.stack.is_config_up();
+
+        // Log network state only if changed since last call
+        if up != self.last_up_state.get() {
+            if up {
+                if let Some(network_config) = self.stack.config_v4() {
+                    info!(
+                        "Wifi: Network configured, hw: {}, {}",
+                        self.stack.hardware_address(),
+                        DisplayNetworkConfig(network_config),
+                    );
+                }
+            } else {
+                info!("Wifi: Network down");
+            }
+        }
+
+        self.last_up_state.set(up);
+        up
     }
 
     /// Wait for network stack to come up (Wifi connected and IP address obtained). This function
@@ -205,18 +226,6 @@ impl Wifi {
         debug!("Wifi: Waiting for network to come up...");
         self.stack.wait_config_up().await;
         debug_assert!(self.stack.is_link_up() && self.stack.is_config_up());
-
-        match self.stack.config_v4() {
-            Some(network_config) => {
-                info!(
-                    "Wifi: Network configured, hw: {}, {}",
-                    self.stack.hardware_address(),
-                    DisplayNetworkConfig(network_config),
-                );
-            }
-            // Panic on failure since no IPv4 indicates a serious error
-            None => panic!("Failed to retrieve IPv4 network configuration"),
-        }
     }
 
     /// Query DNS for IP address of given name
