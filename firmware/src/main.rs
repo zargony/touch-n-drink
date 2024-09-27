@@ -66,6 +66,8 @@ use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
 use log::{error, info};
 
+extern crate alloc;
+
 static VERSION_STR: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 static GIT_SHA_STR: &str = env!("GIT_SHORT_SHA");
 
@@ -101,7 +103,7 @@ async fn main(spawner: Spawner) {
     let _led = AnyOutput::new(io.pins.gpio8, Level::High);
 
     // Initialize global allocator
-    esp_alloc::heap_allocator!(128 * 1024);
+    esp_alloc::heap_allocator!(72 * 1024);
 
     // Initialize async executor
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
