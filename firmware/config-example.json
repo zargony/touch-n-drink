@@ -1,0 +1,19 @@
+// Note that you must remove all comments in your own configuration file since
+// JSON officially doesn't allow comments and parsing will fail with comments.
+{
+  // SSID and WPA2 password to use for connecting to Wifi network. Wifi must
+  // provide an IPv4 address via DHCP and internet access to required services.
+  "wifi-ssid": "My Wifi",
+  "wifi-password": "12345",
+
+  // Credentials for connecting to the Vereinsflieger API. See Vereinsflieger
+  // REST Documentation for details. Note that password needs to be given as
+  // its hex MD5 hash instead of plain text.
+  "vf-username": "touchndrink@cool-aeroclub.de",
+  "vf-password-md5": "00000000000000000000000000000000",
+  "vf-appkey": "00000000000000000000000000000000",
+  "vf-cid": 0,
+
+  // Vereinsflieger article id to use for purchases
+  "vf-article-id": 0
+}

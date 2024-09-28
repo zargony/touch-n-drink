@@ -138,6 +138,7 @@ pub struct Wifi {
 
 impl Wifi {
     /// Create and initialize Wifi interface
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         timer: impl EspWifiTimerSource,
         mut rng: Rng,
@@ -145,6 +146,8 @@ impl Wifi {
         clocks: &Clocks<'_>,
         wifi: peripherals::WIFI,
         spawner: Spawner,
+        ssid: &str,
+        password: &str,
     ) -> Result<Self, InitializationError> {
         debug!("Wifi: Initializing controller...");
 
@@ -155,6 +158,12 @@ impl Wifi {
         debug!("Wifi: Static configuration: {:?}", esp_wifi::CONFIG);
         let init = esp_wifi::initialize(EspWifiInitFor::Wifi, timer, rng, radio_clocks, clocks)?;
         let client_config = WifiClientConfiguration {
+            ssid: ssid
+                .try_into()
+                .map_err(|()| InitializationError::General(0))?,
+            password: password
+                .try_into()
+                .map_err(|()| InitializationError::General(0))?,
             ..Default::default()
         };
         let (device, mut controller) = wifi::new_with_config(&init, wifi, client_config)?;

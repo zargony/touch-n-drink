@@ -40,6 +40,7 @@
 #![no_main]
 
 mod buzzer;
+mod config;
 mod display;
 mod error;
 mod http;
@@ -115,6 +116,9 @@ async fn main(spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     info!("Touch 'n Drink {VERSION_STR} ({GIT_SHA_STR})");
 
+    // Read system configuration
+    let config = config::Config::read();
+
     // Initialize I2C controller
     let i2c = I2C::new_with_timeout_async(
         peripherals.I2C0,
@@ -168,6 +172,8 @@ async fn main(spawner: Spawner) {
         &clocks,
         peripherals.WIFI,
         spawner,
+        &config.wifi_ssid,
+        &config.wifi_password,
     )
     .await
     {

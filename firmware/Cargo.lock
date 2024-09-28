@@ -938,6 +938,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "esp-partition-table"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2f5b2accc551f643064854e8cbe82727ba6d15eeaae28cab18c8bc54ec411e4"
+dependencies = [
+ "embedded-storage",
+ "md5",
+]
+
+[[package]]
 name = "esp-println"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -958,6 +968,16 @@ dependencies = [
  "document-features",
  "riscv",
  "riscv-rt-macros",
+]
+
+[[package]]
+name = "esp-storage"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fa3fc3afc3a56b91522a35b9f773d40d2332d0a66ff1e8a823152cda4ff1923"
+dependencies = [
+ "critical-section",
+ "embedded-storage",
 ]
 
 [[package]]
@@ -1426,6 +1446,12 @@ dependencies = [
  "quote",
  "syn 1.0.109",
 ]
+
+[[package]]
+name = "md5"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "memchr"
@@ -2009,11 +2035,14 @@ dependencies = [
  "embedded-hal-async",
  "embedded-io-async",
  "embedded-nal-async",
+ "embedded-storage",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",
+ "esp-partition-table",
  "esp-println",
+ "esp-storage",
  "esp-wifi",
  "git2",
  "log",
