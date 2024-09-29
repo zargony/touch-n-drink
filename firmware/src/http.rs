@@ -75,6 +75,9 @@ impl<'a, TCP: TcpConnect, DNS: Dns> Http<'a, TCP, DNS> {
         write_buffer: &'a mut [u8],
         base_url: &'a str,
     ) -> Self {
+        // FIXME: embedded-tls can't verify TLS certificates (though pinning is supported)
+        // This is bad since it makes communication vulnerable to mitm attacks. esp-mbedtls would
+        // be an alternative, but is atm only supported with git reqwless and nightly Rust.
         let tls_config = TlsConfig::new(seed, read_buffer, write_buffer, TlsVerify::None);
         Self {
             client: HttpClient::new_with_tls(tcp_client, dns_socket, tls_config),
