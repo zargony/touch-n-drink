@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use core::cell::Cell;
 use core::fmt;
 use embassy_executor::{task, Spawner};
@@ -16,7 +17,6 @@ use esp_wifi::wifi::{
 use esp_wifi::{EspWifiInitFor, EspWifiTimerSource};
 use log::{debug, info, warn};
 use rand_core::RngCore;
-use static_cell::StaticCell;
 
 /// Delay after Wifi disconnect or connection failure before trying to reconnect
 const CONNECT_RETRY_DELAY: Duration = Duration::from_millis(5000);
@@ -32,18 +32,6 @@ const TX_BUFFER_SIZE: usize = 1024;
 
 /// Wifi initialization error
 pub use esp_wifi::InitializationError;
-
-/// Static network stack
-static STACK: StaticCell<Stack<WifiDevice<'_, WifiStaDevice>>> = StaticCell::new();
-
-/// Static network stack resources (sockets, inflight dns queries)
-// Needs at least one socket for DHCP, one socket for DNS, plus additional sockets for connections
-static RESOURCES: StaticCell<StackResources<{ 2 + NUM_TCP_SOCKETS }>> = StaticCell::new();
-
-/// Static TCP client state
-static TCP_CLIENT_STATE: StaticCell<
-    TcpClientState<NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>,
-> = StaticCell::new();
 
 /// Option display helper
 struct DisplayOption<T: fmt::Display>(Option<T>);
@@ -178,10 +166,18 @@ impl Wifi {
             Err(err) => panic!("Failed to spawn Wifi connection task: {:?}", err),
         }
 
-        // Initialize static network stack
+        // Following some resources are allocated and leaked to get a `&'static mut` reference.
+        // This is ok, since only one instance of `Wifi` can exist and it'll never be dropped.
+
+        // Initialize network stack resources (sockets, inflight dns queries). Needs at least one
+        // socket for DHCP, one socket for DNS, plus additional sockets for connections.
+        let resources = Box::new(StackResources::<{ 2 + NUM_TCP_SOCKETS }>::new());
+        let resources = Box::leak(resources);
+
+        // Initialize network stack
         let config = Config::dhcpv4(DhcpConfig::default());
-        let resources = RESOURCES.init(StackResources::new());
-        let stack = STACK.init(Stack::new(device, config, resources, random_seed));
+        let stack = Box::new(Stack::new(device, config, resources, random_seed));
+        let stack = Box::leak(stack);
 
         // Spawn task for running network stack
         debug!("Wifi: Spawning network task...");
@@ -192,7 +188,8 @@ impl Wifi {
         }
 
         // Initialize TCP client state (reserves tx/rx buffers for TCP sockets)
-        let tcp_client_state = TCP_CLIENT_STATE.init(TcpClientState::new());
+        let tcp_client_state = Box::new(TcpClientState::new());
+        let tcp_client_state = Box::leak(tcp_client_state);
 
         info!("Wifi: Controller initialized");
         Ok(Self {

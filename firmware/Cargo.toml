@@ -71,5 +71,4 @@ reqwless = { version = "0.12", default-features = false, features = ["alloc", "e
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 ssd1306 = { version = "0.9", features = ["async"] }
-static_cell = "2.1"
 u8g2-fonts = "0.4"

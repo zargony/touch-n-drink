@@ -2052,7 +2052,6 @@ dependencies = [
  "serde",
  "serde_json",
  "ssd1306",
- "static_cell",
  "u8g2-fonts",
 ]
 
