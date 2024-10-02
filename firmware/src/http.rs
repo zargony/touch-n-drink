@@ -1,6 +1,6 @@
+use crate::wifi::{DnsSocket, TcpClient, TcpConnection};
 use core::fmt;
 use embedded_io_async::{Read, Write};
-use embedded_nal_async::{Dns, TcpConnect};
 use log::debug;
 use reqwless::client::{
     HttpClient, HttpResource, HttpResourceRequestBuilder, TlsConfig, TlsVerify,
@@ -51,12 +51,12 @@ impl fmt::Display for Error {
 }
 
 /// HTTP client
-pub struct Http<'a, TCP: TcpConnect, DNS: Dns> {
-    client: HttpClient<'a, TCP, DNS>,
+pub struct Http<'a> {
+    client: HttpClient<'a, TcpClient<'a>, DnsSocket<'a>>,
     base_url: &'a str,
 }
 
-impl<'a, TCP: TcpConnect, DNS: Dns> fmt::Debug for Http<'a, TCP, DNS> {
+impl<'a> fmt::Debug for Http<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Http")
             .field("base_url", &self.base_url)
@@ -64,12 +64,12 @@ impl<'a, TCP: TcpConnect, DNS: Dns> fmt::Debug for Http<'a, TCP, DNS> {
     }
 }
 
-impl<'a, TCP: TcpConnect, DNS: Dns> Http<'a, TCP, DNS> {
+impl<'a> Http<'a> {
     /// Create new HTTP client using the given TCP and DNS sockets
     #[allow(dead_code)]
     pub fn new(
-        tcp_client: &'a TCP,
-        dns_socket: &'a DNS,
+        tcp_client: &'a TcpClient<'a>,
+        dns_socket: &'a DnsSocket<'a>,
         seed: u64,
         read_buffer: &'a mut [u8],
         write_buffer: &'a mut [u8],
@@ -124,9 +124,9 @@ impl<'a, TCP: TcpConnect, DNS: Dns> Http<'a, TCP, DNS> {
     }
 }
 
-impl<'a, TCP: TcpConnect, DNS: Dns> Http<'a, TCP, DNS> {
+impl<'a> Http<'a> {
     /// Returns a connected http resource client
-    async fn resource(&mut self) -> Result<HttpResource<'_, TCP::Connection<'_>>, Error> {
+    async fn resource(&mut self) -> Result<HttpResource<'_, TcpConnection<'_>>, Error> {
         // TODO: keep resource cached so that we stay connected (and reconnect only when required)?
         let resource = self.client.resource(self.base_url).await?;
         debug!("HTTP: Connect {}", self.base_url);

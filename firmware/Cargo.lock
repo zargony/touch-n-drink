@@ -2034,7 +2034,6 @@ dependencies = [
  "embedded-graphics",
  "embedded-hal-async",
  "embedded-io-async",
- "embedded-nal-async",
  "embedded-storage",
  "esp-alloc",
  "esp-backtrace",

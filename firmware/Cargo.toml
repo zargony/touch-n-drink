@@ -54,7 +54,6 @@ embassy-time = { version = "0.3", features = ["generic-queue"] }
 embedded-graphics = "0.8"
 embedded-hal-async = "1.0"
 embedded-io-async = "0.6"
-embedded-nal-async = "0.7"
 embedded-storage = "0.3"
 esp-alloc = "0.4"
 esp-backtrace = { version = "0.14", features = ["esp32c3", "custom-halt", "panic-handler", "exception-handler", "println"] }
