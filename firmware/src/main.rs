@@ -141,7 +141,7 @@ async fn main(spawner: Spawner) {
     let _ = display.screen(&screen::Splash).await;
 
     // Initialize keypad
-    let keypad = keypad::Keypad::new(
+    let mut keypad = keypad::Keypad::new(
         [
             AnyInput::new(io.pins.gpio5, Pull::Up),
             AnyInput::new(io.pins.gpio6, Pull::Up),
@@ -157,7 +157,7 @@ async fn main(spawner: Spawner) {
 
     // Initialize NFC reader
     let nfc_irq = AnyInput::new(io.pins.gpio20, Pull::Up);
-    let nfc = match nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq).await {
+    let mut nfc = match nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq).await {
         Ok(nfc) => nfc,
         // Panic on failure since an initialization error indicates a serious error
         Err(err) => panic!("NFC reader initialization failed: {:?}", err),
@@ -188,7 +188,7 @@ async fn main(spawner: Spawner) {
     let _ = buzzer.startup().await;
 
     // Create UI
-    let mut ui = ui::Ui::new(display, keypad, nfc, buzzer, wifi);
+    let mut ui = ui::Ui::new(&mut display, &mut keypad, &mut nfc, &mut buzzer, &wifi);
 
     // Show splash screen for a while, ignore any error
     let _ = ui.show_splash().await;

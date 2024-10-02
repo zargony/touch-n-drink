@@ -36,21 +36,21 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// User interface
 pub struct Ui<'a, I2C, IRQ> {
-    display: Display<I2C>,
-    keypad: Keypad<'a, 3, 4>,
-    nfc: Nfc<I2C, IRQ>,
-    buzzer: Buzzer<'a>,
-    wifi: Wifi,
+    display: &'a mut Display<I2C>,
+    keypad: &'a mut Keypad<'a, 3, 4>,
+    nfc: &'a mut Nfc<I2C, IRQ>,
+    buzzer: &'a mut Buzzer<'a>,
+    wifi: &'a Wifi,
 }
 
 impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     /// Create user interface with given human interface devices
     pub fn new(
-        display: Display<I2C>,
-        keypad: Keypad<'a, 3, 4>,
-        nfc: Nfc<I2C, IRQ>,
-        buzzer: Buzzer<'a>,
-        wifi: Wifi,
+        display: &'a mut Display<I2C>,
+        keypad: &'a mut Keypad<'a, 3, 4>,
+        nfc: &'a mut Nfc<I2C, IRQ>,
+        buzzer: &'a mut Buzzer<'a>,
+        wifi: &'a Wifi,
     ) -> Self {
         Self {
             display,
