@@ -1,4 +1,4 @@
-use crate::wifi::{DnsSocket, TcpClient, TcpConnection};
+use crate::wifi::{DnsSocket, TcpClient, TcpConnection, Wifi};
 use core::fmt;
 use embedded_io_async::{Read, Write};
 use log::debug;
@@ -12,6 +12,12 @@ use serde::{de::DeserializeOwned, Serialize};
 
 /// Maximum size of response from server
 const MAX_RESPONSE_SIZE: usize = 4096;
+
+/// TLS read buffer size
+const READ_BUFFER_SIZE: usize = 4096;
+
+/// TLS write buffer size
+const WRITE_BUFFER_SIZE: usize = 2048;
 
 /// HTTP client error
 #[derive(Debug)]
@@ -50,6 +56,23 @@ impl fmt::Display for Error {
     }
 }
 
+/// HTTP client resources
+pub struct Resources {
+    read_buffer: [u8; READ_BUFFER_SIZE],
+    write_buffer: [u8; WRITE_BUFFER_SIZE],
+}
+
+impl Resources {
+    /// Create new HTTP client resources
+    #[allow(dead_code)]
+    pub fn new() -> Self {
+        Self {
+            read_buffer: [0; READ_BUFFER_SIZE],
+            write_buffer: [0; WRITE_BUFFER_SIZE],
+        }
+    }
+}
+
 /// HTTP client
 pub struct Http<'a> {
     client: HttpClient<'a, TcpClient<'a>, DnsSocket<'a>>,
@@ -65,24 +88,21 @@ impl<'a> fmt::Debug for Http<'a> {
 }
 
 impl<'a> Http<'a> {
-    /// Create new HTTP client using the given TCP and DNS sockets
+    /// Create new HTTP client using the given resources
     #[allow(dead_code)]
-    pub fn new(
-        tcp_client: &'a TcpClient<'a>,
-        dns_socket: &'a DnsSocket<'a>,
-        seed: u64,
-        read_buffer: &'a mut [u8],
-        write_buffer: &'a mut [u8],
-        base_url: &'a str,
-    ) -> Self {
+    pub fn new(wifi: &'a Wifi, seed: u64, resources: &'a mut Resources, base_url: &'a str) -> Self {
         // FIXME: embedded-tls can't verify TLS certificates (though pinning is supported)
         // This is bad since it makes communication vulnerable to mitm attacks. esp-mbedtls would
         // be an alternative, but is atm only supported with git reqwless and nightly Rust.
-        let tls_config = TlsConfig::new(seed, read_buffer, write_buffer, TlsVerify::None);
-        Self {
-            client: HttpClient::new_with_tls(tcp_client, dns_socket, tls_config),
-            base_url,
-        }
+        let tls_config = TlsConfig::new(
+            seed,
+            &mut resources.read_buffer,
+            &mut resources.write_buffer,
+            TlsVerify::None,
+        );
+        let client = HttpClient::new_with_tls(wifi.tcp(), wifi.dns(), tls_config);
+
+        Self { client, base_url }
     }
 
     /// Send GET request, deserialize JSON response
