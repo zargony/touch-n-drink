@@ -33,16 +33,16 @@ const RX_BUFFER_SIZE: usize = 4096;
 pub type Device = WifiDevice<'static, WifiStaDevice>;
 
 /// Type of DNS socket
-pub type DnsSocket = dns::DnsSocket<'static, Device>;
+pub type DnsSocket<'d> = dns::DnsSocket<'d, Device>;
 
 /// Type of TCP client
-pub type TcpClient =
-    tcp::client::TcpClient<'static, Device, NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>;
+pub type TcpClient<'d> =
+    tcp::client::TcpClient<'d, Device, NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>;
 
 /// Type of TCP connection returned by TCP client
 #[allow(dead_code)]
-pub type TcpConnection =
-    tcp::client::TcpConnection<'static, NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>;
+pub type TcpConnection<'d> =
+    tcp::client::TcpConnection<'d, NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>;
 
 /// Wifi initialization error
 pub use esp_wifi::InitializationError;
@@ -134,8 +134,8 @@ impl fmt::Display for DisplayNetworkConfig {
 /// Wifi interface
 pub struct Wifi {
     stack: &'static Stack<Device>,
-    dns_socket: &'static DnsSocket,
-    tcp_client: &'static TcpClient,
+    dns_socket: &'static DnsSocket<'static>,
+    tcp_client: &'static TcpClient<'static>,
     last_up_state: Cell<bool>,
 }
 
@@ -277,13 +277,13 @@ impl Wifi {
 
     /// Provide an embedded-nal-async compatible DNS socket
     #[allow(dead_code)]
-    pub fn dns(&self) -> &'static DnsSocket {
+    pub fn dns(&self) -> &'_ DnsSocket {
         self.dns_socket
     }
 
     /// Provide an embedded-nal-async compatible TCP client
     #[allow(dead_code)]
-    pub fn tcp(&self) -> &'static TcpClient {
+    pub fn tcp(&self) -> &'_ TcpClient {
         self.tcp_client
     }
 }
