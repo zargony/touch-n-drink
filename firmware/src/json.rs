@@ -149,7 +149,6 @@ pub struct Reader<R> {
 
 impl<R: BufRead> Reader<R> {
     /// Create JSON reader
-    #[allow(dead_code)]
     pub fn new(reader: R) -> Self {
         Self { reader, pos: 0 }
     }
@@ -537,7 +536,6 @@ pub struct Writer<W> {
 
 impl<W: Write> Writer<W> {
     /// Create JSON writer
-    #[allow(dead_code)]
     pub fn new(writer: W) -> Self {
         Self { writer }
     }
