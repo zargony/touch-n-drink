@@ -170,6 +170,9 @@ impl<'a> Http<'a> {
     async fn send_request_parse_response<C: Read + Write, B: RequestBody, T: DeserializeOwned>(
         request: HttpResourceRequestBuilder<'_, '_, C, B>,
     ) -> Result<T, Error> {
+        // rx_buf is used to buffer response headers. The response body reader uses this only for
+        // non-TLS connections. Body reader of TLS connections will use the TLS read_buffer for
+        // buffering parts of the body. However, read_to_end will again always use this buffer.
         let mut rx_buf = [0; MAX_RESPONSE_SIZE];
         let response = request.send(&mut rx_buf).await?;
 
