@@ -44,6 +44,7 @@ mod config;
 mod display;
 mod error;
 mod http;
+mod json;
 mod keypad;
 mod nfc;
 mod pn532;
