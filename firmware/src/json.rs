@@ -16,6 +16,48 @@ pub enum Value {
     Object(Vec<(String, Value)>),
 }
 
+impl From<()> for Value {
+    fn from(_value: ()) -> Self {
+        Self::Null
+    }
+}
+
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        Self::Boolean(value)
+    }
+}
+
+impl From<f64> for Value {
+    fn from(value: f64) -> Self {
+        Self::Number(value)
+    }
+}
+
+impl From<&str> for Value {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+impl From<String> for Value {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<Vec<Value>> for Value {
+    fn from(value: Vec<Value>) -> Self {
+        Self::Array(value)
+    }
+}
+
+impl From<Vec<(String, Value)>> for Value {
+    fn from(value: Vec<(String, Value)>) -> Self {
+        Self::Object(value)
+    }
+}
+
 impl TryFrom<Value> for bool {
     type Error = Error<()>;
 
