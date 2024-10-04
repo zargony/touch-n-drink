@@ -506,13 +506,19 @@ impl FromJson for Value {
 mod tests {
     use super::*;
 
-    fn r(s: &str) -> Reader<&[u8]> {
+    fn reader(s: &str) -> Reader<&[u8]> {
         Reader::new(s.as_bytes())
+    }
+
+    macro_rules! assert_read_eq {
+        ($json:expr, $method:ident, $value:expr) => {{
+            assert_eq!(reader($json).$method().await, $value);
+        }};
     }
 
     #[async_std::test]
     async fn read() {
-        #[derive(Debug, Default)]
+        #[derive(Debug, Default, PartialEq)]
         struct Test {
             foo: String,
             bar: f64,
@@ -537,22 +543,24 @@ mod tests {
         }
 
         let json = r#"{"foo": "hi", "bar": 42, "baz": true}"#;
-        let test: Test = r(json).read().await.unwrap();
-        assert_eq!(test.foo, "hi");
-        assert_eq!(test.bar, 42.0);
-        assert_eq!(test.baz, true);
+        assert_read_eq!(
+            json,
+            read,
+            Ok(Test {
+                foo: "hi".into(),
+                bar: 42.0,
+                baz: true,
+            })
+        );
     }
 
     #[async_std::test]
     async fn read_any() {
-        assert_eq!(r("null").read_any().await, Ok(Value::Null));
-        assert_eq!(r("false").read_any().await, Ok(Value::Boolean(false)));
-        assert_eq!(r("123.456").read_any().await, Ok(Value::Number(123.456)));
-        assert_eq!(
-            r(r#""hello""#).read_any().await,
-            Ok(Value::String("hello".into()))
-        );
-        assert_eq!(r("buzz").read_any().await, Err(Error::Unexpected('b')));
+        assert_read_eq!("null", read_any, Ok(Value::Null));
+        assert_read_eq!("false", read_any, Ok(Value::Boolean(false)));
+        assert_read_eq!("123.456", read_any, Ok(Value::Number(123.456)));
+        assert_read_eq!("\"hello\"", read_any, Ok(Value::String("hello".into())));
+        assert_read_eq!("buzz", read_any, Err(Error::Unexpected('b')));
     }
 
     #[async_std::test]
@@ -560,7 +568,7 @@ mod tests {
         let json = r#"{"foo": "hi", "bar": 42, "baz": true}"#;
         let mut values = Vec::new();
         let collect = |k, v| values.push((k, v));
-        assert_eq!(r(json).read_object(collect).await, Ok(()));
+        assert_eq!(reader(json).read_object(collect).await, Ok(()));
         assert_eq!(values.len(), 3);
         assert_eq!(values[0].0, "foo");
         assert_eq!(values[0].1, Value::String("hi".into()));
@@ -575,7 +583,7 @@ mod tests {
         let json = "[1, 2, 3, 4]";
         let mut values = Vec::new();
         let collect = |v| values.push(v);
-        assert_eq!(r(json).read_array(collect).await, Ok(()));
+        assert_eq!(reader(json).read_array(collect).await, Ok(()));
         assert_eq!(values.len(), 4);
         assert_eq!(values[0], Value::Number(1.0));
         assert_eq!(values[1], Value::Number(2.0));
@@ -585,66 +593,55 @@ mod tests {
 
     #[async_std::test]
     async fn read_string() {
-        assert_eq!(r(r#""""#).read_string().await.unwrap(), "");
-        assert_eq!(r(r#""hello""#).read_string().await.unwrap(), "hello");
-        assert_eq!(
-            r(r#""hello \"world\"""#).read_string().await.unwrap(),
-            r#"hello "world""#
+        assert_read_eq!("\"\"", read_string, Ok("".into()));
+        assert_read_eq!("\"hello\"", read_string, Ok("hello".into()));
+        assert_read_eq!(
+            r#""hello \"world""#,
+            read_string,
+            Ok("hello \"world".into())
         );
-        assert_eq!(r(r#""hello"#).read_string().await, Err(Error::Eof));
+        assert_read_eq!("\"hello", read_string, Err(Error::Eof));
     }
 
     #[async_std::test]
     async fn read_number() {
-        assert_eq!(r("0").read_number().await, Ok(0.0));
-        assert_eq!(r("123").read_number().await, Ok(123.0));
-        assert_eq!(r("-234").read_number().await, Ok(-234.0));
-        assert_eq!(r("0.0").read_number().await, Ok(0.0));
-        assert_eq!(r("123.456").read_number().await, Ok(123.456));
-        assert_eq!(r("-234.567").read_number().await, Ok(-234.567));
-        assert_eq!(r("null").read_number().await, Err(Error::Unexpected('n')));
-        assert_eq!(r(r#""0""#).read_number().await, Err(Error::Unexpected('"')));
+        assert_read_eq!("0", read_number, Ok(0.0));
+        assert_read_eq!("123", read_number, Ok(123.0));
+        assert_read_eq!("-234", read_number, Ok(-234.0));
+        assert_read_eq!("0.0", read_number, Ok(0.0));
+        assert_read_eq!("123.456", read_number, Ok(123.456));
+        assert_read_eq!("-234.567", read_number, Ok(-234.567));
+        assert_read_eq!("null", read_number, Err(Error::Unexpected('n')));
+        assert_read_eq!("\"0\"", read_number, Err(Error::Unexpected('"')));
     }
 
     #[async_std::test]
     async fn read_integer() {
-        assert_eq!(r("0").read_integer().await, Ok(0));
-        assert_eq!(r("123").read_integer().await, Ok(123));
-        assert_eq!(r("-234").read_integer().await, Ok(-234));
-        assert_eq!(r("null").read_integer().await, Err(Error::Unexpected('n')));
-        assert_eq!(
-            r("123.456").read_integer().await,
-            Err(Error::Unexpected('.'))
-        );
-        assert_eq!(
-            r(r#""0""#).read_integer().await,
-            Err(Error::Unexpected('"'))
-        );
+        assert_read_eq!("0", read_integer, Ok(0));
+        assert_read_eq!("123", read_integer, Ok(123));
+        assert_read_eq!("-234", read_integer, Ok(-234));
+        assert_read_eq!("null", read_integer, Err(Error::Unexpected('n')));
+        assert_read_eq!("123.456", read_integer, Err(Error::Unexpected('.')));
+        assert_read_eq!("\"0\"", read_integer, Err(Error::Unexpected('"')));
     }
 
     #[async_std::test]
     async fn read_boolean() {
-        assert_eq!(r("false").read_boolean().await, Ok(false));
-        assert_eq!(r("true").read_boolean().await, Ok(true));
-        assert_eq!(r("t").read_boolean().await, Err(Error::Eof));
-        assert_eq!(r("0").read_boolean().await, Err(Error::Unexpected('0')));
-        assert_eq!(r("True").read_boolean().await, Err(Error::Unexpected('T')));
-        assert_eq!(r("1234").read_boolean().await, Err(Error::Unexpected('1')));
-        assert_eq!(
-            r(r#""true""#).read_boolean().await,
-            Err(Error::Unexpected('"'))
-        );
+        assert_read_eq!("false", read_boolean, Ok(false));
+        assert_read_eq!("true", read_boolean, Ok(true));
+        assert_read_eq!("t", read_boolean, Err(Error::Eof));
+        assert_read_eq!("0", read_boolean, Err(Error::Unexpected('0')));
+        assert_read_eq!("True", read_boolean, Err(Error::Unexpected('T')));
+        assert_read_eq!("1234", read_boolean, Err(Error::Unexpected('1')));
+        assert_read_eq!("\"true\"", read_boolean, Err(Error::Unexpected('"')));
     }
 
     #[async_std::test]
     async fn read_null() {
-        assert_eq!(r("null").read_null().await, Ok(()));
-        assert_eq!(r("n").read_null().await, Err(Error::Eof));
-        assert_eq!(r("0").read_null().await, Err(Error::Unexpected('0')));
-        assert_eq!(r("1234").read_null().await, Err(Error::Unexpected('1')));
-        assert_eq!(
-            r(r#""null""#).read_null().await,
-            Err(Error::Unexpected('"'))
-        );
+        assert_read_eq!("null", read_null, Ok(()));
+        assert_read_eq!("n", read_null, Err(Error::Eof));
+        assert_read_eq!("0", read_null, Err(Error::Unexpected('0')));
+        assert_read_eq!("1234", read_null, Err(Error::Unexpected('1')));
+        assert_read_eq!("\"null\"", read_null, Err(Error::Unexpected('"')));
     }
 }
