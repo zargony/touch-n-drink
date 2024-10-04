@@ -1,9 +1,9 @@
 use alloc::boxed::Box;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
 use core::iter::Extend;
-use embedded_io_async::BufRead;
+use embedded_io_async::{BufRead, Write};
 
 /// JSON value
 #[derive(Debug, Clone, PartialEq)]
@@ -49,10 +49,10 @@ impl TryFrom<Value> for String {
     }
 }
 
-/// JSON reader error
+/// JSON reader/writer error
 #[derive(Debug, PartialEq)]
 pub enum Error<E> {
-    Read(E),
+    Io(E),
     Eof,
     Unexpected(char),
     NumberTooLarge,
@@ -61,14 +61,14 @@ pub enum Error<E> {
 
 impl<E: embedded_io_async::Error> From<E> for Error<E> {
     fn from(err: E) -> Self {
-        Self::Read(err)
+        Self::Io(err)
     }
 }
 
 impl<E: fmt::Display> fmt::Display for Error<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Read(err) => write!(f, "Read error: {err}"),
+            Self::Io(err) => write!(f, "I/O error: {err}"),
             Self::Eof => write!(f, "Premature EOF"),
             Self::Unexpected(ch) => write!(f, "Unexpected `{ch}`"),
             Self::NumberTooLarge => write!(f, "Number too large"),
@@ -130,7 +130,6 @@ impl<R: BufRead> Reader<R> {
     /// can contain any JSON value. Note that the value is completely read into memory, so for
     /// large objects or arrays, this may allocate a lot memory. See `read_object` and `read_array`
     /// for memory-optimized streaming read of objects and arrays.
-    #[allow(dead_code)]
     pub async fn read_any(&mut self) -> Result<Value, Error<R::Error>> {
         self.trim().await?;
         match self.peek().await? {
@@ -487,24 +486,281 @@ impl FromJson for Vec<(String, Value)> {
     }
 }
 
-// FIXME: Generic implementation for `Extend<(String, Value)>` conflicts with `Extend<String>` above
-// impl<T: Default + Extend<(String, Value)>> FromJson for T {
-//     async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-//         let mut vec = Self::default();
-//         reader.read_object(|k, v| vec.extend([(k, v)])).await?;
-//         Ok(vec)
-//     }
-// }
-
 impl FromJson for Value {
     async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
         reader.read_any().await
     }
 }
 
+/// Asynchronous streaming JSON writer
+///
+/// This JSON writer writes to a wrapped asynchronous byte writer and creates JSON without storing
+/// any JSON in memory.
+#[derive(Debug)]
+pub struct Writer<W> {
+    writer: W,
+}
+
+impl<W: Write> Writer<W> {
+    /// Create JSON writer
+    #[allow(dead_code)]
+    pub fn new(writer: W) -> Self {
+        Self { writer }
+    }
+
+    /// Returns a reference to the inner writer wrapped by this writer
+    #[allow(dead_code)]
+    pub fn get_ref(&self) -> &W {
+        &self.writer
+    }
+
+    /// Returns a mutable reference to the inner writer wrapped by this writer
+    #[allow(dead_code)]
+    pub fn get_mut(&mut self) -> &mut W {
+        &mut self.writer
+    }
+
+    /// Consumes the writer, returning its inner writer
+    #[allow(dead_code)]
+    pub fn into_inner(self) -> W {
+        self.writer
+    }
+
+    /// Write type to JSON
+    /// Uses the type's `ToJson` implementation to write JSON to this reader.
+    pub async fn write<T: ToJson>(&mut self, value: &T) -> Result<(), Error<W::Error>> {
+        value.to_json(self).await
+    }
+
+    /// Write any JSON value
+    pub async fn write_any(&mut self, value: &Value) -> Result<(), Error<W::Error>> {
+        match value {
+            Value::Object(object) => Box::pin(self.write_object(object)).await,
+            Value::Array(array) => Box::pin(self.write_array(array)).await,
+            Value::String(string) => self.write_string(string).await,
+            Value::Number(number) => self.write_number(*number).await,
+            Value::Boolean(boolean) => self.write_boolean(*boolean).await,
+            Value::Null => self.write_null().await,
+        }
+    }
+
+    /// Write JSON object
+    pub async fn write_object<'a, K, V, I>(&mut self, iter: I) -> Result<(), Error<W::Error>>
+    where
+        K: AsRef<str> + 'a,
+        V: ToJson + 'a,
+        I: IntoIterator<Item = &'a (K, V)>,
+    {
+        self.writer.write_all(b"{").await?;
+        for (i, (k, v)) in iter.into_iter().enumerate() {
+            if i > 0 {
+                self.writer.write_all(b", ").await?;
+            }
+            self.write_string(k.as_ref()).await?;
+            self.writer.write_all(b": ").await?;
+            self.write(v).await?;
+        }
+        self.writer.write_all(b"}").await?;
+        Ok(())
+    }
+
+    /// Write JSON array
+    pub async fn write_array<'a, T, I>(&mut self, iter: I) -> Result<(), Error<W::Error>>
+    where
+        T: ToJson + 'a,
+        I: IntoIterator<Item = &'a T>,
+    {
+        self.writer.write_all(b"[").await?;
+        for (i, elem) in iter.into_iter().enumerate() {
+            if i > 0 {
+                self.writer.write_all(b", ").await?;
+            }
+            self.write(elem).await?;
+        }
+        self.writer.write_all(b"]").await?;
+        Ok(())
+    }
+
+    /// Write JSON string
+    pub async fn write_string(&mut self, value: &str) -> Result<(), Error<W::Error>> {
+        self.writer.write_all(b"\"").await?;
+        // OPTIMIZE: Writing each char separately to a writer is quite inefficient
+        for ch in value.escape_default() {
+            self.writer.write_all(&[ch as u8]).await?;
+        }
+        self.writer.write_all(b"\"").await?;
+        Ok(())
+    }
+
+    /// Write JSON number
+    pub async fn write_number(&mut self, value: f64) -> Result<(), Error<W::Error>> {
+        let buf = value.to_string();
+        self.writer.write_all(buf.as_bytes()).await?;
+        Ok(())
+    }
+
+    /// Write JSON integer
+    pub async fn write_integer(&mut self, value: i64) -> Result<(), Error<W::Error>> {
+        let buf = value.to_string();
+        self.writer.write_all(buf.as_bytes()).await?;
+        Ok(())
+    }
+
+    /// Write JSON boolean
+    pub async fn write_boolean(&mut self, value: bool) -> Result<(), Error<W::Error>> {
+        self.writer
+            .write_all(if value { b"true" } else { b"false" })
+            .await?;
+        Ok(())
+    }
+
+    /// Write JSON null
+    pub async fn write_null(&mut self) -> Result<(), Error<W::Error>> {
+        self.writer.write_all(b"null").await?;
+        Ok(())
+    }
+}
+
+/// Serialize to streaming JSON
+pub trait ToJson {
+    /// Serialize this type using the given JSON writer
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>>;
+}
+
+impl ToJson for () {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_null().await
+    }
+}
+
+impl ToJson for bool {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_boolean(*self).await
+    }
+}
+
+impl ToJson for u8 {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_integer(i64::from(*self)).await
+    }
+}
+
+impl ToJson for u16 {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_integer(i64::from(*self)).await
+    }
+}
+
+impl ToJson for u32 {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_integer(i64::from(*self)).await
+    }
+}
+
+impl ToJson for u64 {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer
+            .write_integer(i64::try_from(*self).map_err(|_e| Error::NumberTooLarge)?)
+            .await
+    }
+}
+
+impl ToJson for i8 {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_integer(i64::from(*self)).await
+    }
+}
+
+impl ToJson for i16 {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_integer(i64::from(*self)).await
+    }
+}
+
+impl ToJson for i32 {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_integer(i64::from(*self)).await
+    }
+}
+
+impl ToJson for i64 {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_integer(*self).await
+    }
+}
+
+impl ToJson for f32 {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        #[allow(clippy::cast_lossless)]
+        writer.write_number(*self as f64).await
+    }
+}
+
+impl ToJson for f64 {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_number(*self).await
+    }
+}
+
+impl ToJson for str {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_string(self).await
+    }
+}
+
+impl ToJson for String {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_string(self).await
+    }
+}
+
+impl<T: ToJson> ToJson for [T] {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_array(self).await
+    }
+}
+
+impl<T: ToJson> ToJson for [(&str, T)] {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_object(self).await
+    }
+}
+
+impl<T: ToJson> ToJson for [(String, T)] {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_object(self).await
+    }
+}
+
+impl ToJson for Value {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_any(self).await
+    }
+}
+
+impl<T: ToJson> ToJson for &T {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        (**self).to_json(writer).await
+    }
+}
+
+impl<T: ToJson> ToJson for &mut T {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        (**self).to_json(writer).await
+    }
+}
+
+impl<T: ToJson> ToJson for Box<T> {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        (**self).to_json(writer).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::collections::{LinkedList, VecDeque};
+    use alloc::vec;
 
     fn reader(s: &str) -> Reader<&[u8]> {
         Reader::new(s.as_bytes())
@@ -596,9 +852,9 @@ mod tests {
         assert_read_eq!("\"\"", read_string, Ok("".into()));
         assert_read_eq!("\"hello\"", read_string, Ok("hello".into()));
         assert_read_eq!(
-            r#""hello \"world""#,
+            r#""hello \"world\"""#,
             read_string,
-            Ok("hello \"world".into())
+            Ok("hello \"world\"".into())
         );
         assert_read_eq!("\"hello", read_string, Err(Error::Eof));
     }
@@ -643,5 +899,133 @@ mod tests {
         assert_read_eq!("0", read_null, Err(Error::Unexpected('0')));
         assert_read_eq!("1234", read_null, Err(Error::Unexpected('1')));
         assert_read_eq!("\"null\"", read_null, Err(Error::Unexpected('"')));
+    }
+
+    fn writer() -> Writer<Vec<u8>> {
+        Writer::new(Vec::new())
+    }
+
+    macro_rules! assert_write_eq {
+        ($method:ident, $($value:expr)?, $json:expr) => {{
+            let mut writer = writer();
+            let res = writer.$method($($value)?).await;
+            let json = String::from_utf8(writer.into_inner()).unwrap();
+            assert_eq!(res.map(|()| json.as_str()), $json)
+        }};
+    }
+
+    #[async_std::test]
+    async fn write() {
+        #[derive(Debug, Default)]
+        struct Test {
+            foo: String,
+            bar: f64,
+            baz: bool,
+        }
+
+        impl ToJson for Test {
+            async fn to_json<W: Write>(
+                &self,
+                writer: &mut Writer<W>,
+            ) -> Result<(), Error<W::Error>> {
+                writer
+                    .write_object(&[
+                        ("foo", Value::String(self.foo.clone())),
+                        ("bar", Value::Number(self.bar)),
+                        ("baz", Value::Boolean(self.baz)),
+                    ])
+                    .await
+            }
+        }
+
+        assert_write_eq!(
+            write,
+            &Test {
+                foo: "hi".into(),
+                bar: 42.0,
+                baz: true,
+            },
+            Ok(r#"{"foo": "hi", "bar": 42, "baz": true}"#)
+        );
+    }
+
+    #[async_std::test]
+    async fn write_any() {
+        assert_write_eq!(write_any, &Value::Null, Ok("null"));
+        assert_write_eq!(write_any, &Value::Boolean(false), Ok("false"));
+        assert_write_eq!(write_any, &Value::Number(123.456), Ok("123.456"));
+        assert_write_eq!(write_any, &Value::String("hello".into()), Ok("\"hello\""));
+    }
+
+    #[async_std::test]
+    async fn write_object() {
+        assert_write_eq!(
+            write_object,
+            &[
+                ("foo", Value::String("hi".into())),
+                ("bar", Value::Number(42.0)),
+                ("baz", Value::Boolean(true))
+            ],
+            Ok(r#"{"foo": "hi", "bar": 42, "baz": true}"#)
+        );
+        assert_write_eq!(
+            write_object,
+            &vec![
+                ("foo", Value::String("hi".into())),
+                ("bar", Value::Number(42.0)),
+                ("baz", Value::Boolean(true))
+            ],
+            Ok(r#"{"foo": "hi", "bar": 42, "baz": true}"#)
+        );
+    }
+
+    #[async_std::test]
+    async fn write_array() {
+        assert_write_eq!(write_array, &[1, 2, 3, 4], Ok("[1, 2, 3, 4]"));
+        assert_write_eq!(write_array, &vec![1, 2, 3, 4], Ok("[1, 2, 3, 4]"));
+        assert_write_eq!(
+            write_array,
+            &LinkedList::from([1, 2, 3, 4]),
+            Ok("[1, 2, 3, 4]")
+        );
+        assert_write_eq!(
+            write_array,
+            &VecDeque::from([1, 2, 3, 4]),
+            Ok("[1, 2, 3, 4]")
+        );
+    }
+
+    #[async_std::test]
+    async fn write_string() {
+        assert_write_eq!(write_string, "", Ok("\"\""));
+        assert_write_eq!(write_string, "hello", Ok("\"hello\""));
+        assert_write_eq!(write_string, "hello \"world\"", Ok(r#""hello \"world\"""#));
+    }
+
+    #[async_std::test]
+    async fn write_number() {
+        assert_write_eq!(write_number, 0.0, Ok("0"));
+        assert_write_eq!(write_number, 123.0, Ok("123"));
+        assert_write_eq!(write_number, -234.0, Ok("-234"));
+        assert_write_eq!(write_number, 123.456, Ok("123.456"));
+        assert_write_eq!(write_number, -234.567, Ok("-234.567"));
+    }
+
+    #[async_std::test]
+    async fn write_integer() {
+        assert_write_eq!(write_integer, 0, Ok("0"));
+        assert_write_eq!(write_integer, 123, Ok("123"));
+        assert_write_eq!(write_integer, -234, Ok("-234"));
+    }
+
+    #[async_std::test]
+    async fn write_boolean() {
+        assert_write_eq!(write_boolean, false, Ok("false"));
+        assert_write_eq!(write_boolean, true, Ok("true"));
+    }
+
+    #[async_std::test]
+    async fn write_null() {
+        assert_write_eq!(write_null, , Ok("null"));
     }
 }
