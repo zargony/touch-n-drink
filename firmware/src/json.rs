@@ -472,6 +472,12 @@ impl FromJson for Vec<(String, Value)> {
 //     }
 // }
 
+impl FromJson for Value {
+    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        reader.read_any().await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
