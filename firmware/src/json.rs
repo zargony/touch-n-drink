@@ -59,6 +59,12 @@ pub enum Error<E> {
     InvalidType,
 }
 
+impl<E: embedded_io_async::Error> From<E> for Error<E> {
+    fn from(err: E) -> Self {
+        Self::Read(err)
+    }
+}
+
 impl<E: fmt::Display> fmt::Display for Error<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -92,6 +98,24 @@ impl<R: BufRead> Reader<R> {
     #[allow(dead_code)]
     pub fn new(reader: R) -> Self {
         Self { reader, pos: 0 }
+    }
+
+    /// Returns a reference to the inner reader wrapped by this reader
+    #[allow(dead_code)]
+    pub fn get_ref(&self) -> &R {
+        &self.reader
+    }
+
+    /// Returns a mutable reference to the inner reader wrapped by this reader
+    #[allow(dead_code)]
+    pub fn get_mut(&mut self) -> &mut R {
+        &mut self.reader
+    }
+
+    /// Consumes the reader, returning its inner reader
+    #[allow(dead_code)]
+    pub fn into_inner(self) -> R {
+        self.reader
     }
 
     /// Read and parse type from JSON
@@ -321,14 +345,14 @@ impl<R: BufRead> Reader<R> {
     /// Peek next character from reader
     async fn peek(&mut self) -> Result<u8, Error<R::Error>> {
         // OPTIMIZE: Minimize calls to fill_buf by keeping a local reference (but: lifetime issues)
-        let buf = self.reader.fill_buf().await.map_err(Error::Read)?;
+        let buf = self.reader.fill_buf().await?;
         match buf.get(self.pos) {
             Some(ch) => Ok(*ch),
             None if self.pos == 0 => Err(Error::Eof),
             None => {
                 self.reader.consume(self.pos);
                 self.pos = 0;
-                let buf = self.reader.fill_buf().await.map_err(Error::Read)?;
+                let buf = self.reader.fill_buf().await?;
                 match buf.first() {
                     Some(ch) => Ok(*ch),
                     None => Err(Error::Eof),
