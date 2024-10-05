@@ -46,9 +46,21 @@ impl From<String> for Value {
     }
 }
 
+impl From<&[Value]> for Value {
+    fn from(value: &[Value]) -> Self {
+        Self::Array(value.into())
+    }
+}
+
 impl From<Vec<Value>> for Value {
     fn from(value: Vec<Value>) -> Self {
         Self::Array(value)
+    }
+}
+
+impl From<&[(String, Value)]> for Value {
+    fn from(value: &[(String, Value)]) -> Self {
+        Self::Object(value.into())
     }
 }
 
@@ -557,33 +569,18 @@ impl<W: Write> Writer<W> {
     /// Write any JSON value
     pub async fn write_any(&mut self, value: &Value) -> Result<(), Error<W::Error>> {
         match value {
-            Value::Object(object) => Box::pin(self.write_object(object)).await,
-            Value::Array(array) => Box::pin(self.write_array(array)).await,
-            Value::String(string) => self.write_string(string).await,
-            Value::Number(number) => self.write_number(*number).await,
-            Value::Boolean(boolean) => self.write_boolean(*boolean).await,
+            Value::Object(object) => Box::pin(self.write(object)).await,
+            Value::Array(array) => Box::pin(self.write(array)).await,
+            Value::String(string) => self.write(string).await,
+            Value::Number(number) => self.write(*number).await,
+            Value::Boolean(boolean) => self.write(*boolean).await,
             Value::Null => self.write_null().await,
         }
     }
 
     /// Write JSON object
-    pub async fn write_object<'a, K, V, I>(&mut self, iter: I) -> Result<(), Error<W::Error>>
-    where
-        K: AsRef<str> + 'a,
-        V: ToJson + 'a,
-        I: IntoIterator<Item = &'a (K, V)>,
-    {
-        self.writer.write_all(b"{").await?;
-        for (i, (k, v)) in iter.into_iter().enumerate() {
-            if i > 0 {
-                self.writer.write_all(b", ").await?;
-            }
-            self.write_string(k.as_ref()).await?;
-            self.writer.write_all(b": ").await?;
-            self.write(v).await?;
-        }
-        self.writer.write_all(b"}").await?;
-        Ok(())
+    pub async fn write_object(&mut self) -> Result<ObjectWriter<W>, Error<W::Error>> {
+        ObjectWriter::new(self).await
     }
 
     /// Write JSON array
@@ -639,6 +636,58 @@ impl<W: Write> Writer<W> {
     /// Write JSON null
     pub async fn write_null(&mut self) -> Result<(), Error<W::Error>> {
         self.writer.write_all(b"null").await?;
+        Ok(())
+    }
+}
+
+/// JSON object writer
+pub struct ObjectWriter<'w, W: Write> {
+    json: &'w mut Writer<W>,
+    has_fields: bool,
+}
+
+impl<'w, W: Write> ObjectWriter<'w, W> {
+    /// Start object
+    pub async fn new(json: &'w mut Writer<W>) -> Result<Self, Error<W::Error>> {
+        json.writer.write_all(b"{").await?;
+        Ok(Self {
+            json,
+            has_fields: false,
+        })
+    }
+
+    /// Write object field
+    pub async fn field<T: ToJson>(
+        &mut self,
+        key: &str,
+        value: T,
+    ) -> Result<&mut Self, Error<W::Error>> {
+        if self.has_fields {
+            self.json.writer.write_all(b", ").await?;
+        }
+        self.json.write_string(key).await?;
+        self.json.writer.write_all(b": ").await?;
+        self.json.write(value).await?;
+        self.has_fields = true;
+        Ok(self)
+    }
+
+    /// Write object fields from iterable collections
+    pub async fn fields_from<'a, K, V, I>(&mut self, iter: I) -> Result<&mut Self, Error<W::Error>>
+    where
+        K: AsRef<str> + 'a,
+        V: ToJson + 'a,
+        I: IntoIterator<Item = &'a (K, V)>,
+    {
+        for (key, value) in iter {
+            self.field(key.as_ref(), value).await?;
+        }
+        Ok(self)
+    }
+
+    /// Finish object
+    pub async fn finish(&mut self) -> Result<(), Error<W::Error>> {
+        self.json.writer.write_all(b"}").await?;
         Ok(())
     }
 }
@@ -742,15 +791,57 @@ impl<T: ToJson> ToJson for [T] {
     }
 }
 
+impl<T: ToJson> ToJson for Vec<T> {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer.write_array(self).await
+    }
+}
+
 impl<T: ToJson> ToJson for [(&str, T)] {
     async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_object(self).await
+        writer
+            .write_object()
+            .await?
+            .fields_from(self)
+            .await?
+            .finish()
+            .await
     }
 }
 
 impl<T: ToJson> ToJson for [(String, T)] {
     async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_object(self).await
+        writer
+            .write_object()
+            .await?
+            .fields_from(self)
+            .await?
+            .finish()
+            .await
+    }
+}
+
+impl<T: ToJson> ToJson for Vec<(&str, T)> {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer
+            .write_object()
+            .await?
+            .fields_from(self)
+            .await?
+            .finish()
+            .await
+    }
+}
+
+impl<T: ToJson> ToJson for Vec<(String, T)> {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer
+            .write_object()
+            .await?
+            .fields_from(self)
+            .await?
+            .finish()
+            .await
     }
 }
 
@@ -970,18 +1061,22 @@ mod tests {
                 writer: &mut Writer<W>,
             ) -> Result<(), Error<W::Error>> {
                 writer
-                    .write_object(&[
-                        ("foo", Value::String(self.foo.clone())),
-                        ("bar", Value::Number(self.bar)),
-                        ("baz", Value::Boolean(self.baz)),
-                    ])
+                    .write_object()
+                    .await?
+                    .field("foo", &self.foo)
+                    .await?
+                    .field("bar", self.bar)
+                    .await?
+                    .field("baz", self.baz)
+                    .await?
+                    .finish()
                     .await
             }
         }
 
         assert_write_eq!(
             write,
-            &Test {
+            Test {
                 foo: "hi".into(),
                 bar: 42.0,
                 baz: true,
@@ -996,26 +1091,48 @@ mod tests {
         assert_write_eq!(write_any, &Value::Boolean(false), Ok("false"));
         assert_write_eq!(write_any, &Value::Number(123.456), Ok("123.456"));
         assert_write_eq!(write_any, &Value::String("hello".into()), Ok("\"hello\""));
+        assert_write_eq!(
+            write_any,
+            &Value::Array(vec![
+                Value::Number(1.0),
+                Value::Number(2.0),
+                Value::Number(3.0),
+                Value::Number(4.0)
+            ]),
+            Ok("[1, 2, 3, 4]")
+        );
+        assert_write_eq!(
+            write_any,
+            &Value::Object(vec![
+                ("foo".into(), Value::String("hi".into())),
+                ("bar".into(), Value::Number(42.0)),
+                ("baz".into(), Value::Boolean(true)),
+            ]),
+            Ok(r#"{"foo": "hi", "bar": 42, "baz": true}"#)
+        );
     }
 
     #[async_std::test]
     async fn write_object() {
-        assert_write_eq!(
-            write_object,
-            &[
-                ("foo", Value::String("hi".into())),
-                ("bar", Value::Number(42.0)),
-                ("baz", Value::Boolean(true))
-            ],
-            Ok(r#"{"foo": "hi", "bar": 42, "baz": true}"#)
-        );
-        assert_write_eq!(
-            write_object,
-            &vec![
-                ("foo", Value::String("hi".into())),
-                ("bar", Value::Number(42.0)),
-                ("baz", Value::Boolean(true))
-            ],
+        let mut writer = writer();
+        let res = (&mut writer)
+            .write_object()
+            .await
+            .unwrap()
+            .field("foo", "hi")
+            .await
+            .unwrap()
+            .field("bar", 42)
+            .await
+            .unwrap()
+            .field("baz", true)
+            .await
+            .unwrap()
+            .finish()
+            .await;
+        let json = String::from_utf8(writer.into_inner()).unwrap();
+        assert_eq!(
+            res.map(|()| json.as_str()),
             Ok(r#"{"foo": "hi", "bar": 42, "baz": true}"#)
         );
     }
