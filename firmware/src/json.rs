@@ -570,7 +570,7 @@ impl<W: Write> Writer<W> {
 
     /// Write type to JSON
     /// Uses the type's `ToJson` implementation to write JSON to this reader.
-    pub async fn write<T: ToJson>(&mut self, value: &T) -> Result<(), Error<W::Error>> {
+    pub async fn write<T: ToJson>(&mut self, value: T) -> Result<(), Error<W::Error>> {
         value.to_json(self).await
     }
 
@@ -610,7 +610,7 @@ impl<W: Write> Writer<W> {
     pub async fn write_array<'a, T, I>(&mut self, iter: I) -> Result<(), Error<W::Error>>
     where
         T: ToJson + 'a,
-        I: IntoIterator<Item = &'a T>,
+        I: IntoIterator<Item = T>,
     {
         self.writer.write_all(b"[").await?;
         for (i, elem) in iter.into_iter().enumerate() {
@@ -780,19 +780,19 @@ impl ToJson for Value {
     }
 }
 
-impl<T: ToJson> ToJson for &T {
+impl<T: ToJson + ?Sized> ToJson for &T {
     async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
         (**self).to_json(writer).await
     }
 }
 
-impl<T: ToJson> ToJson for &mut T {
+impl<T: ToJson + ?Sized> ToJson for &mut T {
     async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
         (**self).to_json(writer).await
     }
 }
 
-impl<T: ToJson> ToJson for Box<T> {
+impl<T: ToJson + ?Sized> ToJson for Box<T> {
     async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
         (**self).to_json(writer).await
     }
@@ -1023,16 +1023,17 @@ mod tests {
 
     #[async_std::test]
     async fn write_array() {
+        assert_write_eq!(write_array, [1, 2, 3, 4], Ok("[1, 2, 3, 4]"));
         assert_write_eq!(write_array, &[1, 2, 3, 4], Ok("[1, 2, 3, 4]"));
-        assert_write_eq!(write_array, &vec![1, 2, 3, 4], Ok("[1, 2, 3, 4]"));
+        assert_write_eq!(write_array, vec![1, 2, 3, 4], Ok("[1, 2, 3, 4]"));
         assert_write_eq!(
             write_array,
-            &LinkedList::from([1, 2, 3, 4]),
+            LinkedList::from([1, 2, 3, 4]),
             Ok("[1, 2, 3, 4]")
         );
         assert_write_eq!(
             write_array,
-            &VecDeque::from([1, 2, 3, 4]),
+            VecDeque::from([1, 2, 3, 4]),
             Ok("[1, 2, 3, 4]")
         );
     }
