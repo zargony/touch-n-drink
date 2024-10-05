@@ -162,7 +162,6 @@ impl<R: BufRead> Reader<R> {
 
     /// Read and parse type from JSON
     /// Uses the type's `FromJson` implementation to create it by reading JSON from this reader.
-    #[allow(dead_code)]
     pub async fn read<T: FromJson>(&mut self) -> Result<T, Error<R::Error>> {
         T::from_json(self).await
     }
@@ -175,12 +174,12 @@ impl<R: BufRead> Reader<R> {
     pub async fn read_any(&mut self) -> Result<Value, Error<R::Error>> {
         self.trim().await?;
         match self.peek().await? {
-            b'{' => Ok(Value::Object(Box::pin(self.read_object_value()).await?)),
-            b'[' => Ok(Value::Array(Box::pin(self.read_array_value()).await?)),
-            b'"' => Ok(Value::String(self.read_string().await?)),
-            b'0'..=b'9' | b'-' => Ok(Value::Number(self.read_number().await?)),
-            b'f' | b't' => Ok(Value::Boolean(self.read_boolean().await?)),
-            b'n' => Ok(self.read_null().await?).map(|()| Value::Null),
+            b'{' => Ok(Value::Object(Box::pin(self.read()).await?)),
+            b'[' => Ok(Value::Array(Box::pin(self.read()).await?)),
+            b'"' => Ok(Value::String(self.read().await?)),
+            b'0'..=b'9' | b'-' => Ok(Value::Number(self.read().await?)),
+            b'f' | b't' => Ok(Value::Boolean(self.read().await?)),
+            b'n' => Ok(self.read().await?).map(|()| Value::Null),
             ch => Err(Error::unexpected(ch)),
         }
     }
@@ -213,17 +212,6 @@ impl<R: BufRead> Reader<R> {
         }
     }
 
-    /// Read and parse JSON object
-    /// A JSON object is read and returned. The returned type `Value::Object` contains all keys
-    /// and values. Note that the object is completely read into memory, so for large objects,
-    /// this may allocate a lot memory. See `read_object` for memory-optimized streaming read of
-    /// objects.
-    async fn read_object_value(&mut self) -> Result<Vec<(String, Value)>, Error<R::Error>> {
-        let mut vec = Vec::new();
-        self.read_object(|k, v| vec.push((k, v))).await?;
-        Ok(vec)
-    }
-
     /// Read and parse JSON array
     /// A JSON array is read and parsed element by element. The given closure is called for every
     /// element as it is parsed. This doesn't need to allocate memory for all elements of the
@@ -244,16 +232,6 @@ impl<R: BufRead> Reader<R> {
                 ch => break Err(Error::unexpected(ch)),
             }
         }
-    }
-
-    /// Read and parse JSON array
-    /// A JSON array is read and returned. The returned type `Value::Array` contains all elements.
-    /// Note that the array is completely read into memory, so for large arrays, this may allocate
-    /// a lot memory. See `read_array` for memory-optimized streaming read of objects.
-    async fn read_array_value(&mut self) -> Result<Vec<Value>, Error<R::Error>> {
-        let mut vec = Vec::new();
-        self.read_array(|elem| vec.push(elem)).await?;
-        Ok(vec)
     }
 
     /// Read and parse JSON string
@@ -524,7 +502,9 @@ impl<T: Default + Extend<Value>> FromJson for T {
 
 impl FromJson for Vec<(String, Value)> {
     async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        reader.read_object_value().await
+        let mut vec = Self::default();
+        reader.read_object(|k, v| vec.extend([(k, v)])).await?;
+        Ok(vec)
     }
 }
 
@@ -858,6 +838,25 @@ mod tests {
         assert_read_eq!("false", read_any, Ok(Value::Boolean(false)));
         assert_read_eq!("123.456", read_any, Ok(Value::Number(123.456)));
         assert_read_eq!("\"hello\"", read_any, Ok(Value::String("hello".into())));
+        assert_read_eq!(
+            "[1, 2, 3, 4]",
+            read_any,
+            Ok(Value::Array(vec![
+                Value::Number(1.0),
+                Value::Number(2.0),
+                Value::Number(3.0),
+                Value::Number(4.0),
+            ]))
+        );
+        assert_read_eq!(
+            r#"{"foo": "hi", "bar": 42, "baz": true}"#,
+            read_any,
+            Ok(Value::Object(vec![
+                ("foo".into(), Value::String("hi".into())),
+                ("bar".into(), Value::Number(42.0)),
+                ("baz".into(), Value::Boolean(true)),
+            ]))
+        );
         assert_read_eq!("buzz", read_any, Err(Error::Unexpected('b')));
     }
 
