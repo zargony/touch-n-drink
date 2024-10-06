@@ -13,7 +13,7 @@ use log::{debug, info, warn};
 pub struct SensitiveString(String);
 
 impl TryFrom<json::Value> for SensitiveString {
-    type Error = json::Error<()>;
+    type Error = json::TryFromValueError;
 
     fn try_from(value: json::Value) -> Result<Self, Self::Error> {
         Ok(Self(value.try_into()?))

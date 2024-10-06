@@ -5,6 +5,16 @@ use core::fmt;
 use core::iter::Extend;
 use embedded_io_async::{BufRead, Write};
 
+/// JSON value conversion error
+#[derive(Debug)]
+pub struct TryFromValueError;
+
+impl fmt::Display for TryFromValueError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "JSON value conversion error")
+    }
+}
+
 /// JSON value
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -71,34 +81,34 @@ impl From<Vec<(String, Value)>> for Value {
 }
 
 impl TryFrom<Value> for bool {
-    type Error = Error<()>;
+    type Error = TryFromValueError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Boolean(b) => Ok(b),
-            _ => Err(Error::InvalidType),
+            _ => Err(TryFromValueError),
         }
     }
 }
 
 impl TryFrom<Value> for f64 {
-    type Error = Error<()>;
+    type Error = TryFromValueError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Number(n) => Ok(n),
-            _ => Err(Error::InvalidType),
+            _ => Err(TryFromValueError),
         }
     }
 }
 
 impl TryFrom<Value> for String {
-    type Error = Error<()>;
+    type Error = TryFromValueError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::String(s) => Ok(s),
-            _ => Err(Error::InvalidType),
+            _ => Err(TryFromValueError),
         }
     }
 }
@@ -116,6 +126,12 @@ pub enum Error<E> {
 impl<E: embedded_io_async::Error> From<E> for Error<E> {
     fn from(err: E) -> Self {
         Self::Io(err)
+    }
+}
+
+impl<E> From<TryFromValueError> for Error<E> {
+    fn from(_err: TryFromValueError) -> Self {
+        Self::InvalidType
     }
 }
 
