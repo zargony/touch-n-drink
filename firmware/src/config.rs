@@ -73,10 +73,13 @@ impl FromJson for Config {
     ) -> Result<Self, json::Error<R::Error>> {
         let mut this = Self::default();
         reader
-            .read_object(|k, v: json::Value| match &*k {
-                "wifi-ssid" => this.wifi_ssid = v.try_into().unwrap(),
-                "wifi-password" => this.wifi_password = v.try_into().unwrap(),
-                _ => (),
+            .read_object(|k, v: json::Value| {
+                match &*k {
+                    "wifi-ssid" => this.wifi_ssid = v.try_into()?,
+                    "wifi-password" => this.wifi_password = v.try_into()?,
+                    _ => (),
+                }
+                Ok(())
             })
             .await?;
         Ok(this)

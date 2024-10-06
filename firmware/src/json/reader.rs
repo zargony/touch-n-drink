@@ -71,7 +71,7 @@ impl<R: BufRead> Reader<R> {
     /// the object, just for one key value pair at a time.
     pub async fn read_object<T: FromJson>(
         &mut self,
-        mut f: impl FnMut(String, T),
+        mut f: impl FnMut(String, T) -> Result<(), Error<R::Error>>,
     ) -> Result<(), Error<R::Error>> {
         self.trim().await?;
         self.expect(b'{').await?;
@@ -80,7 +80,7 @@ impl<R: BufRead> Reader<R> {
             let key = self.read_string().await?;
             self.expect(b':').await?;
             let value = self.read().await?;
-            f(key, value);
+            f(key, value)?;
             self.trim().await?;
             match self.peek().await? {
                 b',' => self.consume(),
@@ -99,13 +99,13 @@ impl<R: BufRead> Reader<R> {
     /// array, just for one element at a time.
     pub async fn read_array<T: FromJson>(
         &mut self,
-        mut f: impl FnMut(T),
+        mut f: impl FnMut(T) -> Result<(), Error<R::Error>>,
     ) -> Result<(), Error<R::Error>> {
         self.trim().await?;
         self.expect(b'[').await?;
         loop {
             let elem = self.read().await?;
-            f(elem);
+            f(elem)?;
             self.trim().await?;
             match self.peek().await? {
                 b',' => self.consume(),
@@ -368,7 +368,12 @@ impl FromJson for String {
 impl<T: Default + Extend<Value>> FromJson for T {
     async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
         let mut vec = Self::default();
-        reader.read_array(|elem| vec.extend([elem])).await?;
+        reader
+            .read_array(|elem| {
+                vec.extend([elem]);
+                Ok(())
+            })
+            .await?;
         Ok(vec)
     }
 }
@@ -376,7 +381,12 @@ impl<T: Default + Extend<Value>> FromJson for T {
 impl FromJson for Vec<(String, Value)> {
     async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
         let mut vec = Self::default();
-        reader.read_object(|k, v| vec.extend([(k, v)])).await?;
+        reader
+            .read_object(|k, v| {
+                vec.extend([(k, v)]);
+                Ok(())
+            })
+            .await?;
         Ok(vec)
     }
 }
@@ -417,11 +427,14 @@ mod tests {
             ) -> Result<Self, Error<R::Error>> {
                 let mut test = Self::default();
                 reader
-                    .read_object(|k, v: Value| match &*k {
-                        "foo" => test.foo = v.try_into().unwrap(),
-                        "bar" => test.bar = v.try_into().unwrap(),
-                        "baz" => test.baz = v.try_into().unwrap(),
-                        _ => (),
+                    .read_object(|k, v: Value| {
+                        match &*k {
+                            "foo" => test.foo = v.try_into()?,
+                            "bar" => test.bar = v.try_into()?,
+                            "baz" => test.baz = v.try_into()?,
+                            _ => (),
+                        }
+                        Ok(())
                     })
                     .await?;
                 Ok(test)
@@ -473,7 +486,10 @@ mod tests {
     async fn read_object() {
         let json = r#"{"foo": "hi", "bar": 42, "baz": true}"#;
         let mut values = Vec::new();
-        let collect = |k, v: Value| values.push((k, v));
+        let collect = |k, v: Value| {
+            values.push((k, v));
+            Ok(())
+        };
         assert_eq!(reader(json).read_object(collect).await, Ok(()));
         assert_eq!(values.len(), 3);
         assert_eq!(values[0].0, "foo");
@@ -488,7 +504,10 @@ mod tests {
     async fn read_array() {
         let json = "[1, 2, 3, 4]";
         let mut values = Vec::new();
-        let collect = |v: Value| values.push(v);
+        let collect = |v: Value| {
+            values.push(v);
+            Ok(())
+        };
         assert_eq!(reader(json).read_array(collect).await, Ok(()));
         assert_eq!(values.len(), 4);
         assert_eq!(values[0], Value::Integer(1));
