@@ -118,7 +118,7 @@ async fn main(spawner: Spawner) {
     info!("Touch 'n Drink {VERSION_STR} ({GIT_SHA_STR})");
 
     // Read system configuration
-    let config = config::Config::read();
+    let config = config::Config::read().await;
 
     // Initialize I2C controller
     let i2c = I2C::new_with_timeout_async(

@@ -1,15 +1,24 @@
+use crate::json::{self, FromJson};
 use alloc::string::String;
 use core::fmt;
 use core::ops::Deref;
+use embedded_io_async::BufRead;
 use embedded_storage::ReadStorage;
 use esp_partition_table::{DataPartitionType, PartitionTable, PartitionType};
 use esp_storage::FlashStorage;
 use log::{debug, info, warn};
-use serde::Deserialize;
 
 /// String with sensitive content (debug and display output redacted)
-#[derive(Default, Deserialize)]
+#[derive(Default)]
 pub struct SensitiveString(String);
+
+impl TryFrom<json::Value> for SensitiveString {
+    type Error = json::Error<()>;
+
+    fn try_from(value: json::Value) -> Result<Self, Self::Error> {
+        Ok(Self(value.try_into()?))
+    }
+}
 
 impl fmt::Debug for SensitiveString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -50,8 +59,7 @@ impl Deref for SensitiveString {
 ///
 /// If there is no valid JSON or no valid `nvs` data partition, a default configuration is provided
 /// (which isn't very useful, but at least doesn't prevent the device from starting).
-#[derive(Debug, Default, Deserialize)]
-#[serde(default, rename_all = "kebab-case")]
+#[derive(Debug, Default)]
 pub struct Config {
     /// Wifi SSID to connect to
     pub wifi_ssid: String,
@@ -59,9 +67,25 @@ pub struct Config {
     pub wifi_password: SensitiveString,
 }
 
+impl FromJson for Config {
+    async fn from_json<R: BufRead>(
+        reader: &mut json::Reader<R>,
+    ) -> Result<Self, json::Error<R::Error>> {
+        let mut this = Self::default();
+        reader
+            .read_object(|k, v| match k.as_str() {
+                "wifi-ssid" => this.wifi_ssid = v.try_into().unwrap(),
+                "wifi-password" => this.wifi_password = v.try_into().unwrap(),
+                _ => (),
+            })
+            .await?;
+        Ok(this)
+    }
+}
+
 impl Config {
     /// Read configuration from nvs flash partition
-    pub fn read() -> Self {
+    pub async fn read() -> Self {
         let mut storage = FlashStorage::new();
 
         // Read partition table (at 0x8000 by default)
@@ -88,16 +112,9 @@ impl Config {
             warn!("Config: Unable to read nvs partition");
             return Self::default();
         }
-        // Find first non-ascii character and trim to the end. This removes trailing 0xff bytes
-        // (unused flash bytes), which would otherwise lead to 'trailing characters' serde error
-        // nightly: let (json, _rest) = bytes.split_once(|b| !b.is_ascii());
-        let json = bytes
-            .split(|b| !b.is_ascii())
-            .next()
-            .unwrap_or(bytes.as_ref());
 
         // Parse JSON config
-        let config = match serde_json::from_slice::<Self>(json) {
+        let config = match json::Reader::new(&bytes[..]).read().await {
             Ok(config) => config,
             Err(err) => {
                 warn!(
