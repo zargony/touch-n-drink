@@ -1,5 +1,6 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use core::str::FromStr;
 use core::{fmt, num};
 
 /// JSON value conversion error
@@ -8,6 +9,12 @@ pub struct TryFromValueError;
 
 impl From<num::TryFromIntError> for TryFromValueError {
     fn from(_err: num::TryFromIntError) -> Self {
+        Self
+    }
+}
+
+impl From<num::ParseIntError> for TryFromValueError {
+    fn from(_err: num::ParseIntError) -> Self {
         Self
     }
 }
@@ -190,6 +197,7 @@ impl TryFrom<Value> for u8 {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Integer(n) => Ok(u8::try_from(n)?),
+            Value::String(s) => Ok(u8::from_str(&s)?),
             _ => Err(TryFromValueError),
         }
     }
@@ -201,6 +209,7 @@ impl TryFrom<Value> for u16 {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Integer(n) => Ok(u16::try_from(n)?),
+            Value::String(s) => Ok(u16::from_str(&s)?),
             _ => Err(TryFromValueError),
         }
     }
@@ -212,6 +221,7 @@ impl TryFrom<Value> for u32 {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Integer(n) => Ok(u32::try_from(n)?),
+            Value::String(s) => Ok(u32::from_str(&s)?),
             _ => Err(TryFromValueError),
         }
     }
@@ -223,6 +233,7 @@ impl TryFrom<Value> for u64 {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Integer(n) => Ok(u64::try_from(n)?),
+            Value::String(s) => Ok(u64::from_str(&s)?),
             _ => Err(TryFromValueError),
         }
     }
@@ -234,6 +245,7 @@ impl TryFrom<Value> for usize {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Integer(n) => Ok(usize::try_from(n)?),
+            Value::String(s) => Ok(usize::from_str(&s)?),
             _ => Err(TryFromValueError),
         }
     }
@@ -245,6 +257,7 @@ impl TryFrom<Value> for i8 {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Integer(n) => Ok(i8::try_from(n)?),
+            Value::String(s) => Ok(i8::from_str(&s)?),
             _ => Err(TryFromValueError),
         }
     }
@@ -256,6 +269,7 @@ impl TryFrom<Value> for i16 {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Integer(n) => Ok(i16::try_from(n)?),
+            Value::String(s) => Ok(i16::from_str(&s)?),
             _ => Err(TryFromValueError),
         }
     }
@@ -267,6 +281,7 @@ impl TryFrom<Value> for i32 {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Integer(n) => Ok(i32::try_from(n)?),
+            Value::String(s) => Ok(i32::from_str(&s)?),
             _ => Err(TryFromValueError),
         }
     }
@@ -278,6 +293,7 @@ impl TryFrom<Value> for i64 {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Integer(n) => Ok(n),
+            Value::String(s) => Ok(i64::from_str(&s)?),
             _ => Err(TryFromValueError),
         }
     }
@@ -289,6 +305,7 @@ impl TryFrom<Value> for isize {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::Integer(n) => Ok(isize::try_from(n)?),
+            Value::String(s) => Ok(isize::from_str(&s)?),
             _ => Err(TryFromValueError),
         }
     }
@@ -305,6 +322,7 @@ impl TryFrom<Value> for f32 {
             // Rust Reference: Casting from an f64 to an f32 will produce the closest possible f32
             #[allow(clippy::cast_possible_truncation)]
             Value::Decimal(n) => Ok(n as f32),
+            Value::String(s) => Ok(f32::from_str(&s)?),
             _ => Err(TryFromValueError),
         }
     }
@@ -319,6 +337,7 @@ impl TryFrom<Value> for f64 {
             #[allow(clippy::cast_precision_loss)]
             Value::Integer(n) => Ok(n as f64),
             Value::Decimal(n) => Ok(n),
+            Value::String(s) => Ok(f64::from_str(&s)?),
             _ => Err(TryFromValueError),
         }
     }
