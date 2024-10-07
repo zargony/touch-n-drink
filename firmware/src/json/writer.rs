@@ -385,7 +385,7 @@ mod tests {
             let mut writer = writer();
             let res = writer.$method($($value)?).await;
             let json = String::from_utf8(writer.into_inner()).unwrap();
-            assert_eq!(res.map(|()| json.as_str()), $json)
+            assert_eq!(res.map(|()| &*json), $json)
         }};
     }
 
@@ -476,7 +476,7 @@ mod tests {
             .await;
         let json = String::from_utf8(writer.into_inner()).unwrap();
         assert_eq!(
-            res.map(|()| json.as_str()),
+            res.map(|()| &*json),
             Ok(r#"{"foo": "hi", "bar": 42, "baz": true}"#)
         );
     }
