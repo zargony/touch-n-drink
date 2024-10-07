@@ -50,9 +50,10 @@ impl<W: Write> Writer<W> {
             Value::Object(object) => Box::pin(self.write(object)).await,
             Value::Array(array) => Box::pin(self.write(array)).await,
             Value::String(string) => self.write(string).await,
-            Value::Number(number) => self.write(*number).await,
+            Value::Decimal(number) => self.write(*number).await,
+            Value::Integer(number) => self.write(*number).await,
             Value::Boolean(boolean) => self.write(*boolean).await,
-            Value::Null => self.write_null().await,
+            Value::Null => self.write(()).await,
         }
     }
 
@@ -89,14 +90,14 @@ impl<W: Write> Writer<W> {
         Ok(())
     }
 
-    /// Write JSON number
-    pub async fn write_number(&mut self, value: f64) -> Result<(), Error<W::Error>> {
+    /// Write JSON number (decimal)
+    pub async fn write_decimal(&mut self, value: f64) -> Result<(), Error<W::Error>> {
         let buf = value.to_string();
         self.writer.write_all(buf.as_bytes()).await?;
         Ok(())
     }
 
-    /// Write JSON integer
+    /// Write JSON number (integer)
     pub async fn write_integer(&mut self, value: i64) -> Result<(), Error<W::Error>> {
         let buf = value.to_string();
         self.writer.write_all(buf.as_bytes()).await?;
@@ -215,6 +216,14 @@ impl ToJson for u64 {
     }
 }
 
+impl ToJson for usize {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer
+            .write_integer(i64::try_from(*self).map_err(|_e| Error::NumberTooLarge)?)
+            .await
+    }
+}
+
 impl ToJson for i8 {
     async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
         writer.write_integer(i64::from(*self)).await
@@ -239,16 +248,23 @@ impl ToJson for i64 {
     }
 }
 
+impl ToJson for isize {
+    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        writer
+            .write_integer(i64::try_from(*self).map_err(|_e| Error::NumberTooLarge)?)
+            .await
+    }
+}
+
 impl ToJson for f32 {
     async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        #[allow(clippy::cast_lossless)]
-        writer.write_number(*self as f64).await
+        writer.write_decimal(f64::from(*self)).await
     }
 }
 
 impl ToJson for f64 {
     async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_number(*self).await
+        writer.write_decimal(*self).await
     }
 }
 
@@ -410,15 +426,16 @@ mod tests {
     async fn write_any() {
         assert_write_eq!(write_any, &Value::Null, Ok("null"));
         assert_write_eq!(write_any, &Value::Boolean(false), Ok("false"));
-        assert_write_eq!(write_any, &Value::Number(123.456), Ok("123.456"));
+        assert_write_eq!(write_any, &Value::Integer(123), Ok("123"));
+        assert_write_eq!(write_any, &Value::Decimal(123.456), Ok("123.456"));
         assert_write_eq!(write_any, &Value::String("hello".into()), Ok("\"hello\""));
         assert_write_eq!(
             write_any,
             &Value::Array(vec![
-                Value::Number(1.0),
-                Value::Number(2.0),
-                Value::Number(3.0),
-                Value::Number(4.0)
+                Value::Integer(1),
+                Value::Integer(2),
+                Value::Integer(3),
+                Value::Integer(4)
             ]),
             Ok("[1, 2, 3, 4]")
         );
@@ -426,7 +443,7 @@ mod tests {
             write_any,
             &Value::Object(vec![
                 ("foo".into(), Value::String("hi".into())),
-                ("bar".into(), Value::Number(42.0)),
+                ("bar".into(), Value::Integer(42)),
                 ("baz".into(), Value::Boolean(true)),
             ]),
             Ok(r#"{"foo": "hi", "bar": 42, "baz": true}"#)
@@ -483,12 +500,12 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn write_number() {
-        assert_write_eq!(write_number, 0.0, Ok("0"));
-        assert_write_eq!(write_number, 123.0, Ok("123"));
-        assert_write_eq!(write_number, -234.0, Ok("-234"));
-        assert_write_eq!(write_number, 123.456, Ok("123.456"));
-        assert_write_eq!(write_number, -234.567, Ok("-234.567"));
+    async fn write_decimal() {
+        assert_write_eq!(write_decimal, 0.0, Ok("0"));
+        assert_write_eq!(write_decimal, 123.0, Ok("123"));
+        assert_write_eq!(write_decimal, -234.0, Ok("-234"));
+        assert_write_eq!(write_decimal, 123.456, Ok("123.456"));
+        assert_write_eq!(write_decimal, -234.567, Ok("-234.567"));
     }
 
     #[async_std::test]

@@ -4,6 +4,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::iter::Extend;
+use core::str::FromStr;
 use embedded_io_async::BufRead;
 
 /// Asynchronous streaming JSON reader
@@ -57,7 +58,7 @@ impl<R: BufRead> Reader<R> {
             b'{' => Ok(Value::Object(Box::pin(self.read()).await?)),
             b'[' => Ok(Value::Array(Box::pin(self.read()).await?)),
             b'"' => Ok(Value::String(self.read().await?)),
-            b'0'..=b'9' | b'-' => Ok(Value::Number(self.read().await?)),
+            b'0'..=b'9' | b'-' => self.read_number().await,
             b'f' | b't' => Ok(Value::Boolean(self.read().await?)),
             b'n' => Ok(self.read().await?).map(|()| Value::Null),
             ch => Err(Error::unexpected(ch)),
@@ -139,73 +140,27 @@ impl<R: BufRead> Reader<R> {
         }
     }
 
-    /// Read and parse JSON number (decimal)
-    pub async fn read_number(&mut self) -> Result<f64, Error<R::Error>> {
-        let negative = match self.peek().await? {
-            b'-' => {
-                self.consume();
-                true
-            }
-            b'0'..=b'9' => false,
-            ch => return Err(Error::unexpected(ch)),
-        };
-        let mut number: f64 = 0.0;
-        let mut decimal: f64 = 0.0;
-        loop {
-            match self.peek().await {
-                Ok(ch @ b'0'..=b'9') => {
-                    self.consume();
-                    let mut value = f64::from(ch - b'0');
-                    if decimal == 0.0 {
-                        number *= 10.0;
-                    } else {
-                        value *= decimal;
-                        decimal /= 10.0;
-                    }
-                    if negative {
-                        number -= value;
-                    } else {
-                        number += value;
-                    }
-                }
-                Ok(b'.') => {
-                    self.consume();
-                    decimal = 0.1;
-                }
-                Ok(_) | Err(Error::Eof) => break Ok(number),
-                Err(err) => break Err(err),
-            }
+    /// Read and parse JSON number (either integer or decimal)
+    pub async fn read_number(&mut self) -> Result<Value, Error<R::Error>> {
+        let s = self.read_digits().await?;
+        match i64::from_str(&s) {
+            Ok(number) => Ok(Value::Integer(number)),
+            Err(_) => Ok(Value::Decimal(
+                f64::from_str(&s).map_err(|_e| Error::InvalidType)?,
+            )),
         }
+    }
+
+    /// Read and parse JSON number (decimal)
+    pub async fn read_decimal(&mut self) -> Result<f64, Error<R::Error>> {
+        let s = self.read_digits().await?;
+        f64::from_str(&s).map_err(|_e| Error::InvalidType)
     }
 
     /// Read and parse JSON number (integer)
     pub async fn read_integer(&mut self) -> Result<i64, Error<R::Error>> {
-        let negative = match self.peek().await? {
-            b'-' => {
-                self.consume();
-                true
-            }
-            b'0'..=b'9' => false,
-            ch => return Err(Error::unexpected(ch)),
-        };
-        let mut number: i64 = 0;
-        loop {
-            match self.peek().await {
-                Ok(ch @ b'0'..=b'9') => {
-                    self.consume();
-                    let value = i64::from(ch - b'0');
-                    number = number.checked_mul(10).ok_or(Error::NumberTooLarge)?;
-                    if negative {
-                        number = number.checked_sub(value).ok_or(Error::NumberTooLarge)?;
-                    } else {
-                        number = number.checked_add(value).ok_or(Error::NumberTooLarge)?;
-                    }
-                }
-                Ok(b'.') => break Err(Error::unexpected(b'.')),
-                Ok(_) | Err(Error::Eof) => break Ok(number),
-                Err(err) => break Err(err),
-            }
-        }
+        let s = self.read_digits().await?;
+        i64::from_str(&s).map_err(|_e| Error::InvalidType)
     }
 
     /// Read and parse JSON boolean
@@ -285,6 +240,28 @@ impl<R: BufRead> Reader<R> {
             ch => Err(Error::unexpected(ch)),
         }
     }
+
+    /// Read digits for parsing a number
+    async fn read_digits(&mut self) -> Result<String, Error<R::Error>> {
+        let mut s = String::new();
+        match self.peek().await? {
+            ch @ (b'-' | b'0'..=b'9') => {
+                self.consume();
+                s.push(char::from(ch));
+            }
+            ch => return Err(Error::unexpected(ch)),
+        }
+        loop {
+            match self.peek().await {
+                Ok(ch @ (b'0'..=b'9' | b'.')) => {
+                    self.consume();
+                    s.push(char::from(ch));
+                }
+                Ok(_) | Err(Error::Eof) => break Ok(s),
+                Err(err) => break Err(err),
+            }
+        }
+    }
 }
 
 /// Deserialize from streaming JSON
@@ -329,6 +306,12 @@ impl FromJson for u64 {
     }
 }
 
+impl FromJson for usize {
+    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        usize::try_from(reader.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
+    }
+}
+
 impl FromJson for i8 {
     async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
         i8::try_from(reader.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
@@ -353,16 +336,23 @@ impl FromJson for i64 {
     }
 }
 
+impl FromJson for isize {
+    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        isize::try_from(reader.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
+    }
+}
+
 impl FromJson for f32 {
     async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        // Rust Reference: Casting from an f64 to an f32 will produce the closest possible f32
         #[allow(clippy::cast_possible_truncation)]
-        Ok(reader.read_number().await? as f32)
+        Ok(reader.read_decimal().await? as f32)
     }
 }
 
 impl FromJson for f64 {
     async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        reader.read_number().await
+        reader.read_decimal().await
     }
 }
 
@@ -451,16 +441,17 @@ mod tests {
     async fn read_any() {
         assert_read_eq!("null", read_any, Ok(Value::Null));
         assert_read_eq!("false", read_any, Ok(Value::Boolean(false)));
-        assert_read_eq!("123.456", read_any, Ok(Value::Number(123.456)));
+        assert_read_eq!("123", read_any, Ok(Value::Integer(123)));
+        assert_read_eq!("123.456", read_any, Ok(Value::Decimal(123.456)));
         assert_read_eq!("\"hello\"", read_any, Ok(Value::String("hello".into())));
         assert_read_eq!(
             "[1, 2, 3, 4]",
             read_any,
             Ok(Value::Array(vec![
-                Value::Number(1.0),
-                Value::Number(2.0),
-                Value::Number(3.0),
-                Value::Number(4.0),
+                Value::Integer(1),
+                Value::Integer(2),
+                Value::Integer(3),
+                Value::Integer(4),
             ]))
         );
         assert_read_eq!(
@@ -468,7 +459,7 @@ mod tests {
             read_any,
             Ok(Value::Object(vec![
                 ("foo".into(), Value::String("hi".into())),
-                ("bar".into(), Value::Number(42.0)),
+                ("bar".into(), Value::Integer(42)),
                 ("baz".into(), Value::Boolean(true)),
             ]))
         );
@@ -485,7 +476,7 @@ mod tests {
         assert_eq!(values[0].0, "foo");
         assert_eq!(values[0].1, Value::String("hi".into()));
         assert_eq!(values[1].0, "bar");
-        assert_eq!(values[1].1, Value::Number(42.0));
+        assert_eq!(values[1].1, Value::Integer(42));
         assert_eq!(values[2].0, "baz");
         assert_eq!(values[2].1, Value::Boolean(true));
     }
@@ -497,10 +488,10 @@ mod tests {
         let collect = |v| values.push(v);
         assert_eq!(reader(json).read_array(collect).await, Ok(()));
         assert_eq!(values.len(), 4);
-        assert_eq!(values[0], Value::Number(1.0));
-        assert_eq!(values[1], Value::Number(2.0));
-        assert_eq!(values[2], Value::Number(3.0));
-        assert_eq!(values[3], Value::Number(4.0));
+        assert_eq!(values[0], Value::Integer(1));
+        assert_eq!(values[1], Value::Integer(2));
+        assert_eq!(values[2], Value::Integer(3));
+        assert_eq!(values[3], Value::Integer(4));
     }
 
     #[async_std::test]
@@ -516,15 +507,15 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn read_number() {
-        assert_read_eq!("0", read_number, Ok(0.0));
-        assert_read_eq!("123", read_number, Ok(123.0));
-        assert_read_eq!("-234", read_number, Ok(-234.0));
-        assert_read_eq!("0.0", read_number, Ok(0.0));
-        assert_read_eq!("123.456", read_number, Ok(123.456));
-        assert_read_eq!("-234.567", read_number, Ok(-234.567));
-        assert_read_eq!("null", read_number, Err(Error::Unexpected('n')));
-        assert_read_eq!("\"0\"", read_number, Err(Error::Unexpected('"')));
+    async fn read_decimal() {
+        assert_read_eq!("0", read_decimal, Ok(0.0));
+        assert_read_eq!("123", read_decimal, Ok(123.0));
+        assert_read_eq!("-234", read_decimal, Ok(-234.0));
+        assert_read_eq!("0.0", read_decimal, Ok(0.0));
+        assert_read_eq!("123.456", read_decimal, Ok(123.456));
+        assert_read_eq!("-234.567", read_decimal, Ok(-234.567));
+        assert_read_eq!("null", read_decimal, Err(Error::Unexpected('n')));
+        assert_read_eq!("\"0\"", read_decimal, Err(Error::Unexpected('"')));
     }
 
     #[async_std::test]
@@ -532,8 +523,10 @@ mod tests {
         assert_read_eq!("0", read_integer, Ok(0));
         assert_read_eq!("123", read_integer, Ok(123));
         assert_read_eq!("-234", read_integer, Ok(-234));
+        assert_read_eq!("0.0", read_integer, Err(Error::InvalidType));
+        assert_read_eq!("123.456", read_integer, Err(Error::InvalidType));
+        assert_read_eq!("-234.567", read_integer, Err(Error::InvalidType));
         assert_read_eq!("null", read_integer, Err(Error::Unexpected('n')));
-        assert_read_eq!("123.456", read_integer, Err(Error::Unexpected('.')));
         assert_read_eq!("\"0\"", read_integer, Err(Error::Unexpected('"')));
     }
 

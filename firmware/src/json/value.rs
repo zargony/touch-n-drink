@@ -1,10 +1,22 @@
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use core::fmt;
+use core::{fmt, num};
 
 /// JSON value conversion error
 #[derive(Debug)]
 pub struct TryFromValueError;
+
+impl From<num::TryFromIntError> for TryFromValueError {
+    fn from(_err: num::TryFromIntError) -> Self {
+        Self
+    }
+}
+
+impl From<num::ParseFloatError> for TryFromValueError {
+    fn from(_err: num::ParseFloatError) -> Self {
+        Self
+    }
+}
 
 impl fmt::Display for TryFromValueError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -17,7 +29,8 @@ impl fmt::Display for TryFromValueError {
 pub enum Value {
     Null,
     Boolean(bool),
-    Number(f64),
+    Integer(i64),
+    Decimal(f64),
     String(String),
     Array(Vec<Value>),
     Object(Vec<(String, Value)>),
@@ -35,9 +48,81 @@ impl From<bool> for Value {
     }
 }
 
+impl From<u8> for Value {
+    fn from(value: u8) -> Self {
+        Self::Integer(i64::from(value))
+    }
+}
+
+impl From<u16> for Value {
+    fn from(value: u16) -> Self {
+        Self::Integer(i64::from(value))
+    }
+}
+
+impl From<u32> for Value {
+    fn from(value: u32) -> Self {
+        Self::Integer(i64::from(value))
+    }
+}
+
+impl TryFrom<u64> for Value {
+    type Error = TryFromValueError;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        Ok(Self::Integer(i64::try_from(value)?))
+    }
+}
+
+impl TryFrom<usize> for Value {
+    type Error = TryFromValueError;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        Ok(Self::Integer(i64::try_from(value)?))
+    }
+}
+
+impl From<i8> for Value {
+    fn from(value: i8) -> Self {
+        Self::Integer(i64::from(value))
+    }
+}
+
+impl From<i16> for Value {
+    fn from(value: i16) -> Self {
+        Self::Integer(i64::from(value))
+    }
+}
+
+impl From<i32> for Value {
+    fn from(value: i32) -> Self {
+        Self::Integer(i64::from(value))
+    }
+}
+
+impl From<i64> for Value {
+    fn from(value: i64) -> Self {
+        Self::Integer(value)
+    }
+}
+
+impl TryFrom<isize> for Value {
+    type Error = TryFromValueError;
+
+    fn try_from(value: isize) -> Result<Self, Self::Error> {
+        Ok(Self::Integer(i64::try_from(value)?))
+    }
+}
+
+impl From<f32> for Value {
+    fn from(value: f32) -> Self {
+        Self::Decimal(f64::from(value))
+    }
+}
+
 impl From<f64> for Value {
     fn from(value: f64) -> Self {
-        Self::Number(value)
+        Self::Decimal(value)
     }
 }
 
@@ -77,6 +162,17 @@ impl From<Vec<(String, Value)>> for Value {
     }
 }
 
+impl TryFrom<Value> for () {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Null => Ok(()),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
 impl TryFrom<Value> for bool {
     type Error = TryFromValueError;
 
@@ -88,12 +184,141 @@ impl TryFrom<Value> for bool {
     }
 }
 
+impl TryFrom<Value> for u8 {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Integer(n) => Ok(u8::try_from(n)?),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
+impl TryFrom<Value> for u16 {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Integer(n) => Ok(u16::try_from(n)?),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
+impl TryFrom<Value> for u32 {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Integer(n) => Ok(u32::try_from(n)?),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
+impl TryFrom<Value> for u64 {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Integer(n) => Ok(u64::try_from(n)?),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
+impl TryFrom<Value> for usize {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Integer(n) => Ok(usize::try_from(n)?),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
+impl TryFrom<Value> for i8 {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Integer(n) => Ok(i8::try_from(n)?),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
+impl TryFrom<Value> for i16 {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Integer(n) => Ok(i16::try_from(n)?),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
+impl TryFrom<Value> for i32 {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Integer(n) => Ok(i32::try_from(n)?),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
+impl TryFrom<Value> for i64 {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Integer(n) => Ok(n),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
+impl TryFrom<Value> for isize {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Integer(n) => Ok(isize::try_from(n)?),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
+impl TryFrom<Value> for f32 {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            // Easy integer to float conversion (decimal in JSON might be written as integer)
+            #[allow(clippy::cast_precision_loss)]
+            Value::Integer(n) => Ok(n as f32),
+            // Rust Reference: Casting from an f64 to an f32 will produce the closest possible f32
+            #[allow(clippy::cast_possible_truncation)]
+            Value::Decimal(n) => Ok(n as f32),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
 impl TryFrom<Value> for f64 {
     type Error = TryFromValueError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
-            Value::Number(n) => Ok(n),
+            // Easy integer to float conversion (decimal in JSON might be written as integer)
+            #[allow(clippy::cast_precision_loss)]
+            Value::Integer(n) => Ok(n as f64),
+            Value::Decimal(n) => Ok(n),
             _ => Err(TryFromValueError),
         }
     }
@@ -105,6 +330,28 @@ impl TryFrom<Value> for String {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
             Value::String(s) => Ok(s),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
+impl TryFrom<Value> for Vec<Value> {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Array(array) => Ok(array),
+            _ => Err(TryFromValueError),
+        }
+    }
+}
+
+impl TryFrom<Value> for Vec<(String, Value)> {
+    type Error = TryFromValueError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Object(object) => Ok(object),
             _ => Err(TryFromValueError),
         }
     }
