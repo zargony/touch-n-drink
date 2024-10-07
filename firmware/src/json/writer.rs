@@ -68,54 +68,60 @@ impl<W: Write> Writer<W> {
         T: ToJson + 'a,
         I: IntoIterator<Item = T>,
     {
-        self.writer.write_all(b"[").await?;
+        self.write_raw(b"[").await?;
         for (i, elem) in iter.into_iter().enumerate() {
             if i > 0 {
-                self.writer.write_all(b", ").await?;
+                self.write_raw(b", ").await?;
             }
             self.write(elem).await?;
         }
-        self.writer.write_all(b"]").await?;
+        self.write_raw(b"]").await?;
         Ok(())
     }
 
     /// Write JSON string
     pub async fn write_string(&mut self, value: &str) -> Result<(), Error<W::Error>> {
-        self.writer.write_all(b"\"").await?;
+        self.write_raw(b"\"").await?;
         // OPTIMIZE: Writing each char separately to a writer is quite inefficient
         for ch in value.escape_default() {
-            self.writer.write_all(&[ch as u8]).await?;
+            self.write_raw(&[ch as u8]).await?;
         }
-        self.writer.write_all(b"\"").await?;
+        self.write_raw(b"\"").await?;
         Ok(())
     }
 
     /// Write JSON number (decimal)
     pub async fn write_decimal(&mut self, value: f64) -> Result<(), Error<W::Error>> {
         let buf = value.to_string();
-        self.writer.write_all(buf.as_bytes()).await?;
+        self.write_raw(buf.as_bytes()).await?;
         Ok(())
     }
 
     /// Write JSON number (integer)
     pub async fn write_integer(&mut self, value: i64) -> Result<(), Error<W::Error>> {
         let buf = value.to_string();
-        self.writer.write_all(buf.as_bytes()).await?;
+        self.write_raw(buf.as_bytes()).await?;
         Ok(())
     }
 
     /// Write JSON boolean
     pub async fn write_boolean(&mut self, value: bool) -> Result<(), Error<W::Error>> {
-        self.writer
-            .write_all(if value { b"true" } else { b"false" })
+        self.write_raw(if value { b"true" } else { b"false" })
             .await?;
         Ok(())
     }
 
     /// Write JSON null
     pub async fn write_null(&mut self) -> Result<(), Error<W::Error>> {
-        self.writer.write_all(b"null").await?;
+        self.write_raw(b"null").await?;
         Ok(())
+    }
+}
+
+impl<W: Write> Writer<W> {
+    /// Write given buffer to JSON
+    async fn write_raw(&mut self, bytes: &[u8]) -> Result<(), Error<W::Error>> {
+        Ok(self.writer.write_all(bytes).await?)
     }
 }
 
@@ -129,7 +135,7 @@ pub struct ObjectWriter<'w, W: Write> {
 impl<'w, W: Write> ObjectWriter<'w, W> {
     /// Start object
     pub async fn new(json: &'w mut Writer<W>) -> Result<Self, Error<W::Error>> {
-        json.writer.write_all(b"{").await?;
+        json.write_raw(b"{").await?;
         Ok(Self {
             json,
             has_fields: false,
@@ -143,10 +149,10 @@ impl<'w, W: Write> ObjectWriter<'w, W> {
         value: T,
     ) -> Result<&mut Self, Error<W::Error>> {
         if self.has_fields {
-            self.json.writer.write_all(b", ").await?;
+            self.json.write_raw(b", ").await?;
         }
         self.json.write_string(key).await?;
-        self.json.writer.write_all(b": ").await?;
+        self.json.write_raw(b": ").await?;
         self.json.write(value).await?;
         self.has_fields = true;
         Ok(self)
@@ -167,7 +173,7 @@ impl<'w, W: Write> ObjectWriter<'w, W> {
 
     /// Finish object
     pub async fn finish(&mut self) -> Result<(), Error<W::Error>> {
-        self.json.writer.write_all(b"}").await?;
+        self.json.write_raw(b"}").await?;
         Ok(())
     }
 }
