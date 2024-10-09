@@ -1,5 +1,6 @@
 use super::error::Error;
 use super::value::Value;
+use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -117,22 +118,28 @@ impl<R: BufRead> Reader<R> {
     /// Read and parse JSON string
     pub async fn read_string(&mut self) -> Result<String, Error<R::Error>> {
         self.expect(b'"').await?;
-        let mut s = String::new();
+        let mut buf = Vec::new();
         loop {
             match self.peek().await? {
                 b'\\' => {
                     self.consume();
                     let ch = self.peek().await?;
-                    s.push(char::from(ch));
+                    buf.push(ch);
                     self.consume();
                 }
                 b'"' => {
                     self.consume();
+                    let s = match String::from_utf8_lossy(&buf) {
+                        // It's safe to use `from_utf8_unchecked` if `from_utf8_lossy` returns
+                        // borrowed data (which is valid UTF-8)
+                        Cow::Borrowed(_s) => unsafe { String::from_utf8_unchecked(buf) },
+                        Cow::Owned(s) => s,
+                    };
                     break Ok(s);
                 }
                 ch => {
                     // OPTIMIZE: Appending each char separately to a string is quite inefficient
-                    s.push(char::from(ch));
+                    buf.push(ch);
                     self.consume();
                 }
             }
