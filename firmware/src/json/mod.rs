@@ -4,7 +4,7 @@ mod error;
 pub use self::error::Error;
 
 mod reader;
-pub use self::reader::{FromJson, Reader};
+pub use self::reader::{FromJson, FromJsonArray, FromJsonObject, Reader};
 
 mod value;
 pub use self::value::{TryFromValueError, Value};

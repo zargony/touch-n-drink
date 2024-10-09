@@ -1,6 +1,7 @@
 use super::error::Error;
 use super::value::Value;
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::iter::Extend;
@@ -65,13 +66,12 @@ impl<R: BufRead> Reader<R> {
     }
 
     /// Read and parse JSON object
-    /// A JSON object is read and parsed key by key. The given closure is called for every key
-    /// value pair as it is parsed. This doesn't need to allocate memory for all keys and values of
-    /// the object, just for one key value pair at a time.
-    pub async fn read_object<T: FromJson>(
-        &mut self,
-        mut f: impl FnMut(String, T) -> Result<(), Error<R::Error>>,
-    ) -> Result<(), Error<R::Error>> {
+    /// A JSON object is read and parsed field by field. The given type is created and is called
+    /// to read each field's value. This doesn't allocate any memory while reading the object
+    /// (except for the current key), so the type's implementation can choose how values are
+    /// stored.
+    pub async fn read_object<T: FromJsonObject>(&mut self) -> Result<T, Error<R::Error>> {
+        let mut obj = T::default();
         self.expect(b'{').await?;
         loop {
             self.trim().await?;
@@ -79,14 +79,13 @@ impl<R: BufRead> Reader<R> {
             self.trim().await?;
             self.expect(b':').await?;
             self.trim().await?;
-            let value = self.read().await?;
-            f(key, value)?;
+            obj.read_next(key, self).await?;
             self.trim().await?;
             match self.peek().await? {
                 b',' => self.consume(),
                 b'}' => {
                     self.consume();
-                    break Ok(());
+                    break Ok(obj);
                 }
                 ch => break Err(Error::unexpected(ch)),
             }
@@ -94,24 +93,21 @@ impl<R: BufRead> Reader<R> {
     }
 
     /// Read and parse JSON array
-    /// A JSON array is read and parsed element by element. The given closure is called for every
-    /// element as it is parsed. This doesn't need to allocate memory for all elements of the
-    /// array, just for one element at a time.
-    pub async fn read_array<T: FromJson>(
-        &mut self,
-        mut f: impl FnMut(T) -> Result<(), Error<R::Error>>,
-    ) -> Result<(), Error<R::Error>> {
+    /// A JSON array is read and parsed element by element. The given type is created and is
+    /// called to read each element. This doesn't allocate any memory while reading the array,
+    /// so the type's implementation can choose how elements are stored.
+    pub async fn read_array<T: FromJsonArray>(&mut self) -> Result<T, Error<R::Error>> {
+        let mut vec = T::default();
         self.expect(b'[').await?;
         loop {
             self.trim().await?;
-            let elem = self.read().await?;
-            f(elem)?;
+            vec.read_next(self).await?;
             self.trim().await?;
             match self.peek().await? {
                 b',' => self.consume(),
                 b']' => {
                     self.consume();
-                    break Ok(());
+                    break Ok(vec);
                 }
                 ch => break Err(Error::unexpected(ch)),
             }
@@ -365,35 +361,68 @@ impl FromJson for String {
     }
 }
 
-impl<T: Default + Extend<Value>> FromJson for T {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        let mut vec = Self::default();
-        reader
-            .read_array(|elem| {
-                vec.extend([elem]);
-                Ok(())
-            })
-            .await?;
-        Ok(vec)
+// FIXME: Unfortunately, a generic `T: FromJsonArray` would be a conflicting implementation
+impl<T: FromJson> FromJson for Vec<T> {
+    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<T>, Error<R::Error>> {
+        reader.read_array().await
     }
 }
 
-impl FromJson for Vec<(String, Value)> {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        let mut vec = Self::default();
-        reader
-            .read_object(|k, v| {
-                vec.extend([(k, v)]);
-                Ok(())
-            })
-            .await?;
-        Ok(vec)
+impl<T: FromJsonObject> FromJson for T {
+    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<T, Error<R::Error>> {
+        reader.read_object().await
     }
 }
 
 impl FromJson for Value {
     async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
         reader.read_any().await
+    }
+}
+
+/// Deserialize from streaming JSON array
+/// The given method is called for every element and gets a reader that MUST be used to read the
+/// next element.
+pub trait FromJsonArray: Sized + Default {
+    /// Read next array element from given JSON reader
+    async fn read_next<R: BufRead>(
+        &mut self,
+        reader: &mut Reader<R>,
+    ) -> Result<(), Error<R::Error>>;
+}
+
+impl<T: FromJson> FromJsonArray for Vec<T> {
+    async fn read_next<R: BufRead>(
+        &mut self,
+        reader: &mut Reader<R>,
+    ) -> Result<(), Error<R::Error>> {
+        let elem = reader.read().await?;
+        self.push(elem);
+        Ok(())
+    }
+}
+
+/// Deserialize from streaming JSON object
+/// The given method is called for every field and gets a reader that MUST be used to read the
+/// next value.
+pub trait FromJsonObject: Sized + Default {
+    /// Read next object value from given JSON reader
+    async fn read_next<R: BufRead>(
+        &mut self,
+        key: String,
+        reader: &mut Reader<R>,
+    ) -> Result<(), Error<R::Error>>;
+}
+
+impl<T: FromJson> FromJsonObject for BTreeMap<String, T> {
+    async fn read_next<R: BufRead>(
+        &mut self,
+        key: String,
+        reader: &mut Reader<R>,
+    ) -> Result<(), Error<R::Error>> {
+        let value = reader.read().await?;
+        self.insert(key, value);
+        Ok(())
     }
 }
 
@@ -421,23 +450,19 @@ mod tests {
             baz: bool,
         }
 
-        impl FromJson for Test {
-            async fn from_json<R: BufRead>(
+        impl FromJsonObject for Test {
+            async fn read_next<R: BufRead>(
+                &mut self,
+                key: String,
                 reader: &mut Reader<R>,
-            ) -> Result<Self, Error<R::Error>> {
-                let mut test = Self::default();
-                reader
-                    .read_object(|k, v: Value| {
-                        match &*k {
-                            "foo" => test.foo = v.try_into()?,
-                            "bar" => test.bar = v.try_into()?,
-                            "baz" => test.baz = v.try_into()?,
-                            _ => (),
-                        }
-                        Ok(())
-                    })
-                    .await?;
-                Ok(test)
+            ) -> Result<(), Error<R::Error>> {
+                match &*key {
+                    "foo" => self.foo = reader.read().await?,
+                    "bar" => self.bar = reader.read().await?,
+                    "baz" => self.baz = reader.read().await?,
+                    _ => _ = reader.read_any().await?,
+                }
+                Ok(())
             }
         }
 
@@ -473,47 +498,31 @@ mod tests {
         assert_read_eq!(
             r#"{"foo": "hi", "bar": 42, "baz": true}"#,
             read_any,
-            Ok(Value::Object(vec![
+            Ok(Value::Object(BTreeMap::from([
                 ("foo".into(), Value::String("hi".into())),
                 ("bar".into(), Value::Integer(42)),
                 ("baz".into(), Value::Boolean(true)),
-            ]))
+            ])))
         );
         assert_read_eq!("buzz", read_any, Err(Error::Unexpected('b')));
     }
 
     #[async_std::test]
     async fn read_object() {
-        let json = r#"{"foo": "hi", "bar": 42, "baz": true}"#;
-        let mut values = Vec::new();
-        let collect = |k, v: Value| {
-            values.push((k, v));
-            Ok(())
-        };
-        assert_eq!(reader(json).read_object(collect).await, Ok(()));
-        assert_eq!(values.len(), 3);
-        assert_eq!(values[0].0, "foo");
-        assert_eq!(values[0].1, Value::String("hi".into()));
-        assert_eq!(values[1].0, "bar");
-        assert_eq!(values[1].1, Value::Integer(42));
-        assert_eq!(values[2].0, "baz");
-        assert_eq!(values[2].1, Value::Boolean(true));
+        assert_read_eq!(
+            r#"{"foo": "hi", "bar": 42, "baz": true}"#,
+            read_object,
+            Ok(BTreeMap::from([
+                ("foo".to_string(), Value::String("hi".into())),
+                ("bar".to_string(), Value::Integer(42)),
+                ("baz".to_string(), Value::Boolean(true)),
+            ]))
+        );
     }
 
     #[async_std::test]
     async fn read_array() {
-        let json = "[1, 2, 3, 4]";
-        let mut values = Vec::new();
-        let collect = |v: Value| {
-            values.push(v);
-            Ok(())
-        };
-        assert_eq!(reader(json).read_array(collect).await, Ok(()));
-        assert_eq!(values.len(), 4);
-        assert_eq!(values[0], Value::Integer(1));
-        assert_eq!(values[1], Value::Integer(2));
-        assert_eq!(values[2], Value::Integer(3));
-        assert_eq!(values[3], Value::Integer(4));
+        assert_read_eq!("[1, 2, 3, 4]", read_array, Ok(vec![1, 2, 3, 4]));
     }
 
     #[async_std::test]

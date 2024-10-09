@@ -1,6 +1,7 @@
 use super::error::Error;
 use super::value::Value;
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use embedded_io_async::Write;
@@ -161,9 +162,9 @@ impl<'w, W: Write> ObjectWriter<'w, W> {
     /// Write object fields from iterable collections
     pub async fn fields_from<'a, K, V, I>(&mut self, iter: I) -> Result<&mut Self, Error<W::Error>>
     where
-        K: AsRef<str> + 'a,
+        K: AsRef<str> + ?Sized + 'a,
         V: ToJson + 'a,
-        I: IntoIterator<Item = &'a (K, V)>,
+        I: IntoIterator<Item = (&'a K, &'a V)>,
     {
         for (key, value) in iter {
             self.field(key.as_ref(), value).await?;
@@ -298,43 +299,19 @@ impl<T: ToJson> ToJson for Vec<T> {
     }
 }
 
-impl<T: ToJson> ToJson for [(&str, T)] {
+impl<K: AsRef<str>, V: ToJson> ToJson for [(K, V)] {
     async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
         writer
             .write_object()
             .await?
-            .fields_from(self)
+            .fields_from(self.iter().map(|(k, v)| (k.as_ref(), v)))
             .await?
             .finish()
             .await
     }
 }
 
-impl<T: ToJson> ToJson for [(String, T)] {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer
-            .write_object()
-            .await?
-            .fields_from(self)
-            .await?
-            .finish()
-            .await
-    }
-}
-
-impl<T: ToJson> ToJson for Vec<(&str, T)> {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer
-            .write_object()
-            .await?
-            .fields_from(self)
-            .await?
-            .finish()
-            .await
-    }
-}
-
-impl<T: ToJson> ToJson for Vec<(String, T)> {
+impl<K: AsRef<str>, V: ToJson> ToJson for BTreeMap<K, V> {
     async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
         writer
             .write_object()
@@ -447,19 +424,20 @@ mod tests {
         );
         assert_write_eq!(
             write_any,
-            &Value::Object(vec![
+            &Value::Object(BTreeMap::from([
                 ("foo".into(), Value::String("hi".into())),
                 ("bar".into(), Value::Integer(42)),
                 ("baz".into(), Value::Boolean(true)),
-            ]),
-            Ok(r#"{"foo": "hi", "bar": 42, "baz": true}"#)
+            ])),
+            // Value's inner BTreeMap reorders fields
+            Ok(r#"{"bar": 42, "baz": true, "foo": "hi"}"#)
         );
     }
 
     #[async_std::test]
     async fn write_object() {
         let mut writer = writer();
-        let res = (&mut writer)
+        let res = writer
             .write_object()
             .await
             .unwrap()

@@ -1,3 +1,4 @@
+use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::str::FromStr;
@@ -40,7 +41,7 @@ pub enum Value {
     Decimal(f64),
     String(String),
     Array(Vec<Value>),
-    Object(Vec<(String, Value)>),
+    Object(BTreeMap<String, Value>),
 }
 
 impl From<()> for Value {
@@ -157,14 +158,14 @@ impl From<Vec<Value>> for Value {
     }
 }
 
-impl From<&[(String, Value)]> for Value {
-    fn from(value: &[(String, Value)]) -> Self {
+impl<const N: usize> From<[(String, Value); N]> for Value {
+    fn from(value: [(String, Value); N]) -> Self {
         Self::Object(value.into())
     }
 }
 
-impl From<Vec<(String, Value)>> for Value {
-    fn from(value: Vec<(String, Value)>) -> Self {
+impl From<BTreeMap<String, Value>> for Value {
+    fn from(value: BTreeMap<String, Value>) -> Self {
         Self::Object(value)
     }
 }
@@ -365,7 +366,7 @@ impl TryFrom<Value> for Vec<Value> {
     }
 }
 
-impl TryFrom<Value> for Vec<(String, Value)> {
+impl TryFrom<Value> for BTreeMap<String, Value> {
     type Error = TryFromValueError;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {

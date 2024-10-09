@@ -1,4 +1,4 @@
-use crate::json::{self, FromJson};
+use crate::json::{self, FromJson, FromJsonObject};
 use alloc::string::String;
 use core::fmt;
 use core::ops::Deref;
@@ -12,11 +12,11 @@ use log::{debug, info, warn};
 #[derive(Default)]
 pub struct SensitiveString(String);
 
-impl TryFrom<json::Value> for SensitiveString {
-    type Error = json::TryFromValueError;
-
-    fn try_from(value: json::Value) -> Result<Self, Self::Error> {
-        Ok(Self(value.try_into()?))
+impl FromJson for SensitiveString {
+    async fn from_json<R: BufRead>(
+        reader: &mut json::Reader<R>,
+    ) -> Result<Self, json::Error<R::Error>> {
+        Ok(Self(reader.read().await?))
     }
 }
 
@@ -67,22 +67,18 @@ pub struct Config {
     pub wifi_password: SensitiveString,
 }
 
-impl FromJson for Config {
-    async fn from_json<R: BufRead>(
+impl FromJsonObject for Config {
+    async fn read_next<R: BufRead>(
+        &mut self,
+        key: String,
         reader: &mut json::Reader<R>,
-    ) -> Result<Self, json::Error<R::Error>> {
-        let mut this = Self::default();
-        reader
-            .read_object(|k, v: json::Value| {
-                match &*k {
-                    "wifi-ssid" => this.wifi_ssid = v.try_into()?,
-                    "wifi-password" => this.wifi_password = v.try_into()?,
-                    _ => (),
-                }
-                Ok(())
-            })
-            .await?;
-        Ok(this)
+    ) -> Result<(), json::Error<R::Error>> {
+        match &*key {
+            "wifi-ssid" => self.wifi_ssid = reader.read().await?,
+            "wifi-password" => self.wifi_password = reader.read().await?,
+            _ => _ = reader.read_any().await?,
+        }
+        Ok(())
     }
 }
 
