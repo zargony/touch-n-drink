@@ -53,7 +53,6 @@ impl<R: BufRead> Reader<R> {
     /// large objects or arrays, this may allocate a lot memory. See `read_object` and `read_array`
     /// for memory-optimized streaming read of objects and arrays.
     pub async fn read_any(&mut self) -> Result<Value, Error<R::Error>> {
-        self.trim().await?;
         match self.peek().await? {
             b'{' => Ok(Value::Object(Box::pin(self.read()).await?)),
             b'[' => Ok(Value::Array(Box::pin(self.read()).await?)),
@@ -73,12 +72,13 @@ impl<R: BufRead> Reader<R> {
         &mut self,
         mut f: impl FnMut(String, T) -> Result<(), Error<R::Error>>,
     ) -> Result<(), Error<R::Error>> {
-        self.trim().await?;
         self.expect(b'{').await?;
         loop {
             self.trim().await?;
             let key = self.read_string().await?;
+            self.trim().await?;
             self.expect(b':').await?;
+            self.trim().await?;
             let value = self.read().await?;
             f(key, value)?;
             self.trim().await?;
@@ -101,9 +101,9 @@ impl<R: BufRead> Reader<R> {
         &mut self,
         mut f: impl FnMut(T) -> Result<(), Error<R::Error>>,
     ) -> Result<(), Error<R::Error>> {
-        self.trim().await?;
         self.expect(b'[').await?;
         loop {
+            self.trim().await?;
             let elem = self.read().await?;
             f(elem)?;
             self.trim().await?;
