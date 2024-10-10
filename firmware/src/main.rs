@@ -74,6 +74,12 @@ extern crate alloc;
 static VERSION_STR: &str = concat!("v", env!("CARGO_PKG_VERSION"));
 static GIT_SHA_STR: &str = env!("GIT_SHORT_SHA");
 
+/// Delay in seconds after which to restart on panic
+#[cfg(not(debug_assertions))]
+const PANIC_RESTART_DELAY_SECS: u64 = 10;
+#[cfg(debug_assertions)]
+const PANIC_RESTART_DELAY_SECS: u64 = 600;
+
 /// Custom halt function for esp-backtrace. Called after panic was handled and should halt
 /// or restart the system.
 #[export_name = "custom_halt"]
@@ -86,9 +92,9 @@ unsafe fn halt() -> ! {
     // TODO: Steal display driver and show a panic message to the user
 
     // Restart automatically after a delay
-    println!("Restarting in 10 seconds...");
+    println!("Restarting in {} seconds...", PANIC_RESTART_DELAY_SECS);
     let mut rtc = Rtc::new(peripherals.LPWR);
-    rtc.rwdt.set_timeout(10_000.millis());
+    rtc.rwdt.set_timeout(PANIC_RESTART_DELAY_SECS.secs());
     rtc.rwdt.unlisten();
     rtc.rwdt.enable();
     loop {
