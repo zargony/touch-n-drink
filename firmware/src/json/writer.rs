@@ -461,6 +461,7 @@ mod tests {
 
     #[async_std::test]
     async fn write_array() {
+        assert_write_eq!(write_array, Vec::<u32>::new(), Ok("[]"));
         assert_write_eq!(write_array, [1, 2, 3, 4], Ok("[1, 2, 3, 4]"));
         assert_write_eq!(write_array, &[1, 2, 3, 4], Ok("[1, 2, 3, 4]"));
         assert_write_eq!(write_array, vec![1, 2, 3, 4], Ok("[1, 2, 3, 4]"));

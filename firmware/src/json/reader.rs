@@ -76,7 +76,13 @@ impl<R: BufRead> Reader<R> {
         self.expect(b'{').await?;
         loop {
             self.trim().await?;
-            let key = self.read_string().await?;
+            let key = match self.peek().await? {
+                b'}' => {
+                    self.consume();
+                    break Ok(obj);
+                }
+                _ => self.read_string().await?,
+            };
             self.trim().await?;
             self.expect(b':').await?;
             self.trim().await?;
@@ -84,10 +90,7 @@ impl<R: BufRead> Reader<R> {
             self.trim().await?;
             match self.peek().await? {
                 b',' => self.consume(),
-                b'}' => {
-                    self.consume();
-                    break Ok(obj);
-                }
+                b'}' => (),
                 ch => break Err(Error::unexpected(ch)),
             }
         }
@@ -102,14 +105,17 @@ impl<R: BufRead> Reader<R> {
         self.expect(b'[').await?;
         loop {
             self.trim().await?;
-            vec.read_next(self).await?;
-            self.trim().await?;
             match self.peek().await? {
-                b',' => self.consume(),
                 b']' => {
                     self.consume();
                     break Ok(vec);
                 }
+                _ => vec.read_next(self).await?,
+            }
+            self.trim().await?;
+            match self.peek().await? {
+                b',' => self.consume(),
+                b']' => (),
                 ch => break Err(Error::unexpected(ch)),
             }
         }
@@ -516,6 +522,7 @@ mod tests {
 
     #[async_std::test]
     async fn read_object() {
+        assert_read_eq!("{}", read_object, Ok(BTreeMap::<String, String>::new()));
         assert_read_eq!(
             r#"{"foo": "hi", "bar": 42, "baz": true}"#,
             read_object,
@@ -529,6 +536,7 @@ mod tests {
 
     #[async_std::test]
     async fn read_array() {
+        assert_read_eq!("[]", read_array, Ok(Vec::<u32>::new()));
         assert_read_eq!("[1, 2, 3, 4]", read_array, Ok(vec![1, 2, 3, 4]));
     }
 
