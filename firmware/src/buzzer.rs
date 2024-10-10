@@ -8,6 +8,14 @@ use esp_hal::peripherals::LEDC;
 use esp_hal::prelude::*;
 use log::{debug, info};
 
+/// PWM duty cycle to use for tones (percentage, 0-100)
+/// For an active low buzzer, 75% duty cycle means 25% active time.
+/// 50% produces max volume, 100% is off
+#[cfg(not(debug_assertions))]
+const TONE_DUTY_CYCLE: u8 = 75;
+#[cfg(debug_assertions)]
+const TONE_DUTY_CYCLE: u8 = 95;
+
 /// Buzzer error
 #[derive(Debug)]
 pub enum Error {
@@ -83,7 +91,7 @@ impl<'a> Buzzer<'a> {
     /// Output the given tone for given duration
     pub async fn tone(&mut self, frequency: u32, duration: Duration) -> Result<(), Error> {
         // debug!("Buzzer: playing {} Hz for {}", frequency, duration);
-        self.drive(frequency, 50)?;
+        self.drive(frequency, TONE_DUTY_CYCLE)?;
         Timer::after(duration).await;
         // To turn off the buzzer, use 100% duty cycle so the output keeps staying high
         self.drive(1, 100)?;
