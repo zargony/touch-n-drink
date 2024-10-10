@@ -1,8 +1,11 @@
+mod proto_articles;
 mod proto_auth;
 
+use crate::article::Articles;
 use crate::http::{self, Http};
 use crate::wifi::Wifi;
 use alloc::string::String;
+use core::cell::RefCell;
 use core::fmt;
 use log::{debug, info, warn};
 
@@ -77,7 +80,6 @@ impl<'a> Vereinsflieger<'a> {
     }
 
     /// Connect to API server
-    #[allow(dead_code)]
     pub async fn connect(&mut self) -> Result<Connection, Error> {
         let connection = self.http.connect(BASE_URL).await?;
 
@@ -121,9 +123,42 @@ impl<'a> Connection<'a> {
                     accesstoken: &self.accesstoken,
                 },
             )
-            .await
-            .unwrap();
+            .await?;
         debug!("Vereinsflieger: Got user information: {:?}", response);
+        Ok(())
+    }
+
+    /// Fetch list of articles and update article lookup table
+    pub async fn refresh_articles<const N: usize>(
+        &mut self,
+        articles: &mut Articles<N>,
+    ) -> Result<(), Error> {
+        use proto_articles::{ArticleListRequest, ArticleListResponse};
+
+        debug!("Vereinsflieger: Refreshing articles...");
+        let request_body = http::Connection::prepare_body(&ArticleListRequest {
+            accesstoken: &self.accesstoken,
+        })
+        .await?;
+        let mut rx_buf = [0; 4096];
+        let mut json = self
+            .connection
+            .post_json("articles/list", &request_body, &mut rx_buf)
+            .await?;
+
+        articles.clear();
+        let articles = RefCell::new(articles);
+
+        let response: ArticleListResponse<N> = json
+            .read_object_with_context(&articles)
+            .await
+            .map_err(http::Error::MalformedResponse)?;
+        info!(
+            "Vereinsflieger: Refreshed {} of {} articles",
+            articles.borrow().count(),
+            response.total_articles
+        );
+
         Ok(())
     }
 }

@@ -117,6 +117,7 @@ impl<M: fmt::Display> Screen for Failure<M> {
 /// Wait while a lengthy action is in progress
 pub enum PleaseWait {
     WifiConnecting,
+    ApiQuerying,
 }
 
 impl Screen for PleaseWait {
@@ -135,6 +136,7 @@ impl Screen for PleaseWait {
         SMALL_FONT.render_aligned(
             match self {
                 Self::WifiConnecting => "WLAN Verbindung\nwird aufgebaut",
+                Self::ApiQuerying => "Vereinsflieger\nAbfrage",
             },
             Point::new(63, 27 + 12),
             VerticalPosition::Baseline,

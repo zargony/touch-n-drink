@@ -39,6 +39,7 @@
 #![no_std]
 #![no_main]
 
+mod article;
 mod buzzer;
 mod config;
 mod display;
@@ -128,6 +129,9 @@ async fn main(spawner: Spawner) {
     // Read system configuration
     let config = config::Config::read().await;
 
+    // Initialize list of articles
+    let mut articles = article::Articles::new([config.vf_article_id]);
+
     // Initialize I2C controller
     let i2c = I2C::new_with_timeout_async(
         peripherals.I2C0,
@@ -216,6 +220,7 @@ async fn main(spawner: Spawner) {
         &mut buzzer,
         &wifi,
         &mut vereinsflieger,
+        &mut articles,
     );
 
     // Show splash screen for a while, ignore any error
@@ -223,6 +228,9 @@ async fn main(spawner: Spawner) {
 
     // Wait for network to become available (if not already), ignore any error
     let _ = ui.wait_network_up().await;
+
+    // Refresh articles, ignore any error
+    let _ = ui.refresh_articles().await;
 
     loop {
         match ui.run().await {

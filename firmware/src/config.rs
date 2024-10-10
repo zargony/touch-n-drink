@@ -1,3 +1,4 @@
+use crate::article::ArticleId;
 use crate::json::{self, FromJson, FromJsonObject};
 use alloc::string::String;
 use core::fmt;
@@ -74,7 +75,7 @@ pub struct Config {
     /// Vereinsflieger API cid (optional)
     pub vf_cid: Option<u32>,
     /// Vereinsflieger article id for purchase
-    pub vf_article_id: u32,
+    pub vf_article_id: ArticleId,
 }
 
 impl FromJsonObject for Config {
