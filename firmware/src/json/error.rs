@@ -2,7 +2,7 @@ use super::value::TryFromValueError;
 use core::fmt;
 
 /// JSON reader/writer error
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error<E> {
     Io(E),
     Eof,

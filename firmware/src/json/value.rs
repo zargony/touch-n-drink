@@ -5,7 +5,7 @@ use core::str::FromStr;
 use core::{fmt, num};
 
 /// JSON value conversion error
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TryFromValueError;
 
 impl From<num::TryFromIntError> for TryFromValueError {
