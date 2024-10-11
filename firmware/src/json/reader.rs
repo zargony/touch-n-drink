@@ -127,6 +127,8 @@ impl<R: BufRead> Reader<R> {
         let mut buf = Vec::new();
         loop {
             match self.peek().await? {
+                // This is safe to check, even in the middle of a UTF-8 character since UTF-8
+                // guarantees that no character encoding is a substring of any other character
                 b'\\' => {
                     self.consume();
                     let ch = self.peek().await?;
