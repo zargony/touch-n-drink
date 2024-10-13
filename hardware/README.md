@@ -12,7 +12,7 @@ Prototype circuit on breadboard:
 
 ESP32 breakout perfboard:
 
-<img alt="Breakout perfboard" src="../images/hardware-pcb.jpeg" style="width: 20em;" />
+<img alt="Breakout perfboard" src="../images/pcb-perfboard.jpeg" style="width: 20em;" />
 
 Front components and connectors:
 
@@ -36,18 +36,28 @@ Wiring of components:
   ([AliExpress](https://s.click.aliexpress.com/e/_DFyKykT)) <!-- https://www.aliexpress.com/item/1005005973913526.html -->
   ([Amazon](https://amzn.to/3S3gAjo)) <!-- https://www.amazon.de/Diyeeni-Funkmodul-Reader-Android-Communication-default/dp/B07V5QDMR4 -->
   ([Model](https://grabcad.com/library/pn532-nfc-rfid-module-v3-kits-1))
-- Prototype PCB 60x40
-  ([AliExpress](https://s.click.aliexpress.com/e/_Ddm12Wr)) <!-- https://www.aliexpress.com/item/1005006665029598.html -->
-  ([Amazon](https://amzn.to/4eYnoIY)) <!-- https://www.amazon.de/Akozon-Leiterplatte-Doppelseiten-Prototyping-Universal/dp/B0B3MJ3WJM -->
-  ([Model](https://grabcad.com/library/pcb-prototype-60x40-1))
 - ESP32-C3 SuperMini
   ([AliExpress](https://s.click.aliexpress.com/e/_DdYM4t9)) <!-- https://www.aliexpress.com/item/1005005967641936.html -->
   ([Amazon](https://amzn.to/4bCXYxz)) <!-- https://www.amazon.de/iHaospace-ESP32-C3-Mini-Entwicklungboard-ESP32-C3FN4/dp/B0D1Y5CPLX -->
   ([Model](https://grabcad.com/library/esp32c3-supermini-1))
-- Passive Buzzer Module (optional)
+- Prototype PCB 60x40 (optional, instead of PCB)
+  ([AliExpress](https://s.click.aliexpress.com/e/_Ddm12Wr)) <!-- https://www.aliexpress.com/item/1005006665029598.html -->
+  ([Amazon](https://amzn.to/4eYnoIY)) <!-- https://www.amazon.de/Akozon-Leiterplatte-Doppelseiten-Prototyping-Universal/dp/B0B3MJ3WJM -->
+  ([Model](https://grabcad.com/library/pcb-prototype-60x40-1))
+- Passive Buzzer Module, 3.3V, active low (optional)
   ([AliExpress](https://s.click.aliexpress.com/e/_Dl2FWF1)) <!-- https://www.aliexpress.com/item/1005006316591026.html -->
   ([Amazon](https://amzn.to/3Y72Ibw)) <!-- https://www.amazon.de/Jopto-Passives-niedrigstufiges-Lautsprecher-Kompatibel/dp/B096ZWCG7F -->
   ([Model](https://grabcad.com/library/buzzer-module-fc-07-1))
+
+## PCB
+
+- 1x Passive Buzzer, THT, 12085
+- 1x S8550, SMT, TSOT-23 (or other generic NPN transistor, BEC pin ordering)
+- 1x 1k resistor, SMT, 0805
+- 2x 5k resistor, SMT, 0805
+- 1x 4-pin JST PH header, SMT, horizontal, S4B-PH-SM4-TB
+- 1x 5-pin JST PH header, SMT, horizontal, S5B-PH-SM4-TB
+- 1x 7-pin JST PH header, SMT, horizontal, S7B-PH-SM4-TB
 
 ## Case
 
