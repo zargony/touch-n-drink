@@ -2798,7 +2798,7 @@
 			(uuid "2a2d2881-3be4-4af9-8d0d-cef39a0c8954")
 		)
 		(instances
-			(project "pcb"
+			(project "touch-n-drink"
 				(path "/0dd75fea-87ef-4971-96b1-82e8e25e165f"
 					(reference "#PWR08")
 					(unit 1)
@@ -3259,7 +3259,7 @@
 			(uuid "28a808d6-2abe-41e2-ac0f-e7cc715d6373")
 		)
 		(instances
-			(project "pcb"
+			(project "touch-n-drink"
 				(path "/0dd75fea-87ef-4971-96b1-82e8e25e165f"
 					(reference "#PWR010")
 					(unit 1)
@@ -3325,7 +3325,7 @@
 			(uuid "63dcc66d-85af-4e33-b0d4-bf35fc885784")
 		)
 		(instances
-			(project "pcb"
+			(project "touch-n-drink"
 				(path "/0dd75fea-87ef-4971-96b1-82e8e25e165f"
 					(reference "#PWR07")
 					(unit 1)
@@ -3391,7 +3391,7 @@
 			(uuid "ec827cd0-6d95-4c2b-a54f-0141b609eda7")
 		)
 		(instances
-			(project "pcb"
+			(project "touch-n-drink"
 				(path "/0dd75fea-87ef-4971-96b1-82e8e25e165f"
 					(reference "#PWR05")
 					(unit 1)
@@ -3587,7 +3587,7 @@
 			(uuid "a476ad5f-51f5-4d69-95bb-88caf8ae72de")
 		)
 		(instances
-			(project "pcb"
+			(project "touch-n-drink"
 				(path "/0dd75fea-87ef-4971-96b1-82e8e25e165f"
 					(reference "#PWR09")
 					(unit 1)
@@ -3654,7 +3654,7 @@
 			(uuid "1f01cd63-450a-43b4-ab3f-eb1cfceba675")
 		)
 		(instances
-			(project "pcb"
+			(project "touch-n-drink"
 				(path "/0dd75fea-87ef-4971-96b1-82e8e25e165f"
 					(reference "R3")
 					(unit 1)
@@ -4071,7 +4071,7 @@
 			(uuid "214545e3-6e21-45b8-a245-a02e0e0bc3dc")
 		)
 		(instances
-			(project "pcb"
+			(project "touch-n-drink"
 				(path "/0dd75fea-87ef-4971-96b1-82e8e25e165f"
 					(reference "#PWR04")
 					(unit 1)
@@ -4278,7 +4278,7 @@
 			(uuid "6b3e590d-9187-4da0-ac62-b6b890452732")
 		)
 		(instances
-			(project "pcb"
+			(project "touch-n-drink"
 				(path "/0dd75fea-87ef-4971-96b1-82e8e25e165f"
 					(reference "#PWR06")
 					(unit 1)

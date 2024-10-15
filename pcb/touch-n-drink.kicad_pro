@@ -450,7 +450,7 @@
     ]
   },
   "meta": {
-    "filename": "pcb.kicad_pro",
+    "filename": "touch-n-drink.kicad_pro",
     "version": 1
   },
   "net_settings": {
@@ -514,7 +514,7 @@
       "plot": "",
       "pos_files": "",
       "specctra_dsn": "",
-      "step": "pcb.step",
+      "step": "touch-n-drink.step",
       "svg": "",
       "vrml": ""
     },

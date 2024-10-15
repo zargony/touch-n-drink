@@ -8,6 +8,10 @@ Touch 'n Drink is a small device that reads NFC id cards of club members of the 
 
 ESP32-C3, Keypad, OLED Display and NFC reader in a custom acrylic case. See [hardware] folder for details.
 
+## PCB
+
+Small custom PCB for the microcontroller and connectors to other components. Either manufactured or manually soldered to a perfboard. See [pcb] folder for details.
+
 ## Firmware
 
 Written in [Rust]. See [firmware] folder for details.
@@ -24,6 +28,7 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 
 [hardware]: ./hardware
 [firmware]: ./firmware
+[pcb]: ./pcb
 
 [discussions]: https://github.com/zargony/touch-n-drink/discussions
 [issues]: https://github.com/zargony/touch-n-drink/issues

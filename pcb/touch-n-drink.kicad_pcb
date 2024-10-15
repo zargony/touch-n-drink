@@ -175,7 +175,7 @@
 		(property ki_fp_filters "R_*")
 		(path "/450af47e-1cd8-4ecc-8e29-20cd1d771f18")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr smd)
 		(fp_line
 			(start -0.227064 -0.735)
@@ -388,7 +388,7 @@
 		(property ki_fp_filters "Connector*:*_1x??_*")
 		(path "/c6d2cd16-c9bc-4ac7-9f1c-0b6176d6a022")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr smd)
 		(fp_line
 			(start 7.06 0.94)
@@ -793,7 +793,7 @@
 		(property ki_fp_filters "ESP32*C3*SuperMini")
 		(path "/43981b74-4986-4103-91f4-e5fee4d0a264")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr smd)
 		(fp_line
 			(start 9 11.35)
@@ -1303,7 +1303,7 @@
 		(property ki_fp_filters "MountingHole*")
 		(path "/e83c886a-2a48-4277-afe8-6d71777416ca")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr exclude_from_pos_files exclude_from_bom)
 		(fp_circle
 			(center 0 0)
@@ -1418,7 +1418,7 @@
 		(property ki_fp_filters "MountingHole*")
 		(path "/a488f581-1560-4b1e-a59d-6096cfd079ac")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr exclude_from_pos_files exclude_from_bom)
 		(fp_circle
 			(center 0 0)
@@ -1531,7 +1531,7 @@
 		(property ki_fp_filters "Connector*:*_1x??_*")
 		(path "/abbb0cd7-f090-472c-beb6-fd6227e9dfd5")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr smd)
 		(fp_line
 			(start 6.06 0.94)
@@ -1931,7 +1931,7 @@
 		)
 		(path "/9bc95fae-d8b7-4b6f-b8fd-8d3179449a16")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr smd)
 		(fp_line
 			(start 0.96 -1.54)
@@ -2200,7 +2200,7 @@
 		(property ki_fp_filters "MountingHole*")
 		(path "/cfd79054-ae69-47ed-a334-02cd218aaeb7")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr exclude_from_pos_files exclude_from_bom)
 		(fp_circle
 			(center 0 0)
@@ -2313,7 +2313,7 @@
 		(property ki_fp_filters "*Buzzer*")
 		(path "/919bc88a-3624-4d41-9a29-d23516dd2bb4")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr through_hole)
 		(fp_circle
 			(center 3.25 0)
@@ -2496,7 +2496,7 @@
 		(property ki_fp_filters "Connector*:*_1x??_*")
 		(path "/15310860-f1ed-4fd6-ba55-febc47738f73")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr smd)
 		(fp_line
 			(start 9.06 0.94)
@@ -2926,7 +2926,7 @@
 		(property ki_fp_filters "R_*")
 		(path "/8dcbb948-a86a-4abf-8862-c926e648b6b4")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr smd)
 		(fp_line
 			(start -0.227064 0.735)
@@ -3141,7 +3141,7 @@
 		(property ki_fp_filters "MountingHole*")
 		(path "/775d0712-3eca-4bbb-9030-1674bc441ace")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr exclude_from_pos_files exclude_from_bom)
 		(fp_circle
 			(center 0 0)
@@ -3255,7 +3255,7 @@
 		(property ki_fp_filters "R_*")
 		(path "/9bf87531-2f8a-4e28-afe1-458fb1acfcdd")
 		(sheetname "Root")
-		(sheetfile "pcb.kicad_sch")
+		(sheetfile "touch-n-drink.kicad_sch")
 		(attr smd)
 		(fp_line
 			(start -0.227064 -0.735)
