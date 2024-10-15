@@ -1,4 +1,4 @@
-# Changelog
+# Touch 'n Drink Firmware Changelog
 
 All notable changes to this project will be documented in this file.
 
