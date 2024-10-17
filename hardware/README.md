@@ -71,5 +71,8 @@ Rendered CAD model:
   ([AliExpress](https://s.click.aliexpress.com/e/_DEIu5LN)) <!-- https://www.aliexpress.com/item/1005004307521473.html -->
   ([Amazon](https://amzn.to/4603OYy)) <!-- https://www.amazon.de/CONPHERON-Kunststoff-Sechskant-Schwarz-Sechskantmutter/dp/B09N1HN8QR -->
   ([Model](https://wiki.freecad.org/Fasteners_Workbench))
+- 6x 6x3 mm Neodymium magnets (optional)
+  ([AliExpress](https://s.click.aliexpress.com/e/_Dkv50zJ)) <!-- https://www.aliexpress.com/item/1005001529831924.html -->
+  ([Amazon](https://amzn.to/3BZGW0k)) <!-- https://www.amazon.de/Magnete-K%C3%BChlschrankmagnete-Whiteboard-Magnettafel-Handwerk/dp/B09W8R43Q8 -->
 - USB-C cable
   ([Model](https://grabcad.com/library/usb-c-with-flexed-cable-1))
