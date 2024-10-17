@@ -78,10 +78,13 @@ pub struct Config {
 }
 
 impl FromJsonObject for Config {
+    type Context = ();
+
     async fn read_next<R: BufRead>(
         &mut self,
         key: String,
         reader: &mut json::Reader<R>,
+        _context: &Self::Context,
     ) -> Result<(), json::Error<R::Error>> {
         match &*key {
             "wifi-ssid" => self.wifi_ssid = reader.read().await?,

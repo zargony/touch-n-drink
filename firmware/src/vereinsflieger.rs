@@ -43,10 +43,13 @@ struct AccessTokenResponse {
 }
 
 impl FromJsonObject for AccessTokenResponse {
+    type Context = ();
+
     async fn read_next<R: BufRead>(
         &mut self,
         key: String,
         reader: &mut json::Reader<R>,
+        _context: &Self::Context,
     ) -> Result<(), json::Error<R::Error>> {
         match &*key {
             "accesstoken" => self.accesstoken = reader.read().await?,
@@ -99,10 +102,13 @@ struct SignInResponse {
 }
 
 impl FromJsonObject for SignInResponse {
+    type Context = ();
+
     async fn read_next<R: BufRead>(
         &mut self,
         _key: String,
         reader: &mut json::Reader<R>,
+        _context: &Self::Context,
     ) -> Result<(), json::Error<R::Error>> {
         _ = reader.read_any().await?;
         Ok(())
@@ -145,10 +151,13 @@ struct UserInformationResponse {
 }
 
 impl FromJsonObject for UserInformationResponse {
+    type Context = ();
+
     async fn read_next<R: BufRead>(
         &mut self,
         key: String,
         reader: &mut json::Reader<R>,
+        _context: &Self::Context,
     ) -> Result<(), json::Error<R::Error>> {
         match &*key {
             "uid" => self.uid = reader.read_any().await?.try_into()?,

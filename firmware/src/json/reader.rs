@@ -67,11 +67,23 @@ impl<R: BufRead> Reader<R> {
     }
 
     /// Read and parse JSON object
-    /// A JSON object is read and parsed field by field. The given type is created and is called
-    /// to read each field's value. This doesn't allocate any memory while reading the object
-    /// (except for the current key), so the type's implementation can choose how values are
-    /// stored.
-    pub async fn read_object<T: FromJsonObject>(&mut self) -> Result<T, Error<R::Error>> {
+    /// A JSON object is read and parsed field by field. The given type is created using its
+    /// `Default` implementation and its `FromJsonObject` implementation is called to read each
+    /// field's value. This doesn't allocate any memory while reading the object (except for the
+    /// current key), so the type's implementation can choose how values are stored.
+    pub async fn read_object<C: Default, T: FromJsonObject<Context = C>>(
+        &mut self,
+    ) -> Result<T, Error<R::Error>> {
+        self.read_object_with_context(&C::default()).await
+    }
+
+    /// Read and parse JSON object
+    /// Same as `read_object`, but allows to pass an additional context reference to the type's
+    /// `FromJsonObject` implementation.
+    pub async fn read_object_with_context<T: FromJsonObject>(
+        &mut self,
+        context: &T::Context,
+    ) -> Result<T, Error<R::Error>> {
         let mut obj = T::default();
         self.expect(b'{').await?;
         loop {
@@ -86,7 +98,7 @@ impl<R: BufRead> Reader<R> {
             self.trim().await?;
             self.expect(b':').await?;
             self.trim().await?;
-            obj.read_next(key, self).await?;
+            obj.read_next(key, self, context).await?;
             self.trim().await?;
             match self.peek().await? {
                 b',' => self.consume(),
@@ -97,10 +109,23 @@ impl<R: BufRead> Reader<R> {
     }
 
     /// Read and parse JSON array
-    /// A JSON array is read and parsed element by element. The given type is created and is
-    /// called to read each element. This doesn't allocate any memory while reading the array,
-    /// so the type's implementation can choose how elements are stored.
-    pub async fn read_array<T: FromJsonArray>(&mut self) -> Result<T, Error<R::Error>> {
+    /// A JSON array is read and parsed element by element. The given type is created using its
+    /// `Default` implementation and its `FromJsonArray` implementation is called to read each
+    /// element. This doesn't allocate any memory while reading the array, so the type's
+    /// implementation can choose how elements are stored.
+    pub async fn read_array<C: Default, T: FromJsonArray<Context = C>>(
+        &mut self,
+    ) -> Result<T, Error<R::Error>> {
+        self.read_array_with_context(&C::default()).await
+    }
+
+    /// Read and parse JSON array
+    /// Same as `read_array`, but allows to pass an additional context reference to the type's
+    /// `FromJsonArray` implementation.
+    pub async fn read_array_with_context<T: FromJsonArray>(
+        &mut self,
+        context: &T::Context,
+    ) -> Result<T, Error<R::Error>> {
         let mut vec = T::default();
         self.expect(b'[').await?;
         loop {
@@ -110,7 +135,7 @@ impl<R: BufRead> Reader<R> {
                     self.consume();
                     break Ok(vec);
                 }
-                _ => vec.read_next(self).await?,
+                _ => vec.read_next(self, context).await?,
             }
             self.trim().await?;
             match self.peek().await? {
@@ -383,7 +408,7 @@ impl<T: FromJson> FromJson for Vec<T> {
     }
 }
 
-impl<T: FromJsonObject> FromJson for T {
+impl<C: Default, T: FromJsonObject<Context = C>> FromJson for T {
     async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<T, Error<R::Error>> {
         reader.read_object().await
     }
@@ -399,17 +424,24 @@ impl FromJson for Value {
 /// The given method is called for every element and gets a reader that MUST be used to read the
 /// next element.
 pub trait FromJsonArray: Sized + Default {
+    /// Additional context information passed to deserialization
+    type Context;
+
     /// Read next array element from given JSON reader
     async fn read_next<R: BufRead>(
         &mut self,
         reader: &mut Reader<R>,
+        context: &Self::Context,
     ) -> Result<(), Error<R::Error>>;
 }
 
 impl<T: FromJson> FromJsonArray for Vec<T> {
+    type Context = ();
+
     async fn read_next<R: BufRead>(
         &mut self,
         reader: &mut Reader<R>,
+        _context: &Self::Context,
     ) -> Result<(), Error<R::Error>> {
         let elem = reader.read().await?;
         self.push(elem);
@@ -421,19 +453,26 @@ impl<T: FromJson> FromJsonArray for Vec<T> {
 /// The given method is called for every field and gets a reader that MUST be used to read the
 /// next value.
 pub trait FromJsonObject: Sized + Default {
+    /// Additional context information passed to deserialization
+    type Context;
+
     /// Read next object value from given JSON reader
     async fn read_next<R: BufRead>(
         &mut self,
         key: String,
         reader: &mut Reader<R>,
+        context: &Self::Context,
     ) -> Result<(), Error<R::Error>>;
 }
 
 impl<T: FromJson> FromJsonObject for BTreeMap<String, T> {
+    type Context = ();
+
     async fn read_next<R: BufRead>(
         &mut self,
         key: String,
         reader: &mut Reader<R>,
+        _context: &Self::Context,
     ) -> Result<(), Error<R::Error>> {
         let value = reader.read().await?;
         self.insert(key, value);
@@ -466,10 +505,13 @@ mod tests {
         }
 
         impl FromJsonObject for Test {
+            type Context = ();
+
             async fn read_next<R: BufRead>(
                 &mut self,
                 key: String,
                 reader: &mut Reader<R>,
+                _context: &Self::Context,
             ) -> Result<(), Error<R::Error>> {
                 match &*key {
                     "foo" => self.foo = reader.read().await?,
