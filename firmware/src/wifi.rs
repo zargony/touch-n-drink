@@ -327,5 +327,4 @@ async fn network(stack: &'static Stack<Device>) -> ! {
     debug!("Wifi: Start network task");
 
     stack.run().await;
-    unreachable!()
 }
