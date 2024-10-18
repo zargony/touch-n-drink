@@ -64,7 +64,7 @@ impl FromJsonObject for AccessTokenResponse {
 struct SignInRequest<'a> {
     accesstoken: &'a str,
     username: &'a str,
-    password: &'a str,
+    password_md5: &'a str,
     appkey: &'a str,
     cid: Option<u32>,
     auth_secret: Option<&'a str>,
@@ -81,7 +81,7 @@ impl<'a> ToJson for SignInRequest<'a> {
             .await?
             .field("username", self.username)
             .await?
-            .field("password", self.password)
+            .field("password", self.password_md5)
             .await?
             .field("appkey", self.appkey)
             .await?;
@@ -175,14 +175,24 @@ impl FromJsonObject for UserInformationResponse {
 }
 
 /// Vereinsflieger API client
-#[derive(Debug)]
 pub struct Vereinsflieger<'a> {
     http: Http<'a>,
-    accesstoken: Option<AccessToken>,
     username: &'a str,
-    password: &'a str,
+    password_md5: &'a str,
     appkey: &'a str,
     cid: Option<u32>,
+}
+
+impl<'a> fmt::Debug for Vereinsflieger<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Vereinsflieger")
+            .field("http", &self.http)
+            .field("username", &self.username)
+            .field("password_md5", &"<redacted>")
+            .field("appkey", &"<redacted>")
+            .field("cid", &self.cid)
+            .finish()
+    }
 }
 
 impl<'a> Vereinsflieger<'a> {
@@ -192,34 +202,62 @@ impl<'a> Vereinsflieger<'a> {
         seed: u64,
         resources: &'a mut http::Resources,
         username: &'a str,
-        password: &'a str,
+        password_md5: &'a str,
         appkey: &'a str,
         cid: Option<u32>,
     ) -> Self {
-        let http = Http::new(wifi, seed, resources, BASE_URL);
+        let http = Http::new(wifi, seed, resources);
 
         Self {
             http,
-            accesstoken: None,
             username,
-            password,
+            password_md5,
             appkey,
             cid,
         }
     }
 
+    /// Connect to API server
+    #[allow(dead_code)]
+    pub async fn connect(&mut self) -> Result<Connection, Error> {
+        let connection = self.http.connect(BASE_URL).await?;
+
+        Connection::sign_in(
+            connection,
+            self.username,
+            self.password_md5,
+            self.appkey,
+            self.cid,
+        )
+        .await
+    }
+}
+
+/// Vereinsflieger API client connection
+pub struct Connection<'a> {
+    connection: http::Connection<'a>,
+    accesstoken: AccessToken,
+}
+
+impl<'a> fmt::Debug for Connection<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Connection")
+            .field("connection", &self.connection)
+            .field("accesstoken", &"<redacted>")
+            .finish()
+    }
+}
+
+impl<'a> Connection<'a> {
     /// Fetch information about authenticated user
     #[allow(dead_code)]
     pub async fn get_user_information(&mut self) -> Result<(), Error> {
-        self.ensure_authenticated().await?;
-        let accesstoken = self.accesstoken()?.clone();
-
         let response: UserInformationResponse = self
-            .http
+            .connection
             .post(
                 "auth/getuser",
                 &UserInformationRequest {
-                    accesstoken: &accesstoken,
+                    accesstoken: &self.accesstoken,
                 },
             )
             .await
@@ -229,63 +267,50 @@ impl<'a> Vereinsflieger<'a> {
     }
 }
 
-impl<'a> Vereinsflieger<'a> {
-    /// Sign in to API server, returns new access token
+impl<'a> Connection<'a> {
+    /// Fetch access token, sign in to API server, return connection for API requests
     async fn sign_in(
-        &mut self,
+        mut connection: http::Connection<'a>,
         username: &str,
-        password: &str,
+        password_md5: &str,
         appkey: &str,
         cid: Option<u32>,
-    ) -> Result<AccessToken, Error> {
+    ) -> Result<Self, Error> {
         // Fetch access token
-        let response: AccessTokenResponse = self.http.get("auth/accesstoken").await?;
+        let response: AccessTokenResponse = connection.get("auth/accesstoken").await?;
         let accesstoken = response.accesstoken;
-        debug!("Vereinsflieger: Got access token {}", accesstoken);
+        // debug!("Vereinsflieger: Got access token {}", accesstoken);
+        debug!(
+            "Vereinsflieger: Got access token (length {})",
+            accesstoken.len()
+        );
 
         // Use access token and credentials to sign in
-        let signin_response: Result<SignInResponse, _> = self
-            .http
+        let response: Result<SignInResponse, _> = connection
             .post(
                 "auth/signin",
                 &SignInRequest {
                     accesstoken: &accesstoken,
                     username,
-                    password,
+                    password_md5,
                     appkey,
                     cid,
                     auth_secret: None,
                 },
             )
             .await;
-        match signin_response {
+        match response {
             Ok(_) => {
                 info!("Vereinsflieger: Signed in as {}", username);
-                Ok(accesstoken)
+                Ok(Self {
+                    connection,
+                    accesstoken,
+                })
             }
             Err(err) => {
                 warn!("Vereinsflieger: Sign in failed: {}", err);
                 Err(err.into())
             }
-        }
-    }
-
-    /// Sign in to API server if we don't have an access token yet
-    async fn ensure_authenticated(&mut self) -> Result<(), Error> {
-        if self.accesstoken.is_none() {
-            let accesstoken = self
-                .sign_in(self.username, self.password, self.appkey, self.cid)
-                .await?;
-            self.accesstoken = Some(accesstoken);
-        }
-        Ok(())
-    }
-
-    /// Current accesstoken (if any)
-    fn accesstoken(&self) -> Result<&AccessToken, Error> {
-        match self.accesstoken {
-            Some(ref accesstoken) => Ok(accesstoken),
-            None => Err(Error::Http(http::Error::Unauthorized)),
         }
     }
 }
