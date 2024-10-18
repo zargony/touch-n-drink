@@ -50,6 +50,7 @@ mod nfc;
 mod pn532;
 mod screen;
 mod ui;
+mod vereinsflieger;
 mod wifi;
 
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
@@ -68,6 +69,7 @@ use esp_hal::timer::systimer::{SystemTimer, Target};
 use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
 use log::{error, info};
+use rand_core::RngCore;
 
 extern crate alloc;
 
@@ -108,7 +110,7 @@ async fn main(spawner: Spawner) {
     let system = SystemControl::new(peripherals.SYSTEM);
     let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
-    let rng = Rng::new(peripherals.RNG);
+    let mut rng = Rng::new(peripherals.RNG);
     let _led = AnyOutput::new(io.pins.gpio8, Level::High);
 
     // Initialize global allocator
@@ -189,13 +191,32 @@ async fn main(spawner: Spawner) {
         Err(err) => panic!("Wifi initialization failed: {:?}", err),
     };
 
+    // Initialize Vereinsflieger API client
+    let mut http_resources = http::Resources::new();
+    let mut vereinsflieger = vereinsflieger::Vereinsflieger::new(
+        &wifi,
+        rng.next_u64(),
+        &mut http_resources,
+        &config.vf_username,
+        &config.vf_password_md5,
+        &config.vf_appkey,
+        config.vf_cid,
+    );
+
     // Initialize buzzer
     let buzzer_pin = AnyPin::new(io.pins.gpio4);
     let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, &clocks, buzzer_pin);
     let _ = buzzer.startup().await;
 
     // Create UI
-    let mut ui = ui::Ui::new(&mut display, &mut keypad, &mut nfc, &mut buzzer, &wifi);
+    let mut ui = ui::Ui::new(
+        &mut display,
+        &mut keypad,
+        &mut nfc,
+        &mut buzzer,
+        &wifi,
+        &mut vereinsflieger,
+    );
 
     // Show splash screen for a while, ignore any error
     let _ = ui.show_splash().await;

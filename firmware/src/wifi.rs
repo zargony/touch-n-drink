@@ -40,7 +40,6 @@ pub type TcpClient<'d> =
     tcp::client::TcpClient<'d, Device, NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>;
 
 /// Type of TCP connection returned by TCP client
-#[allow(dead_code)]
 pub type TcpConnection<'d> =
     tcp::client::TcpConnection<'d, NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>;
 
@@ -276,13 +275,11 @@ impl Wifi {
     }
 
     /// Provide an embedded-nal-async compatible DNS socket
-    #[allow(dead_code)]
     pub fn dns(&self) -> &'_ DnsSocket {
         self.dns_socket
     }
 
     /// Provide an embedded-nal-async compatible TCP client
-    #[allow(dead_code)]
     pub fn tcp(&self) -> &'_ TcpClient {
         self.tcp_client
     }
