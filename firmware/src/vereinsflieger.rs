@@ -48,12 +48,12 @@ impl FromJsonObject for AccessTokenResponse {
     async fn read_next<R: BufRead>(
         &mut self,
         key: String,
-        reader: &mut json::Reader<R>,
+        json: &mut json::Reader<R>,
         _context: &Self::Context,
     ) -> Result<(), json::Error<R::Error>> {
         match &*key {
-            "accesstoken" => self.accesstoken = reader.read().await?,
-            _ => _ = reader.read_any().await?,
+            "accesstoken" => self.accesstoken = json.read().await?,
+            _ => _ = json.read_any().await?,
         }
         Ok(())
     }
@@ -73,9 +73,9 @@ struct SignInRequest<'a> {
 impl<'a> ToJson for SignInRequest<'a> {
     async fn to_json<W: Write>(
         &self,
-        writer: &mut json::Writer<W>,
+        json: &mut json::Writer<W>,
     ) -> Result<(), json::Error<W::Error>> {
-        let mut object = writer.write_object().await?;
+        let mut object = json.write_object().await?;
         let mut object = object
             .field("accesstoken", self.accesstoken)
             .await?
@@ -107,10 +107,10 @@ impl FromJsonObject for SignInResponse {
     async fn read_next<R: BufRead>(
         &mut self,
         _key: String,
-        reader: &mut json::Reader<R>,
+        json: &mut json::Reader<R>,
         _context: &Self::Context,
     ) -> Result<(), json::Error<R::Error>> {
-        _ = reader.read_any().await?;
+        _ = json.read_any().await?;
         Ok(())
     }
 }
@@ -124,10 +124,9 @@ struct UserInformationRequest<'a> {
 impl<'a> ToJson for UserInformationRequest<'a> {
     async fn to_json<W: Write>(
         &self,
-        writer: &mut json::Writer<W>,
+        json: &mut json::Writer<W>,
     ) -> Result<(), json::Error<W::Error>> {
-        writer
-            .write_object()
+        json.write_object()
             .await?
             .field("accesstoken", self.accesstoken)
             .await?
@@ -156,19 +155,19 @@ impl FromJsonObject for UserInformationResponse {
     async fn read_next<R: BufRead>(
         &mut self,
         key: String,
-        reader: &mut json::Reader<R>,
+        json: &mut json::Reader<R>,
         _context: &Self::Context,
     ) -> Result<(), json::Error<R::Error>> {
         match &*key {
-            "uid" => self.uid = reader.read_any().await?.try_into()?,
-            "firstname" => self.firstname = reader.read().await?,
-            "lastname" => self.lastname = reader.read().await?,
-            "memberid" => self.memberid = reader.read_any().await?.try_into()?,
-            "status" => self.status = reader.read().await?,
-            "cid" => self.cid = reader.read_any().await?.try_into()?,
-            "roles" => self.roles = reader.read().await?,
-            "email" => self.email = reader.read().await?,
-            _ => _ = reader.read_any().await?,
+            "uid" => self.uid = json.read_any().await?.try_into()?,
+            "firstname" => self.firstname = json.read().await?,
+            "lastname" => self.lastname = json.read().await?,
+            "memberid" => self.memberid = json.read_any().await?.try_into()?,
+            "status" => self.status = json.read().await?,
+            "cid" => self.cid = json.read_any().await?.try_into()?,
+            "roles" => self.roles = json.read().await?,
+            "email" => self.email = json.read().await?,
+            _ => _ = json.read_any().await?,
         }
         Ok(())
     }

@@ -306,117 +306,117 @@ impl<R: BufRead> Reader<R> {
 /// Deserialize from streaming JSON
 pub trait FromJson: Sized {
     /// Deserialize this type using the given JSON reader
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>>;
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>>;
 }
 
 impl FromJson for () {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        reader.read_null().await
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        json.read_null().await
     }
 }
 
 impl FromJson for bool {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        reader.read_boolean().await
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        json.read_boolean().await
     }
 }
 
 impl FromJson for u8 {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        u8::try_from(reader.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        u8::try_from(json.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
     }
 }
 
 impl FromJson for u16 {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        u16::try_from(reader.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        u16::try_from(json.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
     }
 }
 
 impl FromJson for u32 {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        u32::try_from(reader.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        u32::try_from(json.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
     }
 }
 
 impl FromJson for u64 {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        u64::try_from(reader.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        u64::try_from(json.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
     }
 }
 
 impl FromJson for usize {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        usize::try_from(reader.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        usize::try_from(json.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
     }
 }
 
 impl FromJson for i8 {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        i8::try_from(reader.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        i8::try_from(json.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
     }
 }
 
 impl FromJson for i16 {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        i16::try_from(reader.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        i16::try_from(json.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
     }
 }
 
 impl FromJson for i32 {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        i32::try_from(reader.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        i32::try_from(json.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
     }
 }
 
 impl FromJson for i64 {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        reader.read_integer().await
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        json.read_integer().await
     }
 }
 
 impl FromJson for isize {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        isize::try_from(reader.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        isize::try_from(json.read_integer().await?).map_err(|_e| Error::NumberTooLarge)
     }
 }
 
 impl FromJson for f32 {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
         // Rust Reference: Casting from an f64 to an f32 will produce the closest possible f32
         #[allow(clippy::cast_possible_truncation)]
-        Ok(reader.read_decimal().await? as f32)
+        Ok(json.read_decimal().await? as f32)
     }
 }
 
 impl FromJson for f64 {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        reader.read_decimal().await
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        json.read_decimal().await
     }
 }
 
 impl FromJson for String {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        reader.read_string().await
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        json.read_string().await
     }
 }
 
 // FIXME: Unfortunately, a generic `T: FromJsonArray` would be a conflicting implementation
 impl<T: FromJson> FromJson for Vec<T> {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Vec<T>, Error<R::Error>> {
-        reader.read_array().await
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Vec<T>, Error<R::Error>> {
+        json.read_array().await
     }
 }
 
 impl<C: Default, T: FromJsonObject<Context = C>> FromJson for T {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<T, Error<R::Error>> {
-        reader.read_object().await
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<T, Error<R::Error>> {
+        json.read_object().await
     }
 }
 
 impl FromJson for Value {
-    async fn from_json<R: BufRead>(reader: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
-        reader.read_any().await
+    async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<Self, Error<R::Error>> {
+        json.read_any().await
     }
 }
 
@@ -430,7 +430,7 @@ pub trait FromJsonArray: Sized + Default {
     /// Read next array element from given JSON reader
     async fn read_next<R: BufRead>(
         &mut self,
-        reader: &mut Reader<R>,
+        json: &mut Reader<R>,
         context: &Self::Context,
     ) -> Result<(), Error<R::Error>>;
 }
@@ -440,10 +440,10 @@ impl<T: FromJson> FromJsonArray for Vec<T> {
 
     async fn read_next<R: BufRead>(
         &mut self,
-        reader: &mut Reader<R>,
+        json: &mut Reader<R>,
         _context: &Self::Context,
     ) -> Result<(), Error<R::Error>> {
-        let elem = reader.read().await?;
+        let elem = json.read().await?;
         self.push(elem);
         Ok(())
     }
@@ -460,7 +460,7 @@ pub trait FromJsonObject: Sized + Default {
     async fn read_next<R: BufRead>(
         &mut self,
         key: String,
-        reader: &mut Reader<R>,
+        json: &mut Reader<R>,
         context: &Self::Context,
     ) -> Result<(), Error<R::Error>>;
 }
@@ -471,10 +471,10 @@ impl<T: FromJson> FromJsonObject for BTreeMap<String, T> {
     async fn read_next<R: BufRead>(
         &mut self,
         key: String,
-        reader: &mut Reader<R>,
+        json: &mut Reader<R>,
         _context: &Self::Context,
     ) -> Result<(), Error<R::Error>> {
-        let value = reader.read().await?;
+        let value = json.read().await?;
         self.insert(key, value);
         Ok(())
     }
@@ -510,14 +510,14 @@ mod tests {
             async fn read_next<R: BufRead>(
                 &mut self,
                 key: String,
-                reader: &mut Reader<R>,
+                json: &mut Reader<R>,
                 _context: &Self::Context,
             ) -> Result<(), Error<R::Error>> {
                 match &*key {
-                    "foo" => self.foo = reader.read().await?,
-                    "bar" => self.bar = reader.read().await?,
-                    "baz" => self.baz = reader.read().await?,
-                    _ => _ = reader.read_any().await?,
+                    "foo" => self.foo = json.read().await?,
+                    "bar" => self.bar = json.read().await?,
+                    "baz" => self.baz = json.read().await?,
+                    _ => _ = json.read_any().await?,
                 }
                 Ok(())
             }

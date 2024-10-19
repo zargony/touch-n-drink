@@ -1,5 +1,4 @@
 use crate::json::{self, FromJson, ToJson};
-use crate::json::{Reader as JsonReader, Writer as JsonWriter};
 use crate::wifi::{DnsSocket, TcpClient, TcpConnection, Wifi};
 use alloc::vec::Vec;
 use core::convert::Infallible;
@@ -141,7 +140,7 @@ impl<'a> Connection<'a> {
         &'req mut self,
         path: &'req str,
         rx_buf: &'req mut [u8],
-    ) -> Result<JsonReader<BodyReader<impl Read + BufRead + use<'a, 'req>>>, Error> {
+    ) -> Result<json::Reader<BodyReader<impl Read + BufRead + use<'a, 'req>>>, Error> {
         // FIXME: Return type of this function shouldn't be generic, but reqwless hides the
         // inner type `BufferingReader` so we can't use the full type signature for now
 
@@ -168,7 +167,7 @@ impl<'a> Connection<'a> {
         path: &'req str,
         data: &'req [u8],
         rx_buf: &'req mut [u8],
-    ) -> Result<JsonReader<BodyReader<impl Read + BufRead + use<'a, 'req>>>, Error> {
+    ) -> Result<json::Reader<BodyReader<impl Read + BufRead + use<'a, 'req>>>, Error> {
         // FIXME: Return type of this function shouldn't be generic, but reqwless hides the
         // inner type `BufferingReader` so we can't use the full type signature for now
 
@@ -192,7 +191,7 @@ impl<'a> Connection<'a> {
     pub async fn prepare_body<T: ToJson>(data: T) -> Result<Vec<u8>, Error> {
         // OPTIMIZE: Don't buffer but stream request body. Only needed if we start sending much data
         let mut body = Vec::new();
-        let mut json = JsonWriter::new(&mut body);
+        let mut json = json::Writer::new(&mut body);
         json.write(data).await.map_err(Error::MalformedRequest)?;
         Ok(body)
     }
@@ -203,7 +202,7 @@ impl<'a> Connection<'a> {
     async fn send_request<'req, 'conn, B: RequestBody>(
         request: HttpResourceRequestBuilder<'req, 'conn, TcpConnection<'conn>, B>,
         rx_buf: &'req mut [u8],
-    ) -> Result<JsonReader<BodyReader<impl Read + BufRead + use<'req, 'conn, B>>>, Error> {
+    ) -> Result<json::Reader<BodyReader<impl Read + BufRead + use<'req, 'conn, B>>>, Error> {
         // FIXME: Return type of this function shouldn't be generic, but reqwless hides the
         // inner type `BufferingReader` so we can't use the full type signature for now
 
@@ -227,6 +226,6 @@ impl<'a> Connection<'a> {
         //     return Err(Error::InvalidResponse);
         // }
 
-        Ok(JsonReader::new(response.body().reader()))
+        Ok(json::Reader::new(response.body().reader()))
     }
 }

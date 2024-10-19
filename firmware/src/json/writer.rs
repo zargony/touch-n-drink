@@ -182,127 +182,123 @@ impl<'w, W: Write> ObjectWriter<'w, W> {
 /// Serialize to streaming JSON
 pub trait ToJson {
     /// Serialize this type using the given JSON writer
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>>;
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>>;
 }
 
 impl ToJson for () {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_null().await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_null().await
     }
 }
 
 impl ToJson for bool {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_boolean(*self).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_boolean(*self).await
     }
 }
 
 impl ToJson for u8 {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_integer(i64::from(*self)).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_integer(i64::from(*self)).await
     }
 }
 
 impl ToJson for u16 {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_integer(i64::from(*self)).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_integer(i64::from(*self)).await
     }
 }
 
 impl ToJson for u32 {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_integer(i64::from(*self)).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_integer(i64::from(*self)).await
     }
 }
 
 impl ToJson for u64 {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer
-            .write_integer(i64::try_from(*self).map_err(|_e| Error::NumberTooLarge)?)
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_integer(i64::try_from(*self).map_err(|_e| Error::NumberTooLarge)?)
             .await
     }
 }
 
 impl ToJson for usize {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer
-            .write_integer(i64::try_from(*self).map_err(|_e| Error::NumberTooLarge)?)
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_integer(i64::try_from(*self).map_err(|_e| Error::NumberTooLarge)?)
             .await
     }
 }
 
 impl ToJson for i8 {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_integer(i64::from(*self)).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_integer(i64::from(*self)).await
     }
 }
 
 impl ToJson for i16 {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_integer(i64::from(*self)).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_integer(i64::from(*self)).await
     }
 }
 
 impl ToJson for i32 {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_integer(i64::from(*self)).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_integer(i64::from(*self)).await
     }
 }
 
 impl ToJson for i64 {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_integer(*self).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_integer(*self).await
     }
 }
 
 impl ToJson for isize {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer
-            .write_integer(i64::try_from(*self).map_err(|_e| Error::NumberTooLarge)?)
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_integer(i64::try_from(*self).map_err(|_e| Error::NumberTooLarge)?)
             .await
     }
 }
 
 impl ToJson for f32 {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_decimal(f64::from(*self)).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_decimal(f64::from(*self)).await
     }
 }
 
 impl ToJson for f64 {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_decimal(*self).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_decimal(*self).await
     }
 }
 
 impl ToJson for str {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_string(self).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_string(self).await
     }
 }
 
 impl ToJson for String {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_string(self).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_string(self).await
     }
 }
 
 impl<T: ToJson> ToJson for [T] {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_array(self).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_array(self).await
     }
 }
 
 impl<T: ToJson> ToJson for Vec<T> {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_array(self).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_array(self).await
     }
 }
 
 impl<K: AsRef<str>, V: ToJson> ToJson for [(K, V)] {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer
-            .write_object()
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_object()
             .await?
             .fields_from(self.iter().map(|(k, v)| (k.as_ref(), v)))
             .await?
@@ -312,9 +308,8 @@ impl<K: AsRef<str>, V: ToJson> ToJson for [(K, V)] {
 }
 
 impl<K: AsRef<str>, V: ToJson> ToJson for BTreeMap<K, V> {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer
-            .write_object()
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_object()
             .await?
             .fields_from(self)
             .await?
@@ -324,26 +319,26 @@ impl<K: AsRef<str>, V: ToJson> ToJson for BTreeMap<K, V> {
 }
 
 impl ToJson for Value {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        writer.write_any(self).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        json.write_any(self).await
     }
 }
 
 impl<T: ToJson + ?Sized> ToJson for &T {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        (**self).to_json(writer).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        (**self).to_json(json).await
     }
 }
 
 impl<T: ToJson + ?Sized> ToJson for &mut T {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        (**self).to_json(writer).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        (**self).to_json(json).await
     }
 }
 
 impl<T: ToJson + ?Sized> ToJson for Box<T> {
-    async fn to_json<W: Write>(&self, writer: &mut Writer<W>) -> Result<(), Error<W::Error>> {
-        (**self).to_json(writer).await
+    async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+        (**self).to_json(json).await
     }
 }
 
@@ -359,9 +354,9 @@ mod tests {
 
     macro_rules! assert_write_eq {
         ($method:ident, $($value:expr)?, $json:expr) => {{
-            let mut writer = writer();
-            let res = writer.$method($($value)?).await;
-            let json = String::from_utf8(writer.into_inner()).unwrap();
+            let mut json = writer();
+            let res = json.$method($($value)?).await;
+            let json = String::from_utf8(json.into_inner()).unwrap();
             assert_eq!(res.map(|()| &*json), $json)
         }};
     }
@@ -376,12 +371,8 @@ mod tests {
         }
 
         impl ToJson for Test {
-            async fn to_json<W: Write>(
-                &self,
-                writer: &mut Writer<W>,
-            ) -> Result<(), Error<W::Error>> {
-                writer
-                    .write_object()
+            async fn to_json<W: Write>(&self, json: &mut Writer<W>) -> Result<(), Error<W::Error>> {
+                json.write_object()
                     .await?
                     .field("foo", &self.foo)
                     .await?
@@ -436,8 +427,8 @@ mod tests {
 
     #[async_std::test]
     async fn write_object() {
-        let mut writer = writer();
-        let res = writer
+        let mut json = writer();
+        let res = json
             .write_object()
             .await
             .unwrap()
@@ -452,7 +443,7 @@ mod tests {
             .unwrap()
             .finish()
             .await;
-        let json = String::from_utf8(writer.into_inner()).unwrap();
+        let json = String::from_utf8(json.into_inner()).unwrap();
         assert_eq!(
             res.map(|()| &*json),
             Ok(r#"{"foo": "hi", "bar": 42, "baz": true}"#)
