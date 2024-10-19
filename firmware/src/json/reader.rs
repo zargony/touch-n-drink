@@ -425,7 +425,7 @@ impl FromJson for Value {
 /// next element.
 pub trait FromJsonArray: Sized + Default {
     /// Additional context information passed to deserialization
-    type Context;
+    type Context: ?Sized;
 
     /// Read next array element from given JSON reader
     async fn read_next<R: BufRead>(
@@ -454,7 +454,7 @@ impl<T: FromJson> FromJsonArray for Vec<T> {
 /// next value.
 pub trait FromJsonObject: Sized + Default {
     /// Additional context information passed to deserialization
-    type Context;
+    type Context: ?Sized;
 
     /// Read next object value from given JSON reader
     async fn read_next<R: BufRead>(
