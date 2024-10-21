@@ -1,10 +1,9 @@
+mod proto_auth;
+
 use crate::http::{self, Http};
-use crate::json::{self, FromJsonObject, ToJson};
 use crate::wifi::Wifi;
 use alloc::string::String;
-use alloc::vec::Vec;
 use core::fmt;
-use embedded_io_async::{BufRead, Write};
 use log::{debug, info, warn};
 
 /// Vereinsflieger API base URL
@@ -33,145 +32,6 @@ impl fmt::Display for Error {
 
 /// Access token
 type AccessToken = String;
-
-/// Access token response
-#[derive(Debug, Default)]
-struct AccessTokenResponse {
-    accesstoken: AccessToken,
-    // URL: String,
-    // httpstatuscode: String,
-}
-
-impl FromJsonObject for AccessTokenResponse {
-    type Context = ();
-
-    async fn read_next<R: BufRead>(
-        &mut self,
-        key: String,
-        json: &mut json::Reader<R>,
-        _context: &Self::Context,
-    ) -> Result<(), json::Error<R::Error>> {
-        match &*key {
-            "accesstoken" => self.accesstoken = json.read().await?,
-            _ => _ = json.read_any().await?,
-        }
-        Ok(())
-    }
-}
-
-/// Sign in request
-#[derive(Debug)]
-struct SignInRequest<'a> {
-    accesstoken: &'a str,
-    username: &'a str,
-    password_md5: &'a str,
-    appkey: &'a str,
-    cid: Option<u32>,
-    auth_secret: Option<&'a str>,
-}
-
-impl<'a> ToJson for SignInRequest<'a> {
-    async fn to_json<W: Write>(
-        &self,
-        json: &mut json::Writer<W>,
-    ) -> Result<(), json::Error<W::Error>> {
-        let mut object = json.write_object().await?;
-        let mut object = object
-            .field("accesstoken", self.accesstoken)
-            .await?
-            .field("username", self.username)
-            .await?
-            .field("password", self.password_md5)
-            .await?
-            .field("appkey", self.appkey)
-            .await?;
-        if let Some(cid) = self.cid {
-            object = object.field("cid", f64::from(cid)).await?;
-        }
-        if let Some(auth_secret) = self.auth_secret {
-            object = object.field("auth_secret", auth_secret).await?;
-        }
-        object.finish().await
-    }
-}
-
-/// Sign in response
-#[derive(Debug, Default)]
-struct SignInResponse {
-    // httpstatuscode: String,
-}
-
-impl FromJsonObject for SignInResponse {
-    type Context = ();
-
-    async fn read_next<R: BufRead>(
-        &mut self,
-        _key: String,
-        json: &mut json::Reader<R>,
-        _context: &Self::Context,
-    ) -> Result<(), json::Error<R::Error>> {
-        _ = json.read_any().await?;
-        Ok(())
-    }
-}
-
-/// User information request
-#[derive(Debug)]
-struct UserInformationRequest<'a> {
-    accesstoken: &'a str,
-}
-
-impl<'a> ToJson for UserInformationRequest<'a> {
-    async fn to_json<W: Write>(
-        &self,
-        json: &mut json::Writer<W>,
-    ) -> Result<(), json::Error<W::Error>> {
-        json.write_object()
-            .await?
-            .field("accesstoken", self.accesstoken)
-            .await?
-            .finish()
-            .await
-    }
-}
-
-/// User information response
-#[derive(Debug, Default)]
-struct UserInformationResponse {
-    uid: u32,
-    firstname: String,
-    lastname: String,
-    memberid: u32,
-    status: String,
-    cid: u32,
-    roles: Vec<String>,
-    email: String,
-    // httpstatuscode: String,
-}
-
-impl FromJsonObject for UserInformationResponse {
-    type Context = ();
-
-    async fn read_next<R: BufRead>(
-        &mut self,
-        key: String,
-        json: &mut json::Reader<R>,
-        _context: &Self::Context,
-    ) -> Result<(), json::Error<R::Error>> {
-        match &*key {
-            "uid" => self.uid = json.read_any().await?.try_into()?,
-            "firstname" => self.firstname = json.read().await?,
-            "lastname" => self.lastname = json.read().await?,
-            "memberid" => self.memberid = json.read_any().await?.try_into()?,
-            "status" => self.status = json.read().await?,
-            "cid" => self.cid = json.read_any().await?.try_into()?,
-            "roles" => self.roles = json.read().await?,
-            "email" => self.email = json.read().await?,
-            _ => _ = json.read_any().await?,
-        }
-        Ok(())
-    }
-}
 
 /// Vereinsflieger API client
 pub struct Vereinsflieger<'a> {
@@ -251,6 +111,8 @@ impl<'a> Connection<'a> {
     /// Fetch information about authenticated user
     #[allow(dead_code)]
     pub async fn get_user_information(&mut self) -> Result<(), Error> {
+        use proto_auth::{UserInformationRequest, UserInformationResponse};
+
         let response: UserInformationResponse = self
             .connection
             .post(
@@ -275,6 +137,8 @@ impl<'a> Connection<'a> {
         appkey: &str,
         cid: Option<u32>,
     ) -> Result<Self, Error> {
+        use proto_auth::{AccessTokenResponse, SignInRequest, SignInResponse};
+
         // Fetch access token
         let response: AccessTokenResponse = connection.get("auth/accesstoken").await?;
         let accesstoken = response.accesstoken;
