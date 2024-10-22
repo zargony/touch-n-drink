@@ -208,7 +208,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
                 _ => continue,
             };
             info!("UI: Detected NFC card: {}", uid);
-            let _ = self.buzzer.short_confirmation().await;
+            let _ = self.buzzer.confirm().await;
             // TODO: Verify identification and return user information
             return Ok(uid);
         }

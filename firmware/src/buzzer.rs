@@ -101,23 +101,33 @@ impl<'a> Buzzer<'a> {
     /// Output startup/testing tone
     pub async fn startup(&mut self) -> Result<(), Error> {
         debug!("Buzzer: Playing startup tone");
-        self.tone(3000, Duration::from_millis(1000)).await
+        self.tone(3136, Duration::from_millis(1000)).await // G7
     }
 
     /// Output a short confirmation tone
-    pub async fn short_confirmation(&mut self) -> Result<(), Error> {
-        debug!("Buzzer: Playing short confirmation tone");
-        self.tone(3000, Duration::from_millis(100)).await
+    pub async fn confirm(&mut self) -> Result<(), Error> {
+        debug!("Buzzer: Playing confirm tone");
+        self.tone(3136, Duration::from_millis(100)).await // G7
+    }
+
+    /// Output a long denying tone
+    #[allow(dead_code)]
+    pub async fn deny(&mut self) -> Result<(), Error> {
+        debug!("Buzzer: Playing deny tone");
+        self.tone(392, Duration::from_millis(500)).await?; // G4
+        Timer::after(Duration::from_millis(1000)).await;
+        Ok(())
     }
 
     /// Output an error tone
     pub async fn error(&mut self) -> Result<(), Error> {
         debug!("Buzzer: Playing error tone");
-        self.tone(800, Duration::from_millis(200)).await?;
-        Timer::after(Duration::from_millis(50)).await;
-        self.tone(600, Duration::from_millis(200)).await?;
-        Timer::after(Duration::from_millis(50)).await;
-        self.tone(400, Duration::from_millis(500)).await?;
+        self.tone(784, Duration::from_millis(200)).await?; // G5
+        Timer::after(Duration::from_millis(10)).await;
+        self.tone(587, Duration::from_millis(200)).await?; // D5
+        Timer::after(Duration::from_millis(10)).await;
+        self.tone(392, Duration::from_millis(500)).await?; // G4
+        Timer::after(Duration::from_millis(1000)).await;
         Ok(())
     }
 }
