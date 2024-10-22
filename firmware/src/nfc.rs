@@ -3,9 +3,11 @@ use crate::pn532;
 
 use core::convert::Infallible;
 use core::fmt::{self, Debug};
+use core::str::FromStr;
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
+use hex::FromHex;
 use log::{debug, info, warn};
 use pn532::{Error as Pn532Error, I2CInterfaceWithIrq, Pn532, Request, SAMMode};
 
@@ -181,6 +183,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
 
             // Return UID if retrieved, continue looping otherwise
             if let Some(uid) = maybe_uid {
+                debug!("NFC: Detected NFC card: {}", uid);
                 return Ok(uid);
             }
         }
@@ -192,7 +195,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
 pub struct InvalidUid;
 
 /// NFC UID
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Uid {
     /// Single Size UID (4 bytes), Mifare Classic
     Single([u8; 4]),
@@ -211,6 +214,28 @@ impl TryFrom<&[u8]> for Uid {
             4 => Ok(Self::Single(bytes.try_into().unwrap())),
             7 => Ok(Self::Double(bytes.try_into().unwrap())),
             10 => Ok(Self::Triple(bytes.try_into().unwrap())),
+            _ => Err(InvalidUid),
+        }
+    }
+}
+
+impl FromStr for Uid {
+    type Err = InvalidUid;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.len() {
+            8 => {
+                let bytes = <[u8; 4]>::from_hex(s).map_err(|_e| InvalidUid)?;
+                Ok(Self::Single(bytes))
+            }
+            14 => {
+                let bytes = <[u8; 7]>::from_hex(s).map_err(|_e| InvalidUid)?;
+                Ok(Self::Double(bytes))
+            }
+            20 => {
+                let bytes = <[u8; 10]>::from_hex(s).map_err(|_e| InvalidUid)?;
+                Ok(Self::Triple(bytes))
+            }
             _ => Err(InvalidUid),
         }
     }

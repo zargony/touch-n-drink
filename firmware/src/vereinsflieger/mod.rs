@@ -1,8 +1,10 @@
 mod proto_articles;
 mod proto_auth;
+mod proto_user;
 
 use crate::article::Articles;
 use crate::http::{self, Http};
+use crate::user::Users;
 use crate::wifi::Wifi;
 use alloc::string::String;
 use core::cell::RefCell;
@@ -157,6 +159,42 @@ impl<'a> Connection<'a> {
             "Vereinsflieger: Refreshed {} of {} articles",
             articles.borrow().count(),
             response.total_articles
+        );
+
+        // Discard remaining body (needed to make the next pipelined request work)
+        json.discard_to_end()
+            .await
+            .map_err(http::Error::MalformedResponse)?;
+
+        Ok(())
+    }
+
+    /// Fetch list of users and update user lookup table
+    pub async fn refresh_users(&mut self, users: &mut Users) -> Result<(), Error> {
+        use proto_user::{UserListRequest, UserListResponse};
+
+        debug!("Vereinsflieger: Refreshing users...");
+        let request_body = http::Connection::prepare_body(&UserListRequest {
+            accesstoken: &self.accesstoken,
+        })
+        .await?;
+        let mut rx_buf = [0; 4096];
+        let mut json = self
+            .connection
+            .post_json("user/list", &request_body, &mut rx_buf)
+            .await?;
+
+        users.clear();
+        let users = RefCell::new(users);
+
+        let response: UserListResponse = json
+            .read_object_with_context(&users)
+            .await
+            .map_err(http::Error::MalformedResponse)?;
+        info!(
+            "Vereinsflieger: Refreshed {} of {} users",
+            users.borrow().count(),
+            response.total_users
         );
 
         // Discard remaining body (needed to make the next pipelined request work)

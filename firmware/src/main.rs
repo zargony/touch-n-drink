@@ -51,6 +51,7 @@ mod nfc;
 mod pn532;
 mod screen;
 mod ui;
+mod user;
 mod vereinsflieger;
 mod wifi;
 
@@ -130,8 +131,9 @@ async fn main(spawner: Spawner) {
     // Read system configuration
     let config = config::Config::read().await;
 
-    // Initialize list of articles
+    // Initialize article and user look up tables
     let mut articles = article::Articles::new([config.vf_article_id]);
+    let mut users = user::Users::new();
 
     // Initialize I2C controller
     let i2c = I2c::new_with_timeout_async(
@@ -220,6 +222,7 @@ async fn main(spawner: Spawner) {
         &wifi,
         &mut vereinsflieger,
         &mut articles,
+        &mut users,
     );
 
     // Show splash screen for a while, ignore any error

@@ -1951,6 +1951,7 @@ dependencies = [
  "esp-storage",
  "esp-wifi",
  "git2",
+ "hex",
  "log",
  "pn532",
  "rand_core",
