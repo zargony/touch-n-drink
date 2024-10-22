@@ -71,7 +71,7 @@ impl<R: BufRead> Reader<R> {
     /// `Default` implementation and its `FromJsonObject` implementation is called to read each
     /// field's value. This doesn't allocate any memory while reading the object (except for the
     /// current key), so the type's implementation can choose how values are stored.
-    pub async fn read_object<C: Default, T: FromJsonObject<Context = C>>(
+    pub async fn read_object<C: Default, T: for<'ctx> FromJsonObject<Context<'ctx> = C>>(
         &mut self,
     ) -> Result<T, Error<R::Error>> {
         self.read_object_with_context(&C::default()).await
@@ -82,7 +82,7 @@ impl<R: BufRead> Reader<R> {
     /// `FromJsonObject` implementation.
     pub async fn read_object_with_context<T: FromJsonObject>(
         &mut self,
-        context: &T::Context,
+        context: &T::Context<'_>,
     ) -> Result<T, Error<R::Error>> {
         let mut obj = T::default();
         self.expect(b'{').await?;
@@ -113,7 +113,7 @@ impl<R: BufRead> Reader<R> {
     /// `Default` implementation and its `FromJsonArray` implementation is called to read each
     /// element. This doesn't allocate any memory while reading the array, so the type's
     /// implementation can choose how elements are stored.
-    pub async fn read_array<C: Default, T: FromJsonArray<Context = C>>(
+    pub async fn read_array<C: Default, T: for<'ctx> FromJsonArray<Context<'ctx> = C>>(
         &mut self,
     ) -> Result<T, Error<R::Error>> {
         self.read_array_with_context(&C::default()).await
@@ -124,7 +124,7 @@ impl<R: BufRead> Reader<R> {
     /// `FromJsonArray` implementation.
     pub async fn read_array_with_context<T: FromJsonArray>(
         &mut self,
-        context: &T::Context,
+        context: &T::Context<'_>,
     ) -> Result<T, Error<R::Error>> {
         let mut vec = T::default();
         self.expect(b'[').await?;
@@ -408,7 +408,7 @@ impl<T: FromJson> FromJson for Vec<T> {
     }
 }
 
-impl<C: Default, T: FromJsonObject<Context = C>> FromJson for T {
+impl<C: Default, T: for<'ctx> FromJsonObject<Context<'ctx> = C>> FromJson for T {
     async fn from_json<R: BufRead>(json: &mut Reader<R>) -> Result<T, Error<R::Error>> {
         json.read_object().await
     }
@@ -425,23 +425,23 @@ impl FromJson for Value {
 /// next element.
 pub trait FromJsonArray: Sized + Default {
     /// Additional context information passed to deserialization
-    type Context: ?Sized;
+    type Context<'ctx>: ?Sized;
 
     /// Read next array element from given JSON reader
     async fn read_next<R: BufRead>(
         &mut self,
         json: &mut Reader<R>,
-        context: &Self::Context,
+        context: &Self::Context<'_>,
     ) -> Result<(), Error<R::Error>>;
 }
 
 impl<T: FromJson> FromJsonArray for Vec<T> {
-    type Context = ();
+    type Context<'ctx> = ();
 
     async fn read_next<R: BufRead>(
         &mut self,
         json: &mut Reader<R>,
-        _context: &Self::Context,
+        _context: &Self::Context<'_>,
     ) -> Result<(), Error<R::Error>> {
         let elem = json.read().await?;
         self.push(elem);
@@ -454,25 +454,25 @@ impl<T: FromJson> FromJsonArray for Vec<T> {
 /// next value.
 pub trait FromJsonObject: Sized + Default {
     /// Additional context information passed to deserialization
-    type Context: ?Sized;
+    type Context<'ctx>: ?Sized;
 
     /// Read next object value from given JSON reader
     async fn read_next<R: BufRead>(
         &mut self,
         key: String,
         json: &mut Reader<R>,
-        context: &Self::Context,
+        context: &Self::Context<'_>,
     ) -> Result<(), Error<R::Error>>;
 }
 
 impl<T: FromJson> FromJsonObject for BTreeMap<String, T> {
-    type Context = ();
+    type Context<'ctx> = ();
 
     async fn read_next<R: BufRead>(
         &mut self,
         key: String,
         json: &mut Reader<R>,
-        _context: &Self::Context,
+        _context: &Self::Context<'_>,
     ) -> Result<(), Error<R::Error>> {
         let value = json.read().await?;
         self.insert(key, value);
@@ -511,7 +511,7 @@ mod tests {
                 &mut self,
                 key: String,
                 json: &mut Reader<R>,
-                _context: &Self::Context,
+                _context: &Self::Context<'_>,
             ) -> Result<(), Error<R::Error>> {
                 match &*key {
                     "foo" => self.foo = json.read().await?,
