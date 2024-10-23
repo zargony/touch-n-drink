@@ -6,13 +6,17 @@ Assembled device:
 
 ## Electronics
 
+Wiring of parts (PCB version):
+
+<img alt="Wiring of parts with PCB" src="../images/device-wiring-2.jpg" style="width: 20em;" />
+
 Wiring of parts (perfboard version):
 
-<img alt="Wiring of parts" src="../images/device-wiring-2.jpg" style="width: 20em;" />
+<img alt="Wiring of parts with perfboard" src="../images/device-wiring-3.jpg" style="width: 20em;" />
 
-Front components and connectors:
+JST-PH connectors:
 
-<img alt="Front components" src="../images/device-wiring-1.jpg" style="width: 20em;" />
+<img alt="JST-PH connectors" src="../images/device-wiring-1.jpg" style="width: 20em;" />
 
 Prototype breadboard:
 

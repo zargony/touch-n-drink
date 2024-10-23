@@ -6,13 +6,21 @@ A custom PCB holds the ESP32-C3 Module, a buzzer and connectors to wire up displ
 
 If you don't want to manufacture a PCB, it's also easily possible to wire up components on a perfboard (see below).
 
-PCB Layout:
+Soldered PCB:
 
-<img alt="PCB layout" src="../images/pcb-layout.png" style="width: 20em;" />
+<img alt="Soldered PCB" src="../images/pcb-soldered.jpg" style="width: 20em;" />
+
+Empty PCB:
+
+<img alt="Empty PCB" src="../images/pcb-empty.jpg" style="width: 20em;" />
 
 Rendered PCB model:
 
-<img alt="PCB rendered model" src="../images/pcb-model.jpg" style="width: 20em;" />
+<img alt="Rendered PCB model" src="../images/pcb-model.jpg" style="width: 20em;" />
+
+PCB Layout:
+
+<img alt="PCB layout" src="../images/pcb-layout.png" style="width: 20em;" />
 
 ### Components
 
