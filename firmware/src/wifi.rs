@@ -259,6 +259,7 @@ impl Wifi {
         debug!("Wifi: Waiting for network to come up...");
         self.stack.wait_config_up().await;
         debug_assert!(self.stack.is_link_up() && self.stack.is_config_up());
+        self.is_up();
     }
 
     /// Query DNS for IP address of given name
