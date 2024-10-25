@@ -1,3 +1,4 @@
+use crate::article::Articles;
 use crate::buzzer::Buzzer;
 use crate::display::Display;
 use crate::error::Error;
@@ -13,9 +14,6 @@ use embassy_time::{with_timeout, Duration, TimeoutError, Timer};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
 use log::info;
-
-/// Price for a drink
-const PRICE: f32 = 1.0;
 
 /// How long to show the splash screen if no key is pressed
 const SPLASH_TIMEOUT: Duration = Duration::from_secs(5);
@@ -42,7 +40,8 @@ pub struct Ui<'a, I2C, IRQ> {
     nfc: &'a mut Nfc<I2C, IRQ>,
     buzzer: &'a mut Buzzer<'a>,
     wifi: &'a Wifi,
-    _vereinsflieger: &'a mut Vereinsflieger<'a>,
+    vereinsflieger: &'a mut Vereinsflieger<'a>,
+    articles: &'a mut Articles<1>,
 }
 
 impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
@@ -54,6 +53,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         buzzer: &'a mut Buzzer<'a>,
         wifi: &'a Wifi,
         vereinsflieger: &'a mut Vereinsflieger<'a>,
+        articles: &'a mut Articles<1>,
     ) -> Self {
         Self {
             display,
@@ -61,7 +61,8 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
             nfc,
             buzzer,
             wifi,
-            _vereinsflieger: vereinsflieger,
+            vereinsflieger,
+            articles,
         }
     }
 
@@ -131,19 +132,40 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         }
     }
 
+    /// Refresh article names and prices
+    pub async fn refresh_articles(&mut self) -> Result<(), Error> {
+        self.wait_network_up().await?;
+
+        info!("UI: Refreshing articles...");
+
+        self.display
+            .screen(&screen::PleaseWait::ApiQuerying)
+            .await?;
+        let mut vf = self.vereinsflieger.connect().await?;
+
+        // Show authenticated user information when debugging
+        #[cfg(debug_assertions)]
+        vf.get_user_information().await?;
+
+        // Refresh articles
+        vf.refresh_articles(self.articles).await?;
+
+        Ok(())
+    }
+
     /// Run the user interface flow
     pub async fn run(&mut self) -> Result<(), Error> {
         // Wait for id card and verify identification
         let _uid = self.read_id_card().await?;
         // Ask for number of drinks
         let num_drinks = self.get_number_of_drinks().await?;
+        // Get article price
+        let price = self.articles.get(0).ok_or(Error::ArticleNotFound)?.price;
         // Calculate total price. It's ok to cast num_drinks to f32 as it's always a small number.
         #[allow(clippy::cast_precision_loss)]
-        let total_price = PRICE * num_drinks as f32;
+        let total_price = price * num_drinks as f32;
         // Show total price and ask for confirmation
         self.confirm_purchase(num_drinks, total_price).await?;
-        // Wait for network to become available (if not already)
-        self.wait_network_up().await?;
 
         // TODO: Process payment
         let _ = screen::Success::new(num_drinks);

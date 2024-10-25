@@ -1,3 +1,4 @@
+use crate::article::ArticleId;
 use crate::json::{self, FromJson, FromJsonObject};
 use alloc::string::String;
 use core::fmt;
@@ -14,9 +15,9 @@ pub struct SensitiveString(String);
 
 impl FromJson for SensitiveString {
     async fn from_json<R: BufRead>(
-        reader: &mut json::Reader<R>,
+        json: &mut json::Reader<R>,
     ) -> Result<Self, json::Error<R::Error>> {
-        Ok(Self(reader.read().await?))
+        Ok(Self(json.read().await?))
     }
 }
 
@@ -73,24 +74,27 @@ pub struct Config {
     /// Vereinsflieger API cid (optional)
     pub vf_cid: Option<u32>,
     /// Vereinsflieger article id for purchase
-    pub vf_article_id: u32,
+    pub vf_article_id: ArticleId,
 }
 
 impl FromJsonObject for Config {
+    type Context<'ctx> = ();
+
     async fn read_next<R: BufRead>(
         &mut self,
         key: String,
-        reader: &mut json::Reader<R>,
+        json: &mut json::Reader<R>,
+        _context: &Self::Context<'_>,
     ) -> Result<(), json::Error<R::Error>> {
         match &*key {
-            "wifi-ssid" => self.wifi_ssid = reader.read().await?,
-            "wifi-password" => self.wifi_password = reader.read().await?,
-            "vf-username" => self.vf_username = reader.read().await?,
-            "vf-password-md5" => self.vf_password_md5 = reader.read().await?,
-            "vf-appkey" => self.vf_appkey = reader.read().await?,
-            "vf-cid" => self.vf_cid = Some(reader.read().await?),
-            "vf-article-id" => self.vf_article_id = reader.read().await?,
-            _ => _ = reader.read_any().await?,
+            "wifi-ssid" => self.wifi_ssid = json.read().await?,
+            "wifi-password" => self.wifi_password = json.read().await?,
+            "vf-username" => self.vf_username = json.read().await?,
+            "vf-password-md5" => self.vf_password_md5 = json.read().await?,
+            "vf-appkey" => self.vf_appkey = json.read().await?,
+            "vf-cid" => self.vf_cid = Some(json.read().await?),
+            "vf-article-id" => self.vf_article_id = json.read().await?,
+            _ => _ = json.read_any().await?,
         }
         Ok(())
     }

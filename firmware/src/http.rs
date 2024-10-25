@@ -1,15 +1,15 @@
-use crate::json::{self, FromJson, Reader as JsonReader, ToJson, Writer as JsonWriter};
+use crate::json::{self, FromJson, ToJson};
 use crate::wifi::{DnsSocket, TcpClient, TcpConnection, Wifi};
 use alloc::vec::Vec;
 use core::convert::Infallible;
 use core::fmt;
+use embedded_io_async::{BufRead, Read};
 use log::debug;
-use reqwless::client::{
-    HttpClient, HttpConnection, HttpResource, HttpResourceRequestBuilder, TlsConfig, TlsVerify,
-};
+use reqwless::client::{HttpClient, HttpResource, HttpResourceRequestBuilder};
+use reqwless::client::{TlsConfig, TlsVerify};
 use reqwless::headers::ContentType;
 use reqwless::request::{RequestBody, RequestBuilder};
-use reqwless::response::{Response, StatusCode};
+use reqwless::response::{BodyReader, StatusCode};
 
 /// Maximum size of response from server
 const MAX_RESPONSE_SIZE: usize = 4096;
@@ -76,23 +76,20 @@ impl Resources {
 /// HTTP client
 pub struct Http<'a> {
     client: HttpClient<'a, TcpClient<'a>, DnsSocket<'a>>,
-    base_url: &'a str,
 }
 
 impl<'a> fmt::Debug for Http<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Http")
-            .field("base_url", &self.base_url)
-            .finish()
+        f.debug_struct("Http").finish()
     }
 }
 
 impl<'a> Http<'a> {
     /// Create new HTTP client using the given resources
-    pub fn new(wifi: &'a Wifi, seed: u64, resources: &'a mut Resources, base_url: &'a str) -> Self {
-        // FIXME: embedded-tls can't verify TLS certificates (though pinning is supported)
-        // This is bad since it makes communication vulnerable to mitm attacks. esp-mbedtls would
-        // be an alternative, but is atm only supported with git reqwless and nightly Rust.
+    pub fn new(wifi: &'a Wifi, seed: u64, resources: &'a mut Resources) -> Self {
+        // FIXME: reqwless with embedded-tls can't verify TLS certificates (though pinning is
+        // supported)/ This is bad since it makes communication vulnerable to mitm attacks.
+        // esp-mbedtls would work, but is only supported with git reqwless and nightly Rust atm.
         let tls_config = TlsConfig::new(
             seed,
             &mut resources.read_buffer,
@@ -101,66 +98,118 @@ impl<'a> Http<'a> {
         );
         let client = HttpClient::new_with_tls(wifi.tcp(), wifi.dns(), tls_config);
 
-        Self { client, base_url }
+        Self { client }
     }
 
+    /// Connect to HTTP server
+    pub async fn connect<'conn>(
+        &'conn mut self,
+        base_url: &'conn str,
+    ) -> Result<Connection, Error> {
+        let resource = self.client.resource(base_url).await?;
+        debug!("HTTP: Connected {}", base_url);
+
+        Ok(Connection { resource })
+    }
+}
+
+/// HTTP client connection
+pub struct Connection<'a> {
+    resource: HttpResource<'a, TcpConnection<'a>>,
+}
+
+impl<'a> fmt::Debug for Connection<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Connection")
+            .field("host", &self.resource.host)
+            .field("base_path", &self.resource.base_path)
+            .finish()
+    }
+}
+
+impl<'a> Connection<'a> {
     /// Send GET request, deserialize JSON response
     pub async fn get<T: FromJson>(&mut self, path: &str) -> Result<T, Error> {
-        let base_url = self.base_url;
+        let mut rx_buf = [0; MAX_RESPONSE_SIZE];
+        let mut json = self.get_json(path, &mut rx_buf).await?;
+        json.read().await.map_err(Error::MalformedResponse)
+    }
 
-        let mut resource = self.resource().await?;
+    /// Send GET request, return response body JSON reader
+    pub async fn get_json<'req>(
+        &'req mut self,
+        path: &'req str,
+        rx_buf: &'req mut [u8],
+    ) -> Result<json::Reader<BodyReader<impl Read + BufRead + use<'a, 'req>>>, Error> {
+        // FIXME: Return type of this function shouldn't be generic, but reqwless hides the
+        // inner type `BufferingReader` so we can't use the full type signature for now
 
-        debug!("HTTP: GET {}/{}", base_url, path);
-        let request = resource
+        debug!("HTTP: GET {}/{}", self.resource.base_path, path);
+        let request = self
+            .resource
             .get(path)
             .headers(&[("Accept", "application/json")]);
 
-        Self::send_request_read_response(request).await
+        Self::send_request(request, rx_buf).await
     }
 
     /// Serialize data to JSON, send POST request, deserialize JSON response
     pub async fn post<T: ToJson, U: FromJson>(&mut self, path: &str, data: &T) -> Result<U, Error> {
-        let base_url = self.base_url;
-
-        let mut resource = self.resource().await?;
         let body = Self::prepare_body(data).await?;
+        let mut rx_buf = [0; MAX_RESPONSE_SIZE];
+        let mut json = self.post_json(path, &body, &mut rx_buf).await?;
+        json.read().await.map_err(Error::MalformedResponse)
+    }
 
-        debug!("HTTP: POST {}/{} ({} bytes)", base_url, path, body.len());
-        let request = resource
+    /// Serialize data to JSON, send POST request, return response body JSON reader
+    pub async fn post_json<'req>(
+        &'req mut self,
+        path: &'req str,
+        data: &'req [u8],
+        rx_buf: &'req mut [u8],
+    ) -> Result<json::Reader<BodyReader<impl Read + BufRead + use<'a, 'req>>>, Error> {
+        // FIXME: Return type of this function shouldn't be generic, but reqwless hides the
+        // inner type `BufferingReader` so we can't use the full type signature for now
+
+        debug!(
+            "HTTP: POST {}/{} ({} bytes)",
+            self.resource.base_path,
+            path,
+            data.len()
+        );
+        let request = self
+            .resource
             .post(path)
             .content_type(ContentType::ApplicationJson)
             .headers(&[("Accept", "application/json")])
-            .body(&body[..]);
+            .body(data);
 
-        Self::send_request_read_response(request).await
-    }
-}
-
-impl<'a> Http<'a> {
-    /// Returns a connected http resource client
-    async fn resource(&mut self) -> Result<HttpResource<'_, TcpConnection<'_>>, Error> {
-        // TODO: keep resource cached so that we stay connected (and reconnect only when required)?
-        let resource = self.client.resource(self.base_url).await?;
-        debug!("HTTP: Connect {}", self.base_url);
-        Ok(resource)
+        Self::send_request(request, rx_buf).await
     }
 
     /// Serialize data to JSON for request body
-    async fn prepare_body<T: ToJson>(data: T) -> Result<Vec<u8>, Error> {
+    pub async fn prepare_body<T: ToJson>(data: T) -> Result<Vec<u8>, Error> {
         // OPTIMIZE: Don't buffer but stream request body. Only needed if we start sending much data
         let mut body = Vec::new();
-        let mut json_writer = JsonWriter::new(&mut body);
-        json_writer
-            .write(data)
-            .await
-            .map_err(Error::MalformedRequest)?;
+        let mut json = json::Writer::new(&mut body);
+        json.write(data).await.map_err(Error::MalformedRequest)?;
         Ok(body)
     }
+}
 
-    /// Check response status and headers
-    fn check_response(
-        response: &Response<'_, '_, HttpConnection<'_, TcpConnection>>,
-    ) -> Result<(), Error> {
+impl<'a> Connection<'a> {
+    /// Send request, check response status and return response body JSON reader
+    async fn send_request<'req, 'conn, B: RequestBody>(
+        request: HttpResourceRequestBuilder<'req, 'conn, TcpConnection<'conn>, B>,
+        rx_buf: &'req mut [u8],
+    ) -> Result<json::Reader<BodyReader<impl Read + BufRead + use<'req, 'conn, B>>>, Error> {
+        // FIXME: Return type of this function shouldn't be generic, but reqwless hides the
+        // inner type `BufferingReader` so we can't use the full type signature for now
+
+        // rx_buf is used to buffer response headers. The response body reader uses this only for
+        // non-TLS connections. Body reader of TLS connections will use the TLS read_buffer for
+        // buffering parts of the body. However, read_to_end will again always use this buffer.
+        let response = request.send(rx_buf).await?;
         debug!("HTTP: Status {}", response.status.0);
 
         if response.status.0 == 401 {
@@ -177,22 +226,6 @@ impl<'a> Http<'a> {
         //     return Err(Error::InvalidResponse);
         // }
 
-        Ok(())
-    }
-
-    /// Send request, deserialize JSON response
-    async fn send_request_read_response<B: RequestBody, T: FromJson>(
-        request: HttpResourceRequestBuilder<'_, '_, TcpConnection<'_>, B>,
-    ) -> Result<T, Error> {
-        // rx_buf is used to buffer response headers. The response body reader uses this only for
-        // non-TLS connections. Body reader of TLS connections will use the TLS read_buffer for
-        // buffering parts of the body. However, read_to_end will again always use this buffer.
-        let mut rx_buf = [0; MAX_RESPONSE_SIZE];
-        let response = request.send(&mut rx_buf).await?;
-
-        Self::check_response(&response)?;
-
-        let mut json_reader = JsonReader::new(response.body().reader());
-        json_reader.read().await.map_err(Error::MalformedResponse)
+        Ok(json::Reader::new(response.body().reader()))
     }
 }
