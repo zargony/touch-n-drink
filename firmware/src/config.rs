@@ -4,7 +4,7 @@ use core::fmt;
 use core::ops::Deref;
 use embedded_io_async::BufRead;
 use embedded_storage::ReadStorage;
-use esp_partition_table::{DataPartitionType, PartitionTable, PartitionType};
+use esp_partition_table::{PartitionTable, PartitionType};
 use esp_storage::FlashStorage;
 use log::{debug, info, warn};
 
@@ -50,15 +50,14 @@ impl Deref for SensitiveString {
 
 /// System configuration
 ///
-/// System configuration is stored in the `nvs` flash partition, so it stays unaffected by firmware
-/// updates via USB or OTA. Currently, configuration is read-only at runtime, i.e. it needs to be
-/// flashed manually once per device. To make this easier, it is expected to be stored in JSON
-/// format at the first sector (4 kb) of the `nvs` flash data partition (this is incompatible with
-/// the format that IDF nvs functions expect in this flash partition). See README.md for details
-/// on how to flash a configuration.
+/// System configuration is stored in the `config` flash data partition, so it stays unaffected by
+/// firmware updates via USB or OTA. Currently, configuration is read-only at runtime, i.e. it
+/// needs to be flashed manually once per device. To make this easier, it is expected to be stored
+/// in JSON format in the `config` data partition. See README.md for details on how to flash the
+/// configuration.
 ///
-/// If there is no valid JSON or no valid `nvs` data partition, a default configuration is provided
-/// (which isn't very useful, but at least doesn't prevent the device from starting).
+/// If there is no valid JSON or no valid `config` data partition, a default configuration is
+/// provided (which isn't very useful, but at least doesn't prevent the device from starting).
 #[derive(Debug, Default)]
 pub struct Config {
     /// Wifi SSID to connect to
@@ -98,7 +97,7 @@ impl FromJsonObject for Config {
 }
 
 impl Config {
-    /// Read configuration from nvs flash partition
+    /// Read configuration from `config` flash data partition
     pub async fn read() -> Self {
         let mut storage = FlashStorage::new();
 
@@ -106,24 +105,24 @@ impl Config {
         let table = PartitionTable::default();
         debug!("Config: Reading partition table at 0x{:x}", table.addr);
 
-        // Look up nvs data partition (at 0x9000 by default)
-        let nvs_offset = if let Some(offset) = table
+        // Look up config data partition (custom partition type 0x54, subtype 0x44)
+        let config_offset = if let Some(offset) = table
             .iter_storage(&mut storage, false)
             .flatten()
-            .find(|partition| partition.type_ == PartitionType::Data(DataPartitionType::Nvs))
+            .find(|partition| partition.type_ == PartitionType::User(0x54, 0x44))
             .map(|partition| partition.offset)
         {
-            debug!("Config: Found nvs data partition at offset 0x{:x}", offset);
+            debug!("Config: Found config partition at offset 0x{:x}", offset);
             offset
         } else {
-            warn!("Config: Unable to find nvs data partition");
+            warn!("Config: Unable to find config partition");
             return Self::default();
         };
 
-        // Read first sector (4 kb) of nvs partition
+        // Read first sector (4 kb) of config data partition
         let mut bytes = [0; FlashStorage::SECTOR_SIZE as usize];
-        if let Err(_err) = storage.read(nvs_offset, &mut bytes) {
-            warn!("Config: Unable to read nvs partition");
+        if let Err(_err) = storage.read(config_offset, &mut bytes) {
+            warn!("Config: Unable to read config partition");
             return Self::default();
         }
 
@@ -132,7 +131,7 @@ impl Config {
             Ok(config) => config,
             Err(err) => {
                 warn!(
-                    "Config: Unable to parse configuration in nvs partition: {}",
+                    "Config: Unable to parse configuration in config partition: {}",
                     err
                 );
                 return Self::default();
@@ -140,7 +139,7 @@ impl Config {
         };
 
         debug!("Config: System configuration: {:?}", config);
-        info!("Config: Configuration loaded from nvs partition");
+        info!("Config: Configuration loaded from config partition");
         config
     }
 }
