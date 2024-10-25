@@ -10,8 +10,9 @@ use esp_hal::clock::Clocks;
 use esp_hal::peripherals;
 use esp_hal::rng::Rng;
 use esp_wifi::wifi::{
-    self, ClientConfiguration as WifiClientConfiguration, Configuration as WifiConfiguration,
-    WifiController, WifiDevice, WifiEvent, WifiStaDevice, WifiState,
+    self, AuthMethod, ClientConfiguration as WifiClientConfiguration,
+    Configuration as WifiConfiguration, WifiController, WifiDevice, WifiEvent, WifiStaDevice,
+    WifiState,
 };
 use esp_wifi::{EspWifiInitFor, EspWifiTimerSource};
 use log::{debug, info, warn};
@@ -163,6 +164,11 @@ impl Wifi {
             ssid: ssid
                 .try_into()
                 .map_err(|()| InitializationError::General(0))?,
+            auth_method: if password.is_empty() {
+                AuthMethod::None
+            } else {
+                AuthMethod::WPA2Personal
+            },
             password: password
                 .try_into()
                 .map_err(|()| InitializationError::General(0))?,
