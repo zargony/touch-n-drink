@@ -10,7 +10,7 @@ use core::convert::Infallible;
 use core::fmt::Debug;
 use embassy_time::{with_timeout, Duration};
 use embedded_hal_async::digital::Wait;
-use embedded_hal_async::i2c::I2c;
+use embedded_hal_async::i2c::{I2c, Operation};
 use log::warn;
 use pn532::i2c::{I2C_ADDRESS, PN532_I2C_READY};
 use pn532::requests::BorrowedRequest;
@@ -75,20 +75,18 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Interface for I2CInterfaceWithIrq<
     }
 
     async fn read(&mut self, frame: &mut [u8]) -> Result<(), Self::Error> {
-        // FIXME: Find a way to drop the first byte (ready status) without copying
-        // It would be more efficient to use a transaction with separate read operations for status
-        // and frame, but somehow this results in AckCheckFailed errors with embedded-hal 1.0
-        // self.i2c.transaction(I2C_ADDRESS, &mut [Operation::Read(&mut buf), Operation::Read(frame)])?;
-        let mut buf = [0; BUFFER_SIZE + 1];
+        let mut status = [0];
         self.i2c
-            .read(I2C_ADDRESS, &mut buf[..frame.len() + 1])
+            .transaction(
+                I2C_ADDRESS,
+                &mut [Operation::Read(&mut status), Operation::Read(frame)],
+            )
             .await?;
         // Status in a read frame should always indicate ready since `read` is always called after
         // `wait_ready`. But sometimes it doesn't, which we ignore for now.
-        if buf[0] != PN532_I2C_READY {
+        if status[0] != PN532_I2C_READY {
             warn!("PN532: read while not ready");
         }
-        frame.copy_from_slice(&buf[1..frame.len() + 1]);
         Ok(())
     }
 }
