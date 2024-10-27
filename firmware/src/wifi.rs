@@ -6,7 +6,6 @@ use embassy_net::dns::{self, DnsQueryType};
 use embassy_net::tcp::{self, client::TcpClientState};
 use embassy_net::{Config, DhcpConfig, IpAddress, Stack, StackResources, StaticConfigV4};
 use embassy_time::{Duration, Timer};
-use esp_hal::clock::Clocks;
 use esp_hal::peripherals;
 use esp_hal::rng::Rng;
 use esp_wifi::wifi::{
@@ -146,7 +145,6 @@ impl Wifi {
         timer: impl EspWifiTimerSource,
         mut rng: Rng,
         radio_clocks: peripherals::RADIO_CLK,
-        clocks: &Clocks<'_>,
         wifi: peripherals::WIFI,
         spawner: Spawner,
         ssid: &str,
@@ -158,8 +156,7 @@ impl Wifi {
         let random_seed = rng.next_u64();
 
         // Initialize and start ESP32 Wifi controller
-        debug!("Wifi: Static configuration: {:?}", esp_wifi::CONFIG);
-        let init = esp_wifi::initialize(EspWifiInitFor::Wifi, timer, rng, radio_clocks, clocks)?;
+        let init = esp_wifi::init(EspWifiInitFor::Wifi, timer, rng, radio_clocks)?;
         let client_config = WifiClientConfiguration {
             ssid: ssid
                 .try_into()

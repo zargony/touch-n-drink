@@ -1,3 +1,0 @@
-# Wifi settings tuning, see https://github.com/esp-rs/esp-hal/blob/main/esp-wifi/tuning.md
-[esp-wifi]
-country_code = "DE"

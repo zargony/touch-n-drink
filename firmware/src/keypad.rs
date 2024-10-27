@@ -1,6 +1,6 @@
 use embassy_futures::select::select_array;
 use embassy_time::{Duration, Timer};
-use esp_hal::gpio::{AnyInput, AnyOutputOpenDrain};
+use esp_hal::gpio::{Input, OutputOpenDrain};
 use log::{debug, info};
 
 /// Time to wait for an output pin to settle before scanning inputs
@@ -54,13 +54,13 @@ impl Key {
 
 /// Matrix keypad driver
 pub struct Keypad<'a, const COLS: usize, const ROWS: usize> {
-    cols: [AnyInput<'a>; COLS],
-    rows: [AnyOutputOpenDrain<'a>; ROWS],
+    cols: [Input<'a>; COLS],
+    rows: [OutputOpenDrain<'a>; ROWS],
 }
 
 impl<'a, const COLS: usize, const ROWS: usize> Keypad<'a, COLS, ROWS> {
     /// Create matrix keypad from given input columns and output rows
-    pub fn new(cols: [AnyInput<'a>; COLS], rows: [AnyOutputOpenDrain<'a>; ROWS]) -> Self {
+    pub fn new(cols: [Input<'a>; COLS], rows: [OutputOpenDrain<'a>; ROWS]) -> Self {
         info!("Keypad: {ROWS}x{COLS} matrix initialized");
         Self { cols, rows }
     }
@@ -95,7 +95,7 @@ impl<'a, const COLS: usize, const ROWS: usize> Keypad<'a, COLS, ROWS> {
             out.set_low();
         }
         // Wait for any input to be pulled low
-        select_array(self.cols.each_mut().map(AnyInput::wait_for_falling_edge)).await;
+        select_array(self.cols.each_mut().map(Input::wait_for_falling_edge)).await;
     }
 
     /// Scan all keys and return array of pressed false/true states
@@ -109,7 +109,7 @@ impl<'a, const COLS: usize, const ROWS: usize> Keypad<'a, COLS, ROWS> {
             output.set_low();
             Timer::after(OUTPUT_SETTLE_TIME).await;
             // Easier with feature array_try_map (see https://github.com/rust-lang/rust/issues/79711):
-            //   `self.cols.each_mut().try_map(AnyInput::is_low)?`
+            //   `self.cols.each_mut().try_map(Input::is_low)?`
             for (input, state) in self.cols.iter_mut().zip(states.iter_mut()) {
                 *state = input.is_low();
             }

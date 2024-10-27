@@ -57,15 +57,15 @@ mod wifi;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
+use esp_alloc as _;
 use esp_backtrace as _;
-use esp_hal::clock::ClockControl;
-use esp_hal::gpio::{AnyInput, AnyOutput, AnyOutputOpenDrain, AnyPin, Io, Level, Pull};
-use esp_hal::i2c::I2C;
+use esp_hal::clock::CpuClock;
+use esp_hal::gpio::{Input, Io, Level, Output, OutputOpenDrain, Pull};
+use esp_hal::i2c::I2c;
 use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::Rtc;
-use esp_hal::system::SystemControl;
 use esp_hal::timer::systimer::{SystemTimer, Target};
 use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
@@ -107,20 +107,21 @@ unsafe fn halt() -> ! {
 
 #[main]
 async fn main(spawner: Spawner) {
-    let peripherals = Peripherals::take();
-    let system = SystemControl::new(peripherals.SYSTEM);
-    let clocks = ClockControl::boot_defaults(system.clock_control).freeze();
+    let peripherals = esp_hal::init({
+        let mut config = esp_hal::Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
     let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut rng = Rng::new(peripherals.RNG);
-    let _led = AnyOutput::new(io.pins.gpio8, Level::High);
+    let _led = Output::new(io.pins.gpio8, Level::High);
 
     // Initialize global allocator
-    esp_alloc::heap_allocator!(72 * 1024);
+    esp_alloc::heap_allocator!(90 * 1024);
 
     // Initialize async executor
-    let systimer = SystemTimer::new(peripherals.SYSTIMER);
-    let systimer_alarms = systimer.split::<Target>();
-    esp_hal_embassy::init(&clocks, systimer_alarms.alarm0);
+    let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+    esp_hal_embassy::init(systimer.alarm0);
 
     // Initialize logging
     esp_println::logger::init_logger_from_env();
@@ -133,12 +134,11 @@ async fn main(spawner: Spawner) {
     let mut articles = article::Articles::new([config.vf_article_id]);
 
     // Initialize I2C controller
-    let i2c = I2C::new_with_timeout_async(
+    let i2c = I2c::new_with_timeout_async(
         peripherals.I2C0,
         io.pins.gpio9,
         io.pins.gpio10,
         400.kHz(), // Standard-Mode: 100 kHz, Fast-Mode: 400 kHz
-        &clocks,
         Some(20),
     );
     // Share I2C bus. Since the mcu is single-core and I2C is not used in interrupts, I2C access
@@ -156,20 +156,20 @@ async fn main(spawner: Spawner) {
     // Initialize keypad
     let mut keypad = keypad::Keypad::new(
         [
-            AnyInput::new(io.pins.gpio5, Pull::Up),
-            AnyInput::new(io.pins.gpio6, Pull::Up),
-            AnyInput::new(io.pins.gpio7, Pull::Up),
+            Input::new(io.pins.gpio5, Pull::Up),
+            Input::new(io.pins.gpio6, Pull::Up),
+            Input::new(io.pins.gpio7, Pull::Up),
         ],
         [
-            AnyOutputOpenDrain::new(io.pins.gpio0, Level::High, Pull::None),
-            AnyOutputOpenDrain::new(io.pins.gpio1, Level::High, Pull::None),
-            AnyOutputOpenDrain::new(io.pins.gpio2, Level::High, Pull::None),
-            AnyOutputOpenDrain::new(io.pins.gpio3, Level::High, Pull::None),
+            OutputOpenDrain::new(io.pins.gpio0, Level::High, Pull::None),
+            OutputOpenDrain::new(io.pins.gpio1, Level::High, Pull::None),
+            OutputOpenDrain::new(io.pins.gpio2, Level::High, Pull::None),
+            OutputOpenDrain::new(io.pins.gpio3, Level::High, Pull::None),
         ],
     );
 
     // Initialize NFC reader
-    let nfc_irq = AnyInput::new(io.pins.gpio20, Pull::Up);
+    let nfc_irq = Input::new(io.pins.gpio20, Pull::Up);
     let mut nfc = match nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq).await {
         Ok(nfc) => nfc,
         // Panic on failure since an initialization error indicates a serious error
@@ -177,12 +177,11 @@ async fn main(spawner: Spawner) {
     };
 
     // Initialize Wifi
-    let timg0 = TimerGroup::new(peripherals.TIMG0, &clocks);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
     let wifi = match wifi::Wifi::new(
         timg0.timer0,
         rng,
         peripherals.RADIO_CLK,
-        &clocks,
         peripherals.WIFI,
         spawner,
         &config.wifi_ssid,
@@ -208,8 +207,8 @@ async fn main(spawner: Spawner) {
     );
 
     // Initialize buzzer
-    let buzzer_pin = AnyPin::new(io.pins.gpio4);
-    let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, &clocks, buzzer_pin);
+    let buzzer_pin = Output::new(io.pins.gpio4, Level::High);
+    let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, buzzer_pin);
     let _ = buzzer.startup().await;
 
     // Create UI

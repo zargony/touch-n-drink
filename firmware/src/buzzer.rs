@@ -1,7 +1,6 @@
 use core::fmt;
 use embassy_time::{Duration, Timer};
-use esp_hal::clock::Clocks;
-use esp_hal::gpio::AnyPin;
+use esp_hal::gpio::Output;
 use esp_hal::ledc::{channel, timer, LSGlobalClkSource, Ledc, LowSpeed};
 use esp_hal::peripheral::Peripheral;
 use esp_hal::peripherals::LEDC;
@@ -49,19 +48,15 @@ impl fmt::Display for Error {
 /// Passive buzzer (driven by PWM signal on GPIO)
 pub struct Buzzer<'a> {
     ledc: Ledc<'a>,
-    pin: AnyPin<'a>,
+    pin: Output<'a>,
 }
 
 impl<'a> Buzzer<'a> {
     /// Create new buzzer driver
-    pub fn new(
-        ledc: impl Peripheral<P = LEDC> + 'a,
-        clock_control_config: &'a Clocks<'_>,
-        pin: AnyPin<'a>,
-    ) -> Self {
+    pub fn new(ledc: impl Peripheral<P = LEDC> + 'a, pin: Output<'a>) -> Self {
         debug!("Buzzer: Initializing PWM controller...");
 
-        let mut ledc = Ledc::new(ledc, clock_control_config);
+        let mut ledc = Ledc::new(ledc);
         ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 
         info!("Buzzer: PWM controller initialized");
