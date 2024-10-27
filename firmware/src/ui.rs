@@ -89,11 +89,17 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     }
 
     /// Show error screen and wait for keypress or timeout
-    pub async fn show_error<M: fmt::Display>(&mut self, message: M) -> Result<(), Error> {
+    pub async fn show_error<M: fmt::Display>(
+        &mut self,
+        message: M,
+        interactive: bool,
+    ) -> Result<(), Error> {
         info!("UI: Displaying error: {}", message);
 
         self.display.screen(&screen::Failure::new(message)).await?;
-        let _ = self.buzzer.error().await;
+        if interactive {
+            let _ = self.buzzer.error().await;
+        }
 
         // Wait at least 1s without responding to keypad
         let min_time = Duration::from_secs(1);
@@ -134,6 +140,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
 
     /// Refresh article names and prices
     pub async fn refresh_articles(&mut self) -> Result<(), Error> {
+        // Wait for network to become available (if not already)
         self.wait_network_up().await?;
 
         info!("UI: Refreshing articles...");
@@ -149,6 +156,17 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
 
         // Refresh articles
         vf.refresh_articles(self.articles).await?;
+
+        Ok(())
+    }
+
+    /// Initialize user interface
+    pub async fn init(&mut self) -> Result<(), Error> {
+        // Wait for network to become available (if not already)
+        self.wait_network_up().await?;
+
+        // Refresh article names and prices
+        self.refresh_articles().await?;
 
         Ok(())
     }
@@ -169,7 +187,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
 
         // TODO: Process payment
         let _ = screen::Success::new(num_drinks);
-        let _ = self.show_error("Not implemented yet").await;
+        let _ = self.show_error("Not implemented yet", true).await;
         let _key = self.keypad.read().await;
         Ok(())
     }

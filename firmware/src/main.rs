@@ -225,11 +225,17 @@ async fn main(spawner: Spawner) {
     // Show splash screen for a while, ignore any error
     let _ = ui.show_splash().await;
 
-    // Wait for network to become available (if not already), ignore any error
-    let _ = ui.wait_network_up().await;
-
-    // Refresh articles, ignore any error
-    let _ = ui.refresh_articles().await;
+    loop {
+        match ui.init().await {
+            // Success or cancel: continue
+            Ok(()) | Err(error::Error::Cancel) => break,
+            // Display error to user and try again
+            Err(err) => {
+                error!("Initialization error: {:?}", err);
+                let _ = ui.show_error(&err, false).await;
+            }
+        }
+    }
 
     loop {
         match ui.run().await {
@@ -241,8 +247,8 @@ async fn main(spawner: Spawner) {
             Err(error::Error::UserTimeout) => info!("Timeout waiting for user, starting over..."),
             // Display error to user and start over again
             Err(err) => {
-                error!("Unhandled Error: {:?}", err);
-                let _ = ui.show_error(&err).await;
+                error!("Error: {:?}", err);
+                let _ = ui.show_error(&err, true).await;
             }
         }
     }
