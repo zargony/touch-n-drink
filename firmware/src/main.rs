@@ -247,7 +247,7 @@ async fn main(spawner: Spawner) {
             Err(error::Error::UserTimeout) => info!("Timeout waiting for user, starting over..."),
             // Display error to user and start over again
             Err(err) => {
-                error!("Error: {:?}", err);
+                error!("User flow error: {:?}", err);
                 let _ = ui.show_error(&err, true).await;
             }
         }
