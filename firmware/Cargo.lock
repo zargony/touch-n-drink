@@ -430,6 +430,7 @@ dependencies = [
  "critical-section",
  "document-features",
  "embassy-executor-macros",
+ "log",
 ]
 
 [[package]]
@@ -467,6 +468,7 @@ dependencies = [
  "futures",
  "generic-array 0.14.7",
  "heapless 0.8.0",
+ "log",
  "managed",
  "smoltcp",
  "stable_deref_trait",
@@ -502,6 +504,7 @@ dependencies = [
  "embedded-io-async",
  "futures-util",
  "heapless 0.8.0",
+ "log",
 ]
 
 [[package]]
@@ -520,6 +523,7 @@ dependencies = [
  "embedded-hal-async",
  "futures-util",
  "heapless 0.8.0",
+ "log",
 ]
 
 [[package]]
@@ -816,6 +820,7 @@ dependencies = [
  "esp-hal",
  "esp-hal-procmacros",
  "esp-metadata",
+ "log",
  "portable-atomic",
  "static_cell",
 ]
@@ -1667,6 +1672,7 @@ dependencies = [
  "heapless 0.8.0",
  "hex",
  "httparse",
+ "log",
  "nourl",
  "rand_chacha",
  "rand_core",
