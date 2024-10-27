@@ -159,6 +159,11 @@ impl<'a> Connection<'a> {
             response.total_articles
         );
 
+        // Discard remaining body (needed to make the next pipelined request work)
+        json.discard_to_end()
+            .await
+            .map_err(http::Error::MalformedResponse)?;
+
         Ok(())
     }
 }
