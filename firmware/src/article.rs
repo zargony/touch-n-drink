@@ -1,6 +1,7 @@
 use alloc::string::String;
 
 /// Article id
+/// Equivalent to the Vereinsflieger `articleid` attribute
 #[allow(clippy::module_name_repetitions)]
 pub type ArticleId = u32;
 

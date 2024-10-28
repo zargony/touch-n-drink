@@ -6,6 +6,7 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::str::FromStr;
 use embedded_io_async::{BufRead, Write};
+use log::warn;
 
 /// `articles/list` request
 #[derive(Debug)]
@@ -57,6 +58,11 @@ impl<const N: usize> FromJsonObject for ArticleListResponse<N> {
                     // needed, which heavily reduces memory consumption.
                     let mut articles = context.borrow_mut();
                     articles.update(article.articleid, article.designation.clone(), price);
+                } else {
+                    warn!(
+                        "Ignoring article with no valid price ({}): {}",
+                        article.articleid, article.designation
+                    );
                 }
             }
             _ => _ = json.read_any().await?,
