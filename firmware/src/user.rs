@@ -5,9 +5,9 @@ use alloc::string::String;
 /// Extra NFC card uids to add
 static EXTRA_UIDS: [(Uid, UserId); 2] = [
     // Test card #1 (Mifare Classic 1k)
-    (Uid::Single([0x13, 0xbd, 0x5b, 0x2a]), 1271),
+    (Uid::Single([0x13, 0xbd, 0x5b, 0x2a]), 3),
     // Test token #1 (Mifare Classic 1k)
-    (Uid::Single([0xb7, 0xd3, 0x65, 0x26]), 1271),
+    (Uid::Single([0xb7, 0xd3, 0x65, 0x26]), 3),
 ];
 
 /// User id
