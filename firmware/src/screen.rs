@@ -34,8 +34,8 @@ static LOGO: ImageRaw<BinaryColor> = ImageRaw::new(&[
 ], 128);
 
 const SPLASH_VERSION_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_profont10_tr>();
-const TOTAL_PRICE_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_8x13B_tf>();
-const TITLE_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_8x13_tf>();
+const TITLE_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_8x13B_tf>();
+const MEDIUM_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_6x10_tf>();
 const SMALL_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_5x7_tf>();
 const FOOTER_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_5x7_tf>();
 
@@ -95,7 +95,7 @@ impl<M: fmt::Display> Screen for Failure<M> {
     ) -> Result<(), Error<D::Error>> {
         TITLE_FONT.render_aligned(
             "FEHLER!",
-            Point::new(63, 27),
+            Point::new(63, 26),
             VerticalPosition::Baseline,
             HorizontalAlignment::Center,
             FontColor::Transparent(BinaryColor::On),
@@ -103,7 +103,7 @@ impl<M: fmt::Display> Screen for Failure<M> {
         )?;
         SMALL_FONT.render_aligned(
             format_args!("{}", self.message),
-            Point::new(63, 27 + 12),
+            Point::new(63, 26 + 12),
             VerticalPosition::Baseline,
             HorizontalAlignment::Center,
             FontColor::Transparent(BinaryColor::On),
@@ -133,12 +133,12 @@ impl Screen for PleaseWait {
             FontColor::Transparent(BinaryColor::On),
             target,
         )?;
-        SMALL_FONT.render_aligned(
+        MEDIUM_FONT.render_aligned(
             match self {
                 Self::WifiConnecting => "WLAN Verbindung\nwird aufgebaut",
                 Self::ApiQuerying => "Vereinsflieger\nAbfrage",
             },
-            Point::new(63, 27 + 12),
+            Point::new(63, 26 + 12),
             VerticalPosition::Baseline,
             HorizontalAlignment::Center,
             FontColor::Transparent(BinaryColor::On),
@@ -172,13 +172,29 @@ impl Screen for ScanId {
 }
 
 /// Prompt to ask for number of drinks
-pub struct NumberOfDrinks;
+pub struct NumberOfDrinks<N> {
+    name: N,
+}
 
-impl Screen for NumberOfDrinks {
+impl<N: fmt::Display> NumberOfDrinks<N> {
+    pub fn new(name: N) -> Self {
+        Self { name }
+    }
+}
+
+impl<N: fmt::Display> Screen for NumberOfDrinks<N> {
     fn draw<D: DrawTarget<Color = BinaryColor>>(
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
+        MEDIUM_FONT.render_aligned(
+            format_args!("Hallo {}", self.name),
+            Point::new(63, 8),
+            VerticalPosition::Baseline,
+            HorizontalAlignment::Center,
+            FontColor::Transparent(BinaryColor::On),
+            target,
+        )?;
         TITLE_FONT.render_aligned(
             "Anzahl Getränke\nwählen",
             Point::new(63, 26),
@@ -212,7 +228,7 @@ impl Screen for Checkout {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        TITLE_FONT.render_aligned(
+        MEDIUM_FONT.render_aligned(
             format_args!(
                 "{} {}",
                 self.num_drinks,
@@ -222,15 +238,15 @@ impl Screen for Checkout {
                     "Getränke"
                 }
             ),
-            Point::new(63, 25),
+            Point::new(63, 26),
             VerticalPosition::Baseline,
             HorizontalAlignment::Center,
             FontColor::Transparent(BinaryColor::On),
             target,
         )?;
-        TOTAL_PRICE_FONT.render_aligned(
+        TITLE_FONT.render_aligned(
             format_args!("{:.02} EUR", self.total_price),
-            Point::new(63, 25 + 16),
+            Point::new(63, 26 + 16),
             VerticalPosition::Baseline,
             HorizontalAlignment::Center,
             FontColor::Transparent(BinaryColor::On),
@@ -259,7 +275,7 @@ impl Screen for Success {
     ) -> Result<(), Error<D::Error>> {
         TITLE_FONT.render_aligned(
             "Affirm!",
-            Point::new(63, 27),
+            Point::new(63, 26),
             VerticalPosition::Baseline,
             HorizontalAlignment::Center,
             FontColor::Transparent(BinaryColor::On),
@@ -267,7 +283,7 @@ impl Screen for Success {
         )?;
         SMALL_FONT.render_aligned(
             format_args!("{} Getränke genehmigt", self.num_drinks),
-            Point::new(63, 27 + 12),
+            Point::new(63, 26 + 12),
             VerticalPosition::Baseline,
             HorizontalAlignment::Center,
             FontColor::Transparent(BinaryColor::On),
