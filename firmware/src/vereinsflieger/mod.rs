@@ -1,11 +1,14 @@
 mod proto_articles;
 mod proto_auth;
+mod proto_sale;
 mod proto_user;
 
-use crate::article::Articles;
+use crate::article::{ArticleId, Articles};
 use crate::http::{self, Http};
-use crate::user::Users;
+use crate::time;
+use crate::user::{UserId, Users};
 use crate::wifi::Wifi;
+use alloc::format;
 use alloc::string::String;
 use core::cell::RefCell;
 use core::fmt;
@@ -197,6 +200,40 @@ impl<'a> Connection<'a> {
 
         Ok(())
     }
+
+    /// Store a purchase
+    pub async fn purchase(
+        &mut self,
+        article_id: &ArticleId,
+        amount: f32,
+        user_id: UserId,
+        total_price: f32,
+    ) -> Result<(), Error> {
+        use proto_sale::{SaleAddRequest, SaleAddResponse};
+
+        debug!(
+            "Vereinsflieger: Purchasing {}x {}, {:.02} EUR for user {}",
+            amount, article_id, total_price, user_id
+        );
+
+        let _response: SaleAddResponse = self
+            .connection
+            .post(
+                "sale/add",
+                &SaleAddRequest {
+                    accesstoken: self.accesstoken,
+                    bookingdate: &Self::today(),
+                    articleid: article_id,
+                    amount,
+                    memberid: Some(user_id),
+                    totalprice: Some(total_price),
+                    comment: None,
+                },
+            )
+            .await?;
+        debug!("Vereinsflieger: Purchase successful");
+        Ok(())
+    }
 }
 
 impl<'a> Connection<'a> {
@@ -269,6 +306,15 @@ impl<'a> Connection<'a> {
             }),
             // Actually unreachable
             None => Err(http::Error::Unauthorized.into()),
+        }
+    }
+
+    /// Helper function to get today's date as "yyyy-mm-dd" string
+    fn today() -> String {
+        if let Some(now) = time::now() {
+            format!("{}", now.format("%Y-%m-%d"))
+        } else {
+            String::new()
         }
     }
 }

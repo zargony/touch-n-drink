@@ -26,7 +26,6 @@ pub fn uptime() -> Option<TimeDelta> {
 }
 
 /// Current time
-#[allow(dead_code)]
 pub fn now() -> Option<DateTime<Utc>> {
     if let (Some(start_time), Some(uptime)) = (start_time(), uptime()) {
         Some(start_time + uptime)

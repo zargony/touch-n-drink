@@ -144,7 +144,9 @@ impl Screen for PleaseWait {
             FontColor::Transparent(BinaryColor::On),
             target,
         )?;
-        Footer::new("* Abbruch", "").draw(target)?;
+        if let Self::WifiConnecting = self {
+            Footer::new("* Abbruch", "").draw(target)?;
+        }
         Ok(())
     }
 }

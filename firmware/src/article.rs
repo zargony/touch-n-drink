@@ -55,7 +55,6 @@ impl<const N: usize> Articles<N> {
     }
 
     /// Look up id of article at given index
-    #[allow(dead_code)]
     pub fn id(&self, index: usize) -> Option<&ArticleId> {
         self.ids.get(index)
     }

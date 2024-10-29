@@ -1,4 +1,4 @@
-use crate::article::Articles;
+use crate::article::{ArticleId, Articles};
 use crate::buzzer::Buzzer;
 use crate::display::Display;
 use crate::error::Error;
@@ -182,21 +182,31 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     /// Run the user interface flow
     pub async fn run(&mut self) -> Result<(), Error> {
         // Wait for id card and verify identification
-        let userid = self.authenticate_user().await?;
-        let _user = self.users.get(userid);
+        let user_id = self.authenticate_user().await?;
+        let _user = self.users.get(user_id);
+
         // Ask for number of drinks
         let num_drinks = self.get_number_of_drinks().await?;
+
         // Get article information
+        let article_id = self.articles.id(0).ok_or(Error::ArticleNotFound)?.clone();
         let article = self.articles.get(0).ok_or(Error::ArticleNotFound)?;
+
         // Calculate total price. It's ok to cast num_drinks to f32 as it's always a small number.
         #[allow(clippy::cast_precision_loss)]
-        let total_price = article.price * num_drinks as f32;
+        let amount = num_drinks as f32;
+        let total_price = article.price * amount;
+
         // Show total price and ask for confirmation
         self.confirm_purchase(num_drinks, total_price).await?;
 
-        // TODO: Process payment
-        let _ = screen::Success::new(num_drinks);
-        let _ = self.show_error("Not implemented yet", true).await;
+        // Store purchase
+        self.purchase(&article_id, amount, user_id, total_price)
+            .await?;
+
+        // Show success and affirm to take drinks
+        self.show_success(num_drinks).await?;
+
         Ok(())
     }
 }
@@ -291,6 +301,56 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
                 // User interaction timeout
                 Err(TimeoutError) => return Err(Error::UserTimeout),
             }
+        }
+    }
+
+    /// Purchase the given article
+    async fn purchase(
+        &mut self,
+        article_id: &ArticleId,
+        amount: f32,
+        user_id: UserId,
+        total_price: f32,
+    ) -> Result<(), Error> {
+        // Wait for network to become available (if not already)
+        self.wait_network_up().await?;
+
+        info!(
+            "UI: Purchasing {}x {}, {:.02} EUR for user {}...",
+            amount, article_id, total_price, user_id
+        );
+
+        self.display
+            .screen(&screen::PleaseWait::ApiQuerying)
+            .await?;
+        let mut vf = self.vereinsflieger.connect().await?;
+
+        // Store purchase
+        vf.purchase(article_id, amount, user_id, total_price)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Show success screen and wait for keypress or timeout
+    async fn show_success(&mut self, num_drinks: usize) -> Result<(), Error> {
+        info!("UI: Displaying success, {} drinks", num_drinks);
+
+        self.display
+            .screen(&screen::Success::new(num_drinks))
+            .await?;
+        let _ = self.buzzer.confirm().await;
+
+        // Wait at least 1s without responding to keypad
+        let min_time = Duration::from_secs(1);
+        Timer::after(min_time).await;
+
+        let wait_cancel = async { while self.keypad.read().await != Key::Enter {} };
+        match with_timeout(USER_TIMEOUT - min_time, wait_cancel).await {
+            // Enter key continues
+            Ok(()) => Ok(()),
+            // User interaction timeout
+            Err(TimeoutError) => Err(Error::UserTimeout),
         }
     }
 }
