@@ -7,4 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- First release
+## 0.1.0 - 2024-10-30
+
+- Showcased on general meeting
+- Simple flow: authorize user by NFC, select number of drinks, confirm, purchase
+- Purchases are created on Vereinsflieger
+- Fetch article price from Vereinsflieger
+- Fetch list of authorized users and their NFC uid from Vereinsflieger
+- Static configuration stored on device flash
