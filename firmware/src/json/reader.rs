@@ -516,7 +516,7 @@ mod tests {
         }
 
         impl FromJsonObject for Test {
-            type Context = ();
+            type Context<'ctx> = ();
 
             async fn read_next<R: BufRead>(
                 &mut self,
