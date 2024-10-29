@@ -106,7 +106,6 @@ impl<'a> Buzzer<'a> {
     }
 
     /// Output a long denying tone
-    #[allow(dead_code)]
     pub async fn deny(&mut self) -> Result<(), Error> {
         debug!("Buzzer: Playing deny tone");
         self.tone(392, Duration::from_millis(500)).await?; // G4

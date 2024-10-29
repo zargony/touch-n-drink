@@ -1,8 +1,9 @@
 use alloc::string::String;
 
 /// Article id
+/// Equivalent to the Vereinsflieger `articleid` attribute
 #[allow(clippy::module_name_repetitions)]
-pub type ArticleId = u32;
+pub type ArticleId = String;
 
 /// Article information
 #[derive(Debug, Clone, PartialEq)]
@@ -37,8 +38,8 @@ impl<const N: usize> Articles<N> {
     }
 
     /// Update article with given article id. Ignores article ids not in list.
-    pub fn update(&mut self, id: ArticleId, name: String, price: f32) {
-        if let Some(idx) = self.ids.iter().position(|i| *i == id) {
+    pub fn update(&mut self, id: &ArticleId, name: String, price: f32) {
+        if let Some(idx) = self.find(id) {
             self.articles[idx] = Some(Article { name, price });
         }
     }
@@ -48,10 +49,14 @@ impl<const N: usize> Articles<N> {
         self.articles.iter().filter(|a| a.is_some()).count()
     }
 
+    /// Find index of article with given id
+    pub fn find(&self, id: &ArticleId) -> Option<usize> {
+        self.ids.iter().position(|i| i == id)
+    }
+
     /// Look up id of article at given index
-    #[allow(dead_code)]
-    pub fn id(&self, index: usize) -> Option<ArticleId> {
-        self.ids.get(index).copied()
+    pub fn id(&self, index: usize) -> Option<&ArticleId> {
+        self.ids.get(index)
     }
 
     /// Look up article information at given index

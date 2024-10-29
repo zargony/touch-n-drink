@@ -6,6 +6,7 @@ use alloc::vec::Vec;
 use core::cell::RefCell;
 use core::str::FromStr;
 use embedded_io_async::{BufRead, Write};
+use log::warn;
 
 /// `articles/list` request
 #[derive(Debug)]
@@ -56,7 +57,12 @@ impl<const N: usize> FromJsonObject for ArticleListResponse<N> {
                     // articles directly to the article lookup table and only keeps the articles
                     // needed, which heavily reduces memory consumption.
                     let mut articles = context.borrow_mut();
-                    articles.update(article.articleid, article.designation.clone(), price);
+                    articles.update(&article.articleid, article.designation, price);
+                } else {
+                    warn!(
+                        "Ignoring article with no valid price ({}): {}",
+                        article.articleid, article.designation
+                    );
                 }
             }
             _ => _ = json.read_any().await?,
@@ -68,7 +74,7 @@ impl<const N: usize> FromJsonObject for ArticleListResponse<N> {
 /// Article
 #[derive(Debug, Default)]
 pub struct Article {
-    pub articleid: u32,
+    pub articleid: String,
     pub designation: String,
     pub unittype: String,
     pub prices: Vec<ArticlePrice>,
@@ -84,7 +90,7 @@ impl FromJsonObject for Article {
         _context: &Self::Context<'_>,
     ) -> Result<(), json::Error<R::Error>> {
         match &*key {
-            "articleid" => self.articleid = json.read_any().await?.try_into()?,
+            "articleid" => self.articleid = json.read().await?,
             "designation" => self.designation = json.read().await?,
             "unittype" => self.unittype = json.read().await?,
             "prices" => self.prices = json.read().await?,

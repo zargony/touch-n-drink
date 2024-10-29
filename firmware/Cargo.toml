@@ -44,6 +44,7 @@ overflow-checks = false
 git2 = { version = "0.19", default-features = false }
 
 [dependencies]
+chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 display-interface = "0.5"
 embassy-embedded-hal = "0.2"
 embassy-executor = "0.6"
@@ -63,6 +64,7 @@ esp-partition-table = "0.1"
 esp-println = { version = "0.12", features = ["esp32c3", "log"] }
 esp-storage = { version = "0.3", features = ["esp32c3"] }
 esp-wifi = { version = "0.10", default-features = false, features = ["esp32c3", "esp-alloc", "async", "embassy-net", "log", "phy-enable-usb", "wifi"] }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
 log = { version = "0.4", features = ["release_max_level_info"] }
 pn532 = "0.4"
 rand_core = "0.6"

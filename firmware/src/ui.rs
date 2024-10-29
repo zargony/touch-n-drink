@@ -1,10 +1,11 @@
-use crate::article::Articles;
+use crate::article::{ArticleId, Articles};
 use crate::buzzer::Buzzer;
 use crate::display::Display;
 use crate::error::Error;
 use crate::keypad::{Key, Keypad};
-use crate::nfc::{Nfc, Uid};
+use crate::nfc::Nfc;
 use crate::screen;
+use crate::user::{UserId, Users};
 use crate::vereinsflieger::Vereinsflieger;
 use crate::wifi::Wifi;
 use core::convert::Infallible;
@@ -42,10 +43,12 @@ pub struct Ui<'a, I2C, IRQ> {
     wifi: &'a Wifi,
     vereinsflieger: &'a mut Vereinsflieger<'a>,
     articles: &'a mut Articles<1>,
+    users: &'a mut Users,
 }
 
 impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     /// Create user interface with given human interface devices
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         display: &'a mut Display<I2C>,
         keypad: &'a mut Keypad<'a, 3, 4>,
@@ -54,6 +57,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         wifi: &'a Wifi,
         vereinsflieger: &'a mut Vereinsflieger<'a>,
         articles: &'a mut Articles<1>,
+        users: &'a mut Users,
     ) -> Self {
         Self {
             display,
@@ -63,6 +67,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
             wifi,
             vereinsflieger,
             articles,
+            users,
         }
     }
 
@@ -138,12 +143,12 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         }
     }
 
-    /// Refresh article names and prices
-    pub async fn refresh_articles(&mut self) -> Result<(), Error> {
+    /// Refresh article and user information
+    pub async fn refresh_articles_and_users(&mut self) -> Result<(), Error> {
         // Wait for network to become available (if not already)
         self.wait_network_up().await?;
 
-        info!("UI: Refreshing articles...");
+        info!("UI: Refreshing articles and users...");
 
         self.display
             .screen(&screen::PleaseWait::ApiQuerying)
@@ -154,8 +159,11 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         #[cfg(debug_assertions)]
         vf.get_user_information().await?;
 
-        // Refresh articles
+        // Refresh article information
         vf.refresh_articles(self.articles).await?;
+
+        // Refresh user information
+        vf.refresh_users(self.users).await?;
 
         Ok(())
     }
@@ -165,8 +173,8 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         // Wait for network to become available (if not already)
         self.wait_network_up().await?;
 
-        // Refresh article names and prices
-        self.refresh_articles().await?;
+        // Refresh articles and users
+        self.refresh_articles_and_users().await?;
 
         Ok(())
     }
@@ -174,29 +182,40 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     /// Run the user interface flow
     pub async fn run(&mut self) -> Result<(), Error> {
         // Wait for id card and verify identification
-        let _uid = self.read_id_card().await?;
+        let user_id = self.authenticate_user().await?;
+        let _user = self.users.get(user_id);
+
         // Ask for number of drinks
         let num_drinks = self.get_number_of_drinks().await?;
-        // Get article price
-        let price = self.articles.get(0).ok_or(Error::ArticleNotFound)?.price;
+
+        // Get article information
+        let article_id = self.articles.id(0).ok_or(Error::ArticleNotFound)?.clone();
+        let article = self.articles.get(0).ok_or(Error::ArticleNotFound)?;
+
         // Calculate total price. It's ok to cast num_drinks to f32 as it's always a small number.
         #[allow(clippy::cast_precision_loss)]
-        let total_price = price * num_drinks as f32;
+        let amount = num_drinks as f32;
+        let total_price = article.price * amount;
+
         // Show total price and ask for confirmation
         self.confirm_purchase(num_drinks, total_price).await?;
 
-        // TODO: Process payment
-        let _ = screen::Success::new(num_drinks);
-        let _ = self.show_error("Not implemented yet", true).await;
-        let _key = self.keypad.read().await;
+        // Store purchase
+        self.purchase(&article_id, amount, user_id, total_price)
+            .await?;
+
+        // Show success and affirm to take drinks
+        self.show_success(num_drinks).await?;
+
         Ok(())
     }
 }
 
 impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
-    /// Wait for id card and read it. On idle timeout, enter power saving (turn off display).
-    /// Any key pressed leaves power saving (turn on display).
-    async fn read_id_card(&mut self) -> Result<Uid, Error> {
+    /// Authentication: wait for id card, read it and look up the associated user. On idle timeout,
+    /// enter power saving (turn off display). Any key pressed leaves power saving (turn on
+    /// display).
+    async fn authenticate_user(&mut self) -> Result<UserId, Error> {
         info!("UI: Waiting for NFC card...");
 
         let mut saving_power = false;
@@ -209,7 +228,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
             let uid = match with_timeout(IDLE_TIMEOUT, select(self.nfc.read(), self.keypad.read()))
                 .await
             {
-                // Id card read
+                // Id card detected
                 Ok(Either::First(res)) => res?,
                 // Key pressed while saving power, leave power saving
                 Ok(Either::Second(_key)) if saving_power => {
@@ -225,10 +244,17 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
                 // Otherwise, do nothing
                 _ => continue,
             };
-            info!("UI: Detected NFC card: {}", uid);
-            let _ = self.buzzer.confirm().await;
-            // TODO: Verify identification and return user information
-            return Ok(uid);
+            saving_power = false;
+            // Look up user id by detected NFC uid
+            if let Some(id) = self.users.id(&uid) {
+                // User found, authorized
+                info!("UI: NFC card {} identified as user {}", uid, id);
+                let _ = self.buzzer.confirm().await;
+                break Ok(id);
+            }
+            // User not found, unauthorized
+            info!("UI: NFC card {} unknown, rejecting", uid);
+            let _ = self.buzzer.deny().await;
         }
     }
 
@@ -275,6 +301,56 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
                 // User interaction timeout
                 Err(TimeoutError) => return Err(Error::UserTimeout),
             }
+        }
+    }
+
+    /// Purchase the given article
+    async fn purchase(
+        &mut self,
+        article_id: &ArticleId,
+        amount: f32,
+        user_id: UserId,
+        total_price: f32,
+    ) -> Result<(), Error> {
+        // Wait for network to become available (if not already)
+        self.wait_network_up().await?;
+
+        info!(
+            "UI: Purchasing {}x {}, {:.02} EUR for user {}...",
+            amount, article_id, total_price, user_id
+        );
+
+        self.display
+            .screen(&screen::PleaseWait::ApiQuerying)
+            .await?;
+        let mut vf = self.vereinsflieger.connect().await?;
+
+        // Store purchase
+        vf.purchase(article_id, amount, user_id, total_price)
+            .await?;
+
+        Ok(())
+    }
+
+    /// Show success screen and wait for keypress or timeout
+    async fn show_success(&mut self, num_drinks: usize) -> Result<(), Error> {
+        info!("UI: Displaying success, {} drinks", num_drinks);
+
+        self.display
+            .screen(&screen::Success::new(num_drinks))
+            .await?;
+        let _ = self.buzzer.confirm().await;
+
+        // Wait at least 1s without responding to keypad
+        let min_time = Duration::from_secs(1);
+        Timer::after(min_time).await;
+
+        let wait_cancel = async { while self.keypad.read().await != Key::Enter {} };
+        match with_timeout(USER_TIMEOUT - min_time, wait_cancel).await {
+            // Enter key continues
+            Ok(()) => Ok(()),
+            // User interaction timeout
+            Err(TimeoutError) => Err(Error::UserTimeout),
         }
     }
 }

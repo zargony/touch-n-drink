@@ -232,6 +232,17 @@ impl<R: BufRead> Reader<R> {
         self.expect(b'l').await?;
         Ok(())
     }
+
+    /// Read and discard any remaining data
+    pub async fn discard_to_end(&mut self) -> Result<(), Error<R::Error>> {
+        loop {
+            match self.reader.fill_buf().await?.len() {
+                0 => break,
+                len => self.reader.consume(len),
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<R: BufRead> Reader<R> {
@@ -505,7 +516,7 @@ mod tests {
         }
 
         impl FromJsonObject for Test {
-            type Context = ();
+            type Context<'ctx> = ();
 
             async fn read_next<R: BufRead>(
                 &mut self,
