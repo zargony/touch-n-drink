@@ -172,13 +172,29 @@ impl Screen for ScanId {
 }
 
 /// Prompt to ask for number of drinks
-pub struct NumberOfDrinks;
+pub struct NumberOfDrinks<N> {
+    name: N,
+}
 
-impl Screen for NumberOfDrinks {
+impl<N: fmt::Display> NumberOfDrinks<N> {
+    pub fn new(name: N) -> Self {
+        Self { name }
+    }
+}
+
+impl<N: fmt::Display> Screen for NumberOfDrinks<N> {
     fn draw<D: DrawTarget<Color = BinaryColor>>(
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
+        MEDIUM_FONT.render_aligned(
+            format_args!("Hallo {}", self.name),
+            Point::new(63, 8),
+            VerticalPosition::Baseline,
+            HorizontalAlignment::Center,
+            FontColor::Transparent(BinaryColor::On),
+            target,
+        )?;
         TITLE_FONT.render_aligned(
             "Anzahl Getränke\nwählen",
             Point::new(63, 26),

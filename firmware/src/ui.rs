@@ -8,6 +8,7 @@ use crate::screen;
 use crate::user::{UserId, Users};
 use crate::vereinsflieger::Vereinsflieger;
 use crate::wifi::Wifi;
+use alloc::string::String;
 use core::convert::Infallible;
 use core::fmt;
 use embassy_futures::select::{select, Either};
@@ -183,10 +184,11 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     pub async fn run(&mut self) -> Result<(), Error> {
         // Wait for id card and verify identification
         let user_id = self.authenticate_user().await?;
-        let _user = self.users.get(user_id);
+        let user = self.users.get(user_id);
 
         // Ask for number of drinks
-        let num_drinks = self.get_number_of_drinks().await?;
+        let name = user.map_or(String::new(), |u| u.name.clone());
+        let num_drinks = self.get_number_of_drinks(&name).await?;
 
         // Get article information
         let article_id = self.articles.id(0).ok_or(Error::ArticleNotFound)?.clone();
@@ -259,10 +261,12 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     }
 
     /// Ask for number of drinks
-    async fn get_number_of_drinks(&mut self) -> Result<usize, Error> {
+    async fn get_number_of_drinks(&mut self, name: &str) -> Result<usize, Error> {
         info!("UI: Asking for number of drinks...");
 
-        self.display.screen(&screen::NumberOfDrinks).await?;
+        self.display
+            .screen(&screen::NumberOfDrinks::new(name))
+            .await?;
         loop {
             #[allow(clippy::match_same_arms)]
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
