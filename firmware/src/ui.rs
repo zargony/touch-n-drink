@@ -186,11 +186,11 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         let _user = self.users.get(userid);
         // Ask for number of drinks
         let num_drinks = self.get_number_of_drinks().await?;
-        // Get article price
-        let price = self.articles.get(0).ok_or(Error::ArticleNotFound)?.price;
+        // Get article information
+        let article = self.articles.get(0).ok_or(Error::ArticleNotFound)?;
         // Calculate total price. It's ok to cast num_drinks to f32 as it's always a small number.
         #[allow(clippy::cast_precision_loss)]
-        let total_price = price * num_drinks as f32;
+        let total_price = article.price * num_drinks as f32;
         // Show total price and ask for confirmation
         self.confirm_purchase(num_drinks, total_price).await?;
 

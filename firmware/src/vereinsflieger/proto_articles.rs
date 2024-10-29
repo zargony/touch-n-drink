@@ -57,7 +57,7 @@ impl<const N: usize> FromJsonObject for ArticleListResponse<N> {
                     // articles directly to the article lookup table and only keeps the articles
                     // needed, which heavily reduces memory consumption.
                     let mut articles = context.borrow_mut();
-                    articles.update(article.articleid, article.designation.clone(), price);
+                    articles.update(&article.articleid, article.designation, price);
                 } else {
                     warn!(
                         "Ignoring article with no valid price ({}): {}",
@@ -74,7 +74,7 @@ impl<const N: usize> FromJsonObject for ArticleListResponse<N> {
 /// Article
 #[derive(Debug, Default)]
 pub struct Article {
-    pub articleid: u32,
+    pub articleid: String,
     pub designation: String,
     pub unittype: String,
     pub prices: Vec<ArticlePrice>,
@@ -90,7 +90,7 @@ impl FromJsonObject for Article {
         _context: &Self::Context<'_>,
     ) -> Result<(), json::Error<R::Error>> {
         match &*key {
-            "articleid" => self.articleid = json.read_any().await?.try_into()?,
+            "articleid" => self.articleid = json.read().await?,
             "designation" => self.designation = json.read().await?,
             "unittype" => self.unittype = json.read().await?,
             "prices" => self.prices = json.read().await?,

@@ -15,5 +15,5 @@
   "vf-cid": 0,
 
   // Vereinsflieger article id to use for purchases
-  "vf-article-id": 0
+  "vf-article-id": "1234"
 }
