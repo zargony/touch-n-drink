@@ -1931,6 +1931,7 @@ dependencies = [
 name = "touch-n-drink"
 version = "0.0.0"
 dependencies = [
+ "chrono",
  "display-interface",
  "embassy-embedded-hal",
  "embassy-executor",

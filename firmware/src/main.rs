@@ -50,6 +50,7 @@ mod keypad;
 mod nfc;
 mod pn532;
 mod screen;
+mod time;
 mod ui;
 mod user;
 mod vereinsflieger;
