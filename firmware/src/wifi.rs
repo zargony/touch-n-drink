@@ -140,8 +140,7 @@ pub struct Wifi {
 
 impl Wifi {
     /// Create and initialize Wifi interface
-    #[allow(clippy::too_many_arguments)]
-    pub async fn new(
+    pub fn new(
         timer: impl EspWifiTimerSource,
         mut rng: Rng,
         radio_clocks: peripherals::RADIO_CLK,
@@ -171,9 +170,10 @@ impl Wifi {
                 .map_err(|()| InitializationError::General(0))?,
             ..Default::default()
         };
-        let (device, mut controller) = wifi::new_with_config(&init, wifi, client_config)?;
-        debug!("Wifi: Starting controller...");
-        controller.start().await?;
+        let (device, controller) = wifi::new_with_config(&init, wifi, client_config)?;
+        let wifi_config = controller
+            .get_configuration()
+            .unwrap_or(WifiConfiguration::None);
 
         // Spawn task for handling Wifi connection events
         debug!("Wifi: Spawning connection task...");
@@ -214,7 +214,11 @@ impl Wifi {
         let tcp_client = Box::new(TcpClient::new(stack, tcp_client_state));
         let tcp_client = Box::leak(tcp_client);
 
-        info!("Wifi: Controller initialized");
+        info!(
+            "Wifi: Controller initialized. Hw: {}, {}",
+            stack.hardware_address(),
+            DisplayWifiConfig(wifi_config),
+        );
         Ok(Self {
             stack,
             dns_socket,
@@ -232,8 +236,7 @@ impl Wifi {
             if up {
                 if let Some(network_config) = self.stack.config_v4() {
                     info!(
-                        "Wifi: Network configured, hw: {}, {}",
-                        self.stack.hardware_address(),
+                        "Wifi: Network configured. {}",
                         DisplayNetworkConfig(network_config),
                     );
                 }
@@ -295,29 +298,27 @@ async fn connection(mut controller: WifiController<'static>) -> ! {
     debug!("Wifi: Start connection task");
 
     loop {
-        match wifi::get_wifi_state() {
-            // If connected, wait for disconnect
-            WifiState::StaConnected => {
-                controller.wait_for_event(WifiEvent::StaDisconnected).await;
-                warn!("Wifi: Disconnected");
+        // If connected, wait for disconnect
+        if wifi::get_wifi_state() == WifiState::StaConnected {
+            controller.wait_for_event(WifiEvent::StaDisconnected).await;
+            warn!("Wifi: Disconnected");
+            Timer::after(CONNECT_RETRY_DELAY).await;
+        }
+
+        // If needed, start controller
+        if !matches!(controller.is_started(), Ok(true)) {
+            debug!("Wifi: Starting controller...");
+            controller.start().await.unwrap();
+        }
+
+        // Try to connect
+        info!("Wifi: Connecting...");
+        match controller.connect().await {
+            Ok(()) => info!("Wifi: Connected"),
+            Err(err) => {
+                warn!("Wifi: Failed to connect: {:?}", err);
                 Timer::after(CONNECT_RETRY_DELAY).await;
             }
-            // If disconnected, try to connect
-            WifiState::StaStarted | WifiState::StaDisconnected => {
-                let wifi_config = controller
-                    .get_configuration()
-                    .unwrap_or(WifiConfiguration::None);
-                info!("Wifi: {} connecting...", DisplayWifiConfig(wifi_config));
-                match controller.connect().await {
-                    Ok(()) => info!("Wifi: Connected"),
-                    Err(err) => {
-                        warn!("Wifi: Failed to connect: {:?}", err);
-                        Timer::after(CONNECT_RETRY_DELAY).await;
-                    }
-                }
-            }
-            // Any other state is unexpected and triggers a panic
-            state => panic!("Unexpected Wifi state {:?}", state),
         }
     }
 }

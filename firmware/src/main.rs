@@ -189,9 +189,7 @@ async fn main(spawner: Spawner) {
         spawner,
         &config.wifi_ssid,
         &config.wifi_password,
-    )
-    .await
-    {
+    ) {
         Ok(wifi) => wifi,
         // Panic on failure since an initialization error indicates a static configuration error
         Err(err) => panic!("Wifi initialization failed: {:?}", err),
