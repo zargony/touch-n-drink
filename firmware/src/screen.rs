@@ -4,6 +4,7 @@ use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::image::{Image, ImageRaw};
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
+use rand_core::RngCore;
 use u8g2_fonts::types::{FontColor, HorizontalAlignment, VerticalPosition};
 use u8g2_fonts::{fonts, FontRenderer};
 
@@ -173,12 +174,16 @@ impl Screen for ScanId {
 
 /// Prompt to ask for number of drinks
 pub struct NumberOfDrinks<N> {
+    greeting: u32,
     name: N,
 }
 
 impl<N: fmt::Display> NumberOfDrinks<N> {
-    pub fn new(name: N) -> Self {
-        Self { name }
+    pub fn new<RNG: RngCore>(rng: &mut RNG, name: N) -> Self {
+        Self {
+            greeting: rng.next_u32(),
+            name,
+        }
     }
 }
 
@@ -187,8 +192,16 @@ impl<N: fmt::Display> Screen for NumberOfDrinks<N> {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
+        static GREETINGS: [&str; 9] = [
+            "Hallo", "Hi", "Hey", "Tach", "Servus", "Moin", "Hej", "Olá", "Ciao",
+        ];
+
         MEDIUM_FONT.render_aligned(
-            format_args!("Hallo {}", self.name),
+            format_args!(
+                "{} {}",
+                GREETINGS[self.greeting as usize % GREETINGS.len()],
+                self.name
+            ),
             Point::new(63, 8),
             VerticalPosition::Baseline,
             HorizontalAlignment::Center,

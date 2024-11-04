@@ -214,6 +214,7 @@ async fn main(spawner: Spawner) {
 
     // Create UI
     let mut ui = ui::Ui::new(
+        rng,
         &mut display,
         &mut keypad,
         &mut nfc,
