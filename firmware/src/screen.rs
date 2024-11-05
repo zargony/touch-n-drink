@@ -168,6 +168,7 @@ pub enum PleaseWait {
     WifiConnecting,
     UpdatingData,
     Purchasing,
+    SubmittingTelemetry,
 }
 
 impl Screen for PleaseWait {
@@ -183,6 +184,7 @@ impl Screen for PleaseWait {
                 Self::WifiConnecting => "WLAN Verbindung\nwird aufgebaut",
                 Self::UpdatingData => "Daten-Aktualisierung",
                 Self::Purchasing => "Zahlung wird\nbearbeitet",
+                Self::SubmittingTelemetry => "Daten-Übertragung",
             },
             target,
         )?;

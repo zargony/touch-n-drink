@@ -7,6 +7,7 @@ use crate::keypad::{Key, Keypad};
 use crate::nfc::Nfc;
 use crate::schedule::Daily;
 use crate::screen;
+use crate::telemetry::{Event, Telemetry};
 use crate::user::{UserId, Users};
 use crate::vereinsflieger::Vereinsflieger;
 use crate::wifi::Wifi;
@@ -50,6 +51,7 @@ pub struct Ui<'a, RNG, I2C, IRQ> {
     vereinsflieger: &'a mut Vereinsflieger<'a>,
     articles: &'a mut Articles<1>,
     users: &'a mut Users,
+    telemetry: &'a mut Telemetry<'a>,
     schedule: &'a mut Daily,
 }
 
@@ -67,6 +69,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         vereinsflieger: &'a mut Vereinsflieger<'a>,
         articles: &'a mut Articles<1>,
         users: &'a mut Users,
+        telemetry: &'a mut Telemetry<'a>,
         schedule: &'a mut Daily,
     ) -> Self {
         Self {
@@ -80,6 +83,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
             vereinsflieger,
             articles,
             users,
+            telemetry,
             schedule,
         }
     }
@@ -176,6 +180,39 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         // Refresh user information
         vf.refresh_users(self.users).await?;
 
+        // Close connection to Vereinsflieger API
+        drop(vf);
+
+        self.telemetry.track(Event::DataRefreshed(
+            self.articles.count(),
+            self.users.count_uids(),
+            self.users.count(),
+        ));
+
+        // Submit telemetry data if needed
+        self.submit_telemetry().await?;
+
+        Ok(())
+    }
+
+    /// Submit telemetry data if needed
+    pub async fn submit_telemetry(&mut self) -> Result<(), Error> {
+        if !self.telemetry.needs_flush() {
+            return Ok(());
+        }
+
+        // Wait for network to become available (if not already)
+        self.wait_network_up().await?;
+
+        info!("UI: Submitting telemetry data...");
+
+        self.display
+            .screen(&screen::PleaseWait::SubmittingTelemetry)
+            .await?;
+
+        // Submit telemetry data, ignore any error
+        let _ = self.telemetry.flush(self.http).await;
+
         Ok(())
     }
 
@@ -195,6 +232,9 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
 
     /// Run the user interface flow
     pub async fn run(&mut self) -> Result<(), Error> {
+        // Submit telemetry data if needed
+        self.submit_telemetry().await?;
+
         // Either wait for id card read or schedule time
         let schedule_timer = self.schedule.timer();
         let user_id = match select(self.authenticate_user(), schedule_timer).await {
@@ -226,6 +266,9 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         // Store purchase
         self.purchase(&article_id, amount, user_id, total_price)
             .await?;
+
+        // Submit telemetry data if needed
+        self.submit_telemetry().await?;
 
         // Show success and affirm to take drinks
         self.show_success(num_drinks).await?;
@@ -280,12 +323,14 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
             if let Some(user_id) = self.users.id(&uid) {
                 // User found, authorized
                 info!("UI: NFC card {} identified as user {}", uid, user_id);
+                self.telemetry.track(Event::UserAuthenticated(user_id, uid));
                 let _ = self.buzzer.confirm().await;
                 break Ok(user_id);
             }
 
             // User not found, unauthorized
             info!("UI: NFC card {} unknown, rejecting", uid);
+            self.telemetry.track(Event::AuthenticationFailed(uid));
             let _ = self.buzzer.deny().await;
         }
     }
@@ -362,6 +407,12 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
         // Store purchase
         vf.purchase(article_id, amount, user_id, total_price)
             .await?;
+        self.telemetry.track(Event::ArticlePurchased(
+            user_id,
+            article_id.clone(),
+            amount,
+            total_price,
+        ));
 
         Ok(())
     }

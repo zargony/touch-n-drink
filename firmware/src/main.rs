@@ -47,10 +47,12 @@ mod error;
 mod http;
 mod json;
 mod keypad;
+mod mixpanel;
 mod nfc;
 mod pn532;
 mod schedule;
 mod screen;
+mod telemetry;
 mod time;
 mod ui;
 mod user;
@@ -63,6 +65,7 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
+use esp_hal::efuse::Efuse;
 use esp_hal::gpio::{Input, Level, Output, OutputOpenDrain, Pull};
 use esp_hal::i2c::master::{Config as I2cConfig, I2c};
 use esp_hal::peripherals::Peripherals;
@@ -214,6 +217,12 @@ async fn main(spawner: Spawner) {
         config.vf_cid,
     );
 
+    // Initialize telemetry
+    let device_id: const_hex::Buffer<6, false> =
+        const_hex::Buffer::new().const_format(&Efuse::read_base_mac_address());
+    let mut telemetry = telemetry::Telemetry::new(config.mp_token.as_deref(), device_id.as_str());
+    telemetry.track(telemetry::Event::SystemStart);
+
     // Initialize buzzer
     let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
     let _ = buzzer.startup().await;
@@ -233,6 +242,7 @@ async fn main(spawner: Spawner) {
         &mut vereinsflieger,
         &mut articles,
         &mut users,
+        &mut telemetry,
         &mut schedule,
     );
 

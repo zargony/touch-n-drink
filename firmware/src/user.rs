@@ -69,7 +69,6 @@ impl Users {
     }
 
     /// Number of uids
-    #[allow(dead_code)]
     pub fn count_uids(&self) -> usize {
         self.uids.len()
     }

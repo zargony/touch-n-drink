@@ -6,6 +6,9 @@
   "wifi-ssid": "My Wifi",
   "wifi-password": "12345",
 
+  // Mixpanel project token for analytics (optional)
+  "mp-token": "00000000000000000000000000000000",
+
   // Credentials for connecting to the Vereinsflieger API. See Vereinsflieger
   // REST Documentation for details. Note that password needs to be given as
   // its hex MD5 hash instead of plain text.
