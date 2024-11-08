@@ -6,7 +6,7 @@ use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use rand_core::RngCore;
 use u8g2_fonts::types::{FontColor, HorizontalAlignment, VerticalPosition};
-use u8g2_fonts::{fonts, FontRenderer};
+use u8g2_fonts::{fonts, Content, FontRenderer};
 
 /// Touch 'n Drink bi-color logo
 #[rustfmt::skip]
@@ -40,6 +40,15 @@ const MEDIUM_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_6x10_tf>(
 const SMALL_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_5x7_tf>();
 const FOOTER_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_5x7_tf>();
 
+/// Screen width
+const WIDTH: i32 = 128;
+
+/// Horizontal position for centering
+const HCENTER: i32 = WIDTH / 2;
+
+/// Screen height
+const HEIGHT: i32 = 64;
+
 /// Screen display error
 pub type Error<E> = u8g2_fonts::Error<E>;
 
@@ -49,6 +58,53 @@ pub trait Screen {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>>;
+}
+
+/// Draw centered text on given line
+fn centered<D: DrawTarget<Color = BinaryColor>>(
+    font: &FontRenderer,
+    y: i32,
+    content: impl Content,
+    target: &mut D,
+) -> Result<(), Error<D::Error>> {
+    font.render_aligned(
+        content,
+        Point::new(HCENTER, y),
+        VerticalPosition::Baseline,
+        HorizontalAlignment::Center,
+        FontColor::Transparent(BinaryColor::On),
+        target,
+    )?;
+    Ok(())
+}
+
+/// Draw common footer (bottom 7 lines, 57..64)
+fn footer<D: DrawTarget<Color = BinaryColor>>(
+    left: &str,
+    right: &str,
+    target: &mut D,
+) -> Result<(), Error<D::Error>> {
+    if !left.is_empty() {
+        FOOTER_FONT.render_aligned(
+            left,
+            Point::new(0, HEIGHT - 1),
+            VerticalPosition::Baseline,
+            HorizontalAlignment::Left,
+            FontColor::Transparent(BinaryColor::On),
+            target,
+        )?;
+    }
+    if !right.is_empty() {
+        FOOTER_FONT.render_aligned(
+            right,
+            Point::new(WIDTH - 1, HEIGHT - 1),
+            VerticalPosition::Baseline,
+            HorizontalAlignment::Right,
+            FontColor::Transparent(BinaryColor::On),
+            target,
+        )?;
+    }
+    Ok(())
 }
 
 /// Splash screen
@@ -62,18 +118,11 @@ impl Screen for Splash {
         Image::new(&LOGO, Point::new(0, 13))
             .draw(target)
             .map_err(Error::DisplayError)?;
-        SPLASH_VERSION_FONT.render_aligned(
-            VERSION_STR,
-            Point::new(63, 30 + 12),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
-            target,
-        )?;
+        centered(&SPLASH_VERSION_FONT, 13 + 29, VERSION_STR, target)?;
         #[cfg(not(debug_assertions))]
-        Footer::new("", GIT_SHA_STR).draw(target)?;
+        footer("", GIT_SHA_STR, target)?;
         #[cfg(debug_assertions)]
-        Footer::new("(DEBUG)", GIT_SHA_STR).draw(target)?;
+        footer("(DEBUG)", GIT_SHA_STR, target)?;
         Ok(())
     }
 }
@@ -94,23 +143,14 @@ impl<M: fmt::Display> Screen for Failure<M> {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        TITLE_FONT.render_aligned(
-            "FEHLER!",
-            Point::new(63, 26),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
-            target,
-        )?;
-        SMALL_FONT.render_aligned(
+        centered(&TITLE_FONT, 26, "FEHLER!", target)?;
+        centered(
+            &SMALL_FONT,
+            26 + 12,
             format_args!("{}", self.message),
-            Point::new(63, 26 + 12),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
             target,
         )?;
-        Footer::new("* Abbruch", "").draw(target)?;
+        footer("* Abbruch", "", target)?;
         Ok(())
     }
 }
@@ -126,27 +166,18 @@ impl Screen for PleaseWait {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        TITLE_FONT.render_aligned(
-            "Stand By...",
-            Point::new(63, 26),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
-            target,
-        )?;
-        MEDIUM_FONT.render_aligned(
+        centered(&TITLE_FONT, 26, "Stand By...", target)?;
+        centered(
+            &MEDIUM_FONT,
+            26 + 12,
             match self {
                 Self::WifiConnecting => "WLAN Verbindung\nwird aufgebaut",
                 Self::ApiQuerying => "Vereinsflieger\nAbfrage",
             },
-            Point::new(63, 26 + 12),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
             target,
         )?;
         if let Self::WifiConnecting = self {
-            Footer::new("* Abbruch", "").draw(target)?;
+            footer("* Abbruch", "", target)?;
         }
         Ok(())
     }
@@ -160,26 +191,19 @@ impl Screen for ScanId {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        TITLE_FONT.render_aligned(
-            "Mitgliedsausweis\nscannen",
-            Point::new(63, 26),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
-            target,
-        )?;
+        centered(&TITLE_FONT, 26, "Mitgliedsausweis\nscannen", target)?;
         Ok(())
     }
 }
 
 /// Prompt to ask for number of drinks
-pub struct NumberOfDrinks<N> {
+pub struct NumberOfDrinks<'a> {
     greeting: u32,
-    name: N,
+    name: &'a str,
 }
 
-impl<N: fmt::Display> NumberOfDrinks<N> {
-    pub fn new<RNG: RngCore>(rng: &mut RNG, name: N) -> Self {
+impl<'a> NumberOfDrinks<'a> {
+    pub fn new<RNG: RngCore>(rng: &mut RNG, name: &'a str) -> Self {
         Self {
             greeting: rng.next_u32(),
             name,
@@ -187,36 +211,25 @@ impl<N: fmt::Display> NumberOfDrinks<N> {
     }
 }
 
-impl<N: fmt::Display> Screen for NumberOfDrinks<N> {
+impl<'a> Screen for NumberOfDrinks<'a> {
     fn draw<D: DrawTarget<Color = BinaryColor>>(
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
         static GREETINGS: [&str; 9] = [
-            "Hallo", "Hi", "Hey", "Tach", "Servus", "Moin", "Hej", "Olá", "Ciao",
+            "Hi", "Hallo", "Hey", "Tach", "Servus", "Moin", "Hej", "Olá", "Ciao",
         ];
 
-        MEDIUM_FONT.render_aligned(
-            format_args!(
-                "{} {}",
-                GREETINGS[self.greeting as usize % GREETINGS.len()],
-                self.name
-            ),
-            Point::new(63, 8),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
+        let greeting = GREETINGS[self.greeting as usize % GREETINGS.len()];
+
+        centered(
+            &MEDIUM_FONT,
+            8,
+            format_args!("{greeting} {}", self.name),
             target,
         )?;
-        TITLE_FONT.render_aligned(
-            "Anzahl Getränke\nwählen",
-            Point::new(63, 26),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
-            target,
-        )?;
-        Footer::new("* Abbruch", "1-9 Weiter").draw(target)?;
+        centered(&TITLE_FONT, 8 + 22, "Anzahl Getränke\nwählen", target)?;
+        footer("* Abbruch", "1-9 Weiter", target)?;
         Ok(())
     }
 }
@@ -241,7 +254,9 @@ impl Screen for Checkout {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        MEDIUM_FONT.render_aligned(
+        centered(
+            &MEDIUM_FONT,
+            26,
             format_args!(
                 "{} {}",
                 self.num_drinks,
@@ -251,21 +266,15 @@ impl Screen for Checkout {
                     "Getränke"
                 }
             ),
-            Point::new(63, 26),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
             target,
         )?;
-        TITLE_FONT.render_aligned(
+        centered(
+            &TITLE_FONT,
+            26 + 16,
             format_args!("{:.02} EUR", self.total_price),
-            Point::new(63, 26 + 16),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
             target,
         )?;
-        Footer::new("* Abbruch", "# BEZAHLEN").draw(target)?;
+        footer("* Abbruch", "# BEZAHLEN", target)?;
         Ok(())
     }
 }
@@ -286,62 +295,14 @@ impl Screen for Success {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        TITLE_FONT.render_aligned(
-            "Affirm!",
-            Point::new(63, 26),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
-            target,
-        )?;
-        SMALL_FONT.render_aligned(
+        centered(&TITLE_FONT, 26, "Affirm!", target)?;
+        centered(
+            &SMALL_FONT,
+            26 + 12,
             format_args!("{} Getränke genehmigt", self.num_drinks),
-            Point::new(63, 26 + 12),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Center,
-            FontColor::Transparent(BinaryColor::On),
             target,
         )?;
-        Footer::new("", "# Ok").draw(target)?;
-        Ok(())
-    }
-}
-
-/// Common footer (bottom 7 lines 57..64)
-struct Footer<'a> {
-    left: &'a str,
-    right: &'a str,
-}
-
-impl<'a> Footer<'a> {
-    fn new(left: &'a str, right: &'a str) -> Self {
-        Self { left, right }
-    }
-
-    fn draw<D: DrawTarget<Color = BinaryColor>>(
-        &self,
-        target: &mut D,
-    ) -> Result<(), Error<D::Error>> {
-        if !self.left.is_empty() {
-            FOOTER_FONT.render_aligned(
-                self.left,
-                Point::new(0, 63),
-                VerticalPosition::Baseline,
-                HorizontalAlignment::Left,
-                FontColor::Transparent(BinaryColor::On),
-                target,
-            )?;
-        }
-        if !self.right.is_empty() {
-            FOOTER_FONT.render_aligned(
-                self.right,
-                Point::new(127, 63),
-                VerticalPosition::Baseline,
-                HorizontalAlignment::Right,
-                FontColor::Transparent(BinaryColor::On),
-                target,
-            )?;
-        }
+        footer("", "# Ok", target)?;
         Ok(())
     }
 }
