@@ -49,6 +49,9 @@ const HCENTER: i32 = WIDTH / 2;
 /// Screen height
 const HEIGHT: i32 = 64;
 
+/// Number of characters that fit in a line
+const MEDIUM_CHARS_PER_LINE: i32 = WIDTH / 6;
+
 /// Screen display error
 pub type Error<E> = u8g2_fonts::Error<E>;
 
@@ -220,14 +223,16 @@ impl<'a> Screen for NumberOfDrinks<'a> {
             "Hi", "Hallo", "Hey", "Tach", "Servus", "Moin", "Hej", "Olá", "Ciao",
         ];
 
+        // Trim name if it's too long to display
         let greeting = GREETINGS[self.greeting as usize % GREETINGS.len()];
+        let greeting_len = greeting.len() + 1;
+        let name = if self.name.len() + greeting_len > MEDIUM_CHARS_PER_LINE as usize {
+            &self.name[..(MEDIUM_CHARS_PER_LINE as usize - greeting_len)]
+        } else {
+            self.name
+        };
 
-        centered(
-            &MEDIUM_FONT,
-            8,
-            format_args!("{greeting} {}", self.name),
-            target,
-        )?;
+        centered(&MEDIUM_FONT, 8, format_args!("{greeting} {name}"), target)?;
         centered(&TITLE_FONT, 8 + 22, "Anzahl Getränke\nwählen", target)?;
         footer("* Abbruch", "1-9 Weiter", target)?;
         Ok(())
