@@ -16,6 +16,7 @@ use embassy_time::{with_timeout, Duration, TimeoutError, Timer};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
 use log::info;
+use rand_core::RngCore;
 
 /// How long to show the splash screen if no key is pressed
 const SPLASH_TIMEOUT: Duration = Duration::from_secs(5);
@@ -36,7 +37,8 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
 const IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// User interface
-pub struct Ui<'a, I2C, IRQ> {
+pub struct Ui<'a, RNG, I2C, IRQ> {
+    rng: RNG,
     display: &'a mut Display<I2C>,
     keypad: &'a mut Keypad<'a, 3, 4>,
     nfc: &'a mut Nfc<I2C, IRQ>,
@@ -47,10 +49,11 @@ pub struct Ui<'a, I2C, IRQ> {
     users: &'a mut Users,
 }
 
-impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
+impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C, IRQ> {
     /// Create user interface with given human interface devices
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        rng: RNG,
         display: &'a mut Display<I2C>,
         keypad: &'a mut Keypad<'a, 3, 4>,
         nfc: &'a mut Nfc<I2C, IRQ>,
@@ -61,6 +64,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         users: &'a mut Users,
     ) -> Self {
         Self {
+            rng,
             display,
             keypad,
             nfc,
@@ -213,7 +217,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
     }
 }
 
-impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
+impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C, IRQ> {
     /// Authentication: wait for id card, read it and look up the associated user. On idle timeout,
     /// enter power saving (turn off display). Any key pressed leaves power saving (turn on
     /// display).
@@ -265,7 +269,7 @@ impl<'a, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, I2C, IRQ> {
         info!("UI: Asking for number of drinks...");
 
         self.display
-            .screen(&screen::NumberOfDrinks::new(name))
+            .screen(&screen::NumberOfDrinks::new(&mut self.rng, name))
             .await?;
         loop {
             #[allow(clippy::match_same_arms)]
