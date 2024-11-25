@@ -6,6 +6,7 @@ use embassy_net::dns::{self, DnsQueryType};
 use embassy_net::tcp::{self, client::TcpClientState};
 use embassy_net::{Config, DhcpConfig, IpAddress, Stack, StackResources, StaticConfigV4};
 use embassy_time::{Duration, Timer};
+use esp_hal::peripheral::Peripheral;
 use esp_hal::peripherals;
 use esp_hal::rng::Rng;
 use esp_wifi::wifi::{
@@ -13,7 +14,7 @@ use esp_wifi::wifi::{
     Configuration as WifiConfiguration, WifiController, WifiDevice, WifiEvent, WifiStaDevice,
     WifiState,
 };
-use esp_wifi::{EspWifiInitFor, EspWifiTimerSource};
+use esp_wifi::EspWifiTimerSource;
 use log::{debug, info, warn};
 use rand_core::RngCore;
 
@@ -141,7 +142,7 @@ pub struct Wifi {
 impl Wifi {
     /// Create and initialize Wifi interface
     pub fn new(
-        timer: impl EspWifiTimerSource,
+        timer: impl Peripheral<P = impl EspWifiTimerSource> + 'static,
         mut rng: Rng,
         radio_clocks: peripherals::RADIO_CLK,
         wifi: peripherals::WIFI,
@@ -154,8 +155,12 @@ impl Wifi {
         // Generate random seed
         let random_seed = rng.next_u64();
 
+        // Several resources below are allocated and leaked to get a `&'static mut` reference.
+        // This is ok, since only one instance of `Wifi` can exist and it'll never be dropped.
+
         // Initialize and start ESP32 Wifi controller
-        let init = esp_wifi::init(EspWifiInitFor::Wifi, timer, rng, radio_clocks)?;
+        let init = Box::new(esp_wifi::init(timer, rng, radio_clocks)?);
+        let init = Box::leak(init);
         let client_config = WifiClientConfiguration {
             ssid: ssid
                 .try_into()
@@ -170,9 +175,9 @@ impl Wifi {
                 .map_err(|()| InitializationError::General(0))?,
             ..Default::default()
         };
-        let (device, controller) = wifi::new_with_config(&init, wifi, client_config)?;
+        let (device, controller) = wifi::new_with_config(init, wifi, client_config)?;
         let wifi_config = controller
-            .get_configuration()
+            .configuration()
             .unwrap_or(WifiConfiguration::None);
 
         // Spawn task for handling Wifi connection events
@@ -182,9 +187,6 @@ impl Wifi {
             // Panic on failure since failing to spawn a task indicates a serious error
             Err(err) => panic!("Failed to spawn Wifi connection task: {:?}", err),
         }
-
-        // Most resources below are allocated and leaked to get a `&'static mut` reference.
-        // This is ok, since only one instance of `Wifi` can exist and it'll never be dropped.
 
         // Initialize network stack resources (sockets, inflight dns queries). Needs at least one
         // socket for DHCP, one socket for DNS, plus additional sockets for connections.
@@ -299,7 +301,7 @@ async fn connection(mut controller: WifiController<'static>) -> ! {
 
     loop {
         // If connected, wait for disconnect
-        if wifi::get_wifi_state() == WifiState::StaConnected {
+        if wifi::wifi_state() == WifiState::StaConnected {
             controller.wait_for_event(WifiEvent::StaDisconnected).await;
             warn!("Wifi: Disconnected");
             Timer::after(CONNECT_RETRY_DELAY).await;
@@ -308,12 +310,12 @@ async fn connection(mut controller: WifiController<'static>) -> ! {
         // If needed, start controller
         if !matches!(controller.is_started(), Ok(true)) {
             debug!("Wifi: Starting controller...");
-            controller.start().await.unwrap();
+            controller.start_async().await.unwrap();
         }
 
         // Try to connect
         info!("Wifi: Connecting...");
-        match controller.connect().await {
+        match controller.connect_async().await {
             Ok(()) => info!("Wifi: Connected"),
             Err(err) => {
                 warn!("Wifi: Failed to connect: {:?}", err);

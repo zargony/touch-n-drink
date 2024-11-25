@@ -58,12 +58,12 @@ embedded-io-async = { version = "0.6", features = ["alloc"] }
 embedded-storage = "0.3"
 esp-alloc = "0.5"
 esp-backtrace = { version = "0.14", features = ["esp32c3", "custom-halt", "panic-handler", "exception-handler", "println"] }
-esp-hal = { version = "0.21", features = ["esp32c3"] }
-esp-hal-embassy = { version = "0.4", features = ["esp32c3"] }
+esp-hal = { version = "0.22", features = ["esp32c3"] }
+esp-hal-embassy = { version = "0.5", features = ["esp32c3"] }
 esp-partition-table = "0.1"
 esp-println = { version = "0.12", features = ["esp32c3", "log"] }
-esp-storage = { version = "0.3", features = ["esp32c3"] }
-esp-wifi = { version = "0.10", default-features = false, features = ["esp32c3", "esp-alloc", "async", "embassy-net", "log", "phy-enable-usb", "wifi"] }
+esp-storage = { version = "0.4", features = ["esp32c3"] }
+esp-wifi = { version = "0.11", default-features = false, features = ["esp32c3", "esp-alloc", "log", "wifi"] }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
 log = { version = "0.4", features = ["release_max_level_info"] }
 pn532 = "0.4"
@@ -71,6 +71,11 @@ rand_core = "0.6"
 reqwless = { version = "0.12", default-features = false, features = ["alloc", "embedded-tls"] }
 ssd1306 = { version = "0.9", features = ["async"] }
 u8g2-fonts = "0.4"
+
+# FIXME: Pin maybe-async-cfg to 0.2.4 since 0.2.5 breaks ssd1306
+# See https://github.com/rust-embedded-community/ssd1306/issues/219
+# and https://github.com/rust-embedded-community/ssd1306/commit/f3a2f7aca421fbf3ddda45ecef0dfd1f0f12330e
+maybe-async-cfg = "=0.2.4"
 
 [features]
 default = []

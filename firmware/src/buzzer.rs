@@ -1,9 +1,9 @@
 use core::fmt;
 use embassy_time::{Duration, Timer};
-use esp_hal::gpio::Output;
+use esp_hal::gpio::{AnyPin, OutputPin};
 use esp_hal::ledc::{channel, timer, LSGlobalClkSource, Ledc, LowSpeed};
 use esp_hal::peripheral::Peripheral;
-use esp_hal::peripherals::LEDC;
+use esp_hal::peripherals;
 use esp_hal::prelude::*;
 use log::{debug, info};
 
@@ -48,33 +48,34 @@ impl fmt::Display for Error {
 /// Passive buzzer (driven by PWM signal on GPIO)
 pub struct Buzzer<'a> {
     ledc: Ledc<'a>,
-    pin: Output<'a>,
+    pin: AnyPin,
 }
 
 impl<'a> Buzzer<'a> {
     /// Create new buzzer driver
-    pub fn new(ledc: impl Peripheral<P = LEDC> + 'a, pin: Output<'a>) -> Self {
+    pub fn new(ledc: impl Peripheral<P = peripherals::LEDC> + 'a, pin: impl OutputPin) -> Self {
         debug!("Buzzer: Initializing PWM controller...");
 
         let mut ledc = Ledc::new(ledc);
         ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 
         info!("Buzzer: PWM controller initialized");
-        Self { ledc, pin }
+        Self {
+            ledc,
+            pin: pin.degrade(),
+        }
     }
 
     /// Drive the buzzer with a PWM signal of given frequency and duty cycle
     pub fn drive(&mut self, frequency: u32, duty_pct: u8) -> Result<(), Error> {
         // debug!("Buzzer: driving {} Hz at {}%", frequency, duty_pct);
-        let mut timer = self.ledc.get_timer::<LowSpeed>(timer::Number::Timer0);
+        let mut timer = self.ledc.timer::<LowSpeed>(timer::Number::Timer0);
         timer.configure(timer::config::Config {
             duty: timer::config::Duty::Duty13Bit,
             clock_source: timer::LSClockSource::APBClk,
             frequency: frequency.Hz(),
         })?;
-        let mut channel = self
-            .ledc
-            .get_channel(channel::Number::Channel0, &mut self.pin);
+        let mut channel = self.ledc.channel(channel::Number::Channel0, &mut self.pin);
         channel.configure(channel::config::Config {
             timer: &timer,
             duty_pct,
@@ -83,13 +84,19 @@ impl<'a> Buzzer<'a> {
         Ok(())
     }
 
+    /// Stop driving the buzzer
+    pub fn off(&mut self) -> Result<(), Error> {
+        // To turn off the buzzer, use 100% duty cycle so the output keeps staying high
+        self.drive(1, 100)?;
+        Ok(())
+    }
+
     /// Output the given tone for given duration
     pub async fn tone(&mut self, frequency: u32, duration: Duration) -> Result<(), Error> {
         // debug!("Buzzer: playing {} Hz for {}", frequency, duration);
         self.drive(frequency, TONE_DUTY_CYCLE)?;
         Timer::after(duration).await;
-        // To turn off the buzzer, use 100% duty cycle so the output keeps staying high
-        self.drive(1, 100)?;
+        self.off()?;
         Ok(())
     }
 

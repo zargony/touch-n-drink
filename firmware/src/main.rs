@@ -62,12 +62,12 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
-use esp_hal::gpio::{Input, Io, Level, Output, OutputOpenDrain, Pull};
-use esp_hal::i2c::I2c;
+use esp_hal::gpio::{Input, Level, Output, OutputOpenDrain, Pull};
+use esp_hal::i2c::master::{Config as I2cConfig, I2c};
 use esp_hal::peripherals::Peripherals;
 use esp_hal::prelude::*;
 use esp_hal::rng::Rng;
-use esp_hal::rtc_cntl::Rtc;
+use esp_hal::rtc_cntl::{Rtc, RwdtStage};
 use esp_hal::timer::systimer::{SystemTimer, Target};
 use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
@@ -99,7 +99,8 @@ unsafe fn halt() -> ! {
     // Restart automatically after a delay
     println!("Restarting in {} seconds...", PANIC_RESTART_DELAY_SECS);
     let mut rtc = Rtc::new(peripherals.LPWR);
-    rtc.rwdt.set_timeout(PANIC_RESTART_DELAY_SECS.secs());
+    rtc.rwdt
+        .set_timeout(RwdtStage::Stage0, PANIC_RESTART_DELAY_SECS.secs());
     rtc.rwdt.unlisten();
     rtc.rwdt.enable();
     loop {
@@ -114,9 +115,8 @@ async fn main(spawner: Spawner) {
         config.cpu_clock = CpuClock::max();
         config
     });
-    let io = Io::new(peripherals.GPIO, peripherals.IO_MUX);
     let mut rng = Rng::new(peripherals.RNG);
-    let _led = Output::new(io.pins.gpio8, Level::High);
+    let _led = Output::new(peripherals.GPIO8, Level::High);
 
     // Initialize global allocator
     esp_alloc::heap_allocator!(100 * 1024);
@@ -137,13 +137,17 @@ async fn main(spawner: Spawner) {
     let mut users = user::Users::new();
 
     // Initialize I2C controller
-    let i2c = I2c::new_with_timeout_async(
+    let i2c = I2c::new(
         peripherals.I2C0,
-        io.pins.gpio9,
-        io.pins.gpio10,
-        400.kHz(), // Standard-Mode: 100 kHz, Fast-Mode: 400 kHz
-        Some(20),
-    );
+        I2cConfig {
+            frequency: 400.kHz(), // Standard-Mode: 100 kHz, Fast-Mode: 400 kHz
+            timeout: Some(24),    // Reset bus after 24 bus clock cycles (60 µs) of inactivity
+        },
+    )
+    .with_sda(peripherals.GPIO9)
+    .with_scl(peripherals.GPIO10)
+    .into_async();
+
     // Share I2C bus. Since the mcu is single-core and I2C is not used in interrupts, I2C access
     // cannot be preempted and we can safely use a NoopMutex for shared access.
     let i2c: Mutex<NoopRawMutex, _> = Mutex::new(i2c);
@@ -159,20 +163,20 @@ async fn main(spawner: Spawner) {
     // Initialize keypad
     let mut keypad = keypad::Keypad::new(
         [
-            Input::new(io.pins.gpio5, Pull::Up),
-            Input::new(io.pins.gpio6, Pull::Up),
-            Input::new(io.pins.gpio7, Pull::Up),
+            Input::new(peripherals.GPIO5, Pull::Up),
+            Input::new(peripherals.GPIO6, Pull::Up),
+            Input::new(peripherals.GPIO7, Pull::Up),
         ],
         [
-            OutputOpenDrain::new(io.pins.gpio0, Level::High, Pull::None),
-            OutputOpenDrain::new(io.pins.gpio1, Level::High, Pull::None),
-            OutputOpenDrain::new(io.pins.gpio2, Level::High, Pull::None),
-            OutputOpenDrain::new(io.pins.gpio3, Level::High, Pull::None),
+            OutputOpenDrain::new(peripherals.GPIO0, Level::High, Pull::None),
+            OutputOpenDrain::new(peripherals.GPIO1, Level::High, Pull::None),
+            OutputOpenDrain::new(peripherals.GPIO2, Level::High, Pull::None),
+            OutputOpenDrain::new(peripherals.GPIO3, Level::High, Pull::None),
         ],
     );
 
     // Initialize NFC reader
-    let nfc_irq = Input::new(io.pins.gpio20, Pull::Up);
+    let nfc_irq = Input::new(peripherals.GPIO20, Pull::Up);
     let mut nfc = match nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq).await {
         Ok(nfc) => nfc,
         // Panic on failure since an initialization error indicates a serious error
@@ -208,8 +212,7 @@ async fn main(spawner: Spawner) {
     );
 
     // Initialize buzzer
-    let buzzer_pin = Output::new(io.pins.gpio4, Level::High);
-    let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, buzzer_pin);
+    let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
     let _ = buzzer.startup().await;
 
     // Create UI
