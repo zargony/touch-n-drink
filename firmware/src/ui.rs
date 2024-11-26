@@ -2,6 +2,7 @@ use crate::article::{ArticleId, Articles};
 use crate::buzzer::Buzzer;
 use crate::display::Display;
 use crate::error::Error;
+use crate::http::Http;
 use crate::keypad::{Key, Keypad};
 use crate::nfc::Nfc;
 use crate::screen;
@@ -44,6 +45,7 @@ pub struct Ui<'a, RNG, I2C, IRQ> {
     nfc: &'a mut Nfc<I2C, IRQ>,
     buzzer: &'a mut Buzzer<'a>,
     wifi: &'a Wifi,
+    http: &'a mut Http<'a>,
     vereinsflieger: &'a mut Vereinsflieger<'a>,
     articles: &'a mut Articles<1>,
     users: &'a mut Users,
@@ -59,6 +61,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         nfc: &'a mut Nfc<I2C, IRQ>,
         buzzer: &'a mut Buzzer<'a>,
         wifi: &'a Wifi,
+        http: &'a mut Http<'a>,
         vereinsflieger: &'a mut Vereinsflieger<'a>,
         articles: &'a mut Articles<1>,
         users: &'a mut Users,
@@ -70,6 +73,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
             nfc,
             buzzer,
             wifi,
+            http,
             vereinsflieger,
             articles,
             users,
@@ -158,7 +162,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         self.display
             .screen(&screen::PleaseWait::ApiQuerying)
             .await?;
-        let mut vf = self.vereinsflieger.connect().await?;
+        let mut vf = self.vereinsflieger.connect(self.http).await?;
 
         // Show authenticated user information when debugging
         #[cfg(debug_assertions)]
@@ -331,7 +335,7 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
         self.display
             .screen(&screen::PleaseWait::ApiQuerying)
             .await?;
-        let mut vf = self.vereinsflieger.connect().await?;
+        let mut vf = self.vereinsflieger.connect(self.http).await?;
 
         // Store purchase
         vf.purchase(article_id, amount, user_id, total_price)

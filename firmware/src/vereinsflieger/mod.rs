@@ -7,7 +7,6 @@ use crate::article::{ArticleId, Articles};
 use crate::http::{self, Http};
 use crate::time;
 use crate::user::{UserId, Users};
-use crate::wifi::Wifi;
 use alloc::format;
 use alloc::string::String;
 use core::cell::RefCell;
@@ -43,7 +42,6 @@ type AccessToken = String;
 
 /// Vereinsflieger API client
 pub struct Vereinsflieger<'a> {
-    http: Http<'a>,
     username: &'a str,
     password_md5: &'a str,
     appkey: &'a str,
@@ -54,7 +52,6 @@ pub struct Vereinsflieger<'a> {
 impl fmt::Debug for Vereinsflieger<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Vereinsflieger")
-            .field("http", &self.http)
             .field("username", &self.username)
             .field("password_md5", &"<redacted>")
             .field("appkey", &"<redacted>")
@@ -66,18 +63,12 @@ impl fmt::Debug for Vereinsflieger<'_> {
 impl<'a> Vereinsflieger<'a> {
     /// Create new Vereinsflieger API client using the given TCP and DNS sockets
     pub fn new(
-        wifi: &'a Wifi,
-        seed: u64,
-        resources: &'a mut http::Resources,
         username: &'a str,
         password_md5: &'a str,
         appkey: &'a str,
         cid: Option<u32>,
     ) -> Self {
-        let http = Http::new(wifi, seed, resources);
-
         Self {
-            http,
             username,
             password_md5,
             appkey,
@@ -87,8 +78,8 @@ impl<'a> Vereinsflieger<'a> {
     }
 
     /// Connect to API server
-    pub async fn connect(&mut self) -> Result<Connection, Error> {
-        Connection::new(self).await
+    pub async fn connect<'c>(&'c mut self, http: &'c mut Http<'_>) -> Result<Connection, Error> {
+        Connection::new(self, http).await
     }
 }
 
@@ -239,9 +230,9 @@ impl Connection<'_> {
 impl<'a> Connection<'a> {
     /// Connect to API server, check existing access token (if any) or fetch a new one and sign
     /// in. Return connection for authenticated API requests.
-    async fn new(vf: &'a mut Vereinsflieger<'_>) -> Result<Self, Error> {
+    async fn new(vf: &'a mut Vereinsflieger<'_>, http: &'a mut Http<'_>) -> Result<Self, Error> {
         // Connect to API server
-        let mut connection = vf.http.connect(BASE_URL).await?;
+        let mut connection = http.connect(BASE_URL).await?;
 
         // If exist, check validity of access token
         if let Some(ref accesstoken) = vf.accesstoken {

@@ -199,12 +199,14 @@ async fn main(spawner: Spawner) {
         Err(err) => panic!("Wifi initialization failed: {:?}", err),
     };
 
-    // Initialize Vereinsflieger API client
+    // Initialize HTTP client
+    // As this allocates quite a bit of memory (e.g. for TLS buffers), only a single http client
+    // is created that can be passed to an API client whenever a connection needs to be established
     let mut http_resources = http::Resources::new();
+    let mut http = http::Http::new(&wifi, rng.next_u64(), &mut http_resources);
+
+    // Initialize Vereinsflieger API client
     let mut vereinsflieger = vereinsflieger::Vereinsflieger::new(
-        &wifi,
-        rng.next_u64(),
-        &mut http_resources,
         &config.vf_username,
         &config.vf_password_md5,
         &config.vf_appkey,
@@ -223,6 +225,7 @@ async fn main(spawner: Spawner) {
         &mut nfc,
         &mut buzzer,
         &wifi,
+        &mut http,
         &mut vereinsflieger,
         &mut articles,
         &mut users,
