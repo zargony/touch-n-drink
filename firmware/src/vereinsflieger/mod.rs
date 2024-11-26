@@ -19,20 +19,29 @@ const BASE_URL: &str = "https://www.vereinsflieger.de/interface/rest";
 /// Vereinsflieger API error
 #[derive(Debug)]
 pub enum Error {
-    /// HTTP error (network, protocol, (de)serializing)
-    Http(http::Error),
-}
-
-impl From<http::Error> for Error {
-    fn from(err: http::Error) -> Self {
-        Self::Http(err)
-    }
+    /// Failed to fetch user information
+    FetchUserInformation(http::Error),
+    /// Failed to fetch articles
+    FetchArticles(http::Error),
+    /// Failed to fetch users
+    FetchUsers(http::Error),
+    /// Failed to purchase
+    Purchase(http::Error),
+    /// Failed to connect to API server
+    Connection(http::Error),
+    /// Failed to sign in to API server
+    SignIn(http::Error),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Http(_err) => write!(f, "API error"),
+            Self::FetchUserInformation(err) => write!(f, "VF user info failed ({err})"),
+            Self::FetchArticles(err) => write!(f, "VF fetch articles failed ({err})"),
+            Self::FetchUsers(err) => write!(f, "VF fetch users failed ({err})"),
+            Self::Purchase(err) => write!(f, "VF purchase failed ({err})"),
+            Self::Connection(err) => write!(f, "VF connect failed ({err})"),
+            Self::SignIn(err) => write!(f, "VF sign in failed ({err})"),
         }
     }
 }
@@ -112,7 +121,8 @@ impl Connection<'_> {
                     accesstoken: self.accesstoken,
                 },
             )
-            .await?;
+            .await
+            .map_err(Error::FetchUserInformation)?;
         debug!("Vereinsflieger: Got user information: {:?}", response);
         Ok(())
     }
@@ -128,12 +138,14 @@ impl Connection<'_> {
         let request_body = http::Connection::prepare_body(&ArticleListRequest {
             accesstoken: self.accesstoken,
         })
-        .await?;
+        .await
+        .map_err(Error::FetchArticles)?;
         let mut rx_buf = [0; 4096];
         let mut json = self
             .connection
             .post_json("articles/list", &request_body, &mut rx_buf)
-            .await?;
+            .await
+            .map_err(Error::FetchArticles)?;
 
         articles.clear();
         let articles = RefCell::new(articles);
@@ -141,7 +153,8 @@ impl Connection<'_> {
         let response: ArticleListResponse<N> = json
             .read_object_with_context(&articles)
             .await
-            .map_err(http::Error::MalformedResponse)?;
+            .map_err(http::Error::MalformedResponse)
+            .map_err(Error::FetchArticles)?;
         info!(
             "Vereinsflieger: Refreshed {} of {} articles",
             articles.borrow().count(),
@@ -151,7 +164,8 @@ impl Connection<'_> {
         // Discard remaining body (needed to make the next pipelined request work)
         json.discard_to_end()
             .await
-            .map_err(http::Error::MalformedResponse)?;
+            .map_err(http::Error::MalformedResponse)
+            .map_err(Error::FetchUsers)?;
 
         Ok(())
     }
@@ -164,12 +178,14 @@ impl Connection<'_> {
         let request_body = http::Connection::prepare_body(&UserListRequest {
             accesstoken: self.accesstoken,
         })
-        .await?;
+        .await
+        .map_err(Error::FetchUsers)?;
         let mut rx_buf = [0; 4096];
         let mut json = self
             .connection
             .post_json("user/list", &request_body, &mut rx_buf)
-            .await?;
+            .await
+            .map_err(Error::FetchUsers)?;
 
         users.clear();
         let users = RefCell::new(users);
@@ -177,7 +193,8 @@ impl Connection<'_> {
         let response: UserListResponse = json
             .read_object_with_context(&users)
             .await
-            .map_err(http::Error::MalformedResponse)?;
+            .map_err(http::Error::MalformedResponse)
+            .map_err(Error::FetchUsers)?;
         info!(
             "Vereinsflieger: Refreshed {} of {} users",
             users.borrow().count(),
@@ -187,7 +204,8 @@ impl Connection<'_> {
         // Discard remaining body (needed to make the next pipelined request work)
         json.discard_to_end()
             .await
-            .map_err(http::Error::MalformedResponse)?;
+            .map_err(http::Error::MalformedResponse)
+            .map_err(Error::FetchUsers)?;
 
         Ok(())
     }
@@ -221,7 +239,8 @@ impl Connection<'_> {
                     comment: None,
                 },
             )
-            .await?;
+            .await
+            .map_err(Error::Purchase)?;
         debug!("Vereinsflieger: Purchase successful");
         Ok(())
     }
@@ -232,7 +251,7 @@ impl<'a> Connection<'a> {
     /// in. Return connection for authenticated API requests.
     async fn new(vf: &'a mut Vereinsflieger<'_>, http: &'a mut Http<'_>) -> Result<Self, Error> {
         // Connect to API server
-        let mut connection = http.connect(BASE_URL).await?;
+        let mut connection = http.connect(BASE_URL).await.map_err(Error::Connection)?;
 
         // If exist, check validity of access token
         if let Some(ref accesstoken) = vf.accesstoken {
@@ -247,7 +266,7 @@ impl<'a> Connection<'a> {
                     debug!("Vereinsflieger: Access token expired");
                     vf.accesstoken = None;
                 }
-                Err(err) => return Err(err.into()),
+                Err(err) => return Err(Error::Connection(err)),
             }
         }
 
@@ -256,7 +275,10 @@ impl<'a> Connection<'a> {
             use proto_auth::{AccessTokenResponse, SignInRequest, SignInResponse};
 
             // Fetch a new access token
-            let response: AccessTokenResponse = connection.get("auth/accesstoken").await?;
+            let response: AccessTokenResponse = connection
+                .get("auth/accesstoken")
+                .await
+                .map_err(Error::SignIn)?;
             let accesstoken = response.accesstoken;
             // debug!("Vereinsflieger: Got access token {}", accesstoken);
             debug!(
@@ -285,7 +307,7 @@ impl<'a> Connection<'a> {
                 }
                 Err(err) => {
                     warn!("Vereinsflieger: Sign in failed: {}", err);
-                    return Err(err.into());
+                    return Err(Error::SignIn(err));
                 }
             }
         }
@@ -296,7 +318,7 @@ impl<'a> Connection<'a> {
                 accesstoken,
             }),
             // Actually unreachable
-            None => Err(http::Error::Unauthorized.into()),
+            None => Err(Error::SignIn(http::Error::Unauthorized)),
         }
     }
 
