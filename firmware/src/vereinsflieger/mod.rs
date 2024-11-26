@@ -51,7 +51,7 @@ pub struct Vereinsflieger<'a> {
     accesstoken: Option<AccessToken>,
 }
 
-impl<'a> fmt::Debug for Vereinsflieger<'a> {
+impl fmt::Debug for Vereinsflieger<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Vereinsflieger")
             .field("http", &self.http)
@@ -98,7 +98,7 @@ pub struct Connection<'a> {
     accesstoken: &'a AccessToken,
 }
 
-impl<'a> fmt::Debug for Connection<'a> {
+impl fmt::Debug for Connection<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Connection")
             .field("connection", &self.connection)
@@ -107,7 +107,7 @@ impl<'a> fmt::Debug for Connection<'a> {
     }
 }
 
-impl<'a> Connection<'a> {
+impl Connection<'_> {
     /// Fetch information about authenticated user
     #[allow(dead_code)]
     pub async fn get_user_information(&mut self) -> Result<(), Error> {

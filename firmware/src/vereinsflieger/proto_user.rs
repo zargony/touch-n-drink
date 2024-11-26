@@ -15,7 +15,7 @@ pub struct UserListRequest<'a> {
     pub accesstoken: &'a AccessToken,
 }
 
-impl<'a> ToJson for UserListRequest<'a> {
+impl ToJson for UserListRequest<'_> {
     async fn to_json<W: Write>(
         &self,
         json: &mut json::Writer<W>,

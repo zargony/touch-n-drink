@@ -214,7 +214,7 @@ impl<'a> NumberOfDrinks<'a> {
     }
 }
 
-impl<'a> Screen for NumberOfDrinks<'a> {
+impl Screen for NumberOfDrinks<'_> {
     fn draw<D: DrawTarget<Color = BinaryColor>>(
         &self,
         target: &mut D,

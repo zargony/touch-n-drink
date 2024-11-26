@@ -87,7 +87,7 @@ impl<'a, const COLS: usize, const ROWS: usize> Keypad<'a, COLS, ROWS> {
     }
 }
 
-impl<'a, const COLS: usize, const ROWS: usize> Keypad<'a, COLS, ROWS> {
+impl<const COLS: usize, const ROWS: usize> Keypad<'_, COLS, ROWS> {
     /// Wait for any key to be pressed
     async fn wait_for_keypress(&mut self) {
         // Assuming inputs have pull up resistors, so keys will pull low when pressed
@@ -119,7 +119,7 @@ impl<'a, const COLS: usize, const ROWS: usize> Keypad<'a, COLS, ROWS> {
     }
 }
 
-impl<'a> Keypad<'a, 3, 4> {
+impl Keypad<'_, 3, 4> {
     // 1 2 3
     // 4 5 6
     // 7 8 9
@@ -149,7 +149,7 @@ impl<'a> Keypad<'a, 3, 4> {
 }
 
 #[allow(dead_code)]
-impl<'a> Keypad<'a, 4, 4> {
+impl Keypad<'_, 4, 4> {
     // 1 2 3 A
     // 4 5 6 B
     // 7 8 9 C

@@ -62,7 +62,7 @@ impl<T: fmt::Display> fmt::Display for DisplayOption<T> {
 /// List display helper
 struct DisplayList<'a, T: fmt::Display>(&'a [T]);
 
-impl<'a, T: fmt::Display> fmt::Display for DisplayList<'a, T> {
+impl<T: fmt::Display> fmt::Display for DisplayList<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.0.is_empty() {
             write!(f, "-")?;

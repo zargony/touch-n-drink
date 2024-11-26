@@ -20,7 +20,7 @@ pub struct SaleAddRequest<'a> {
     // pub caid2: Option<u32>,
 }
 
-impl<'a> ToJson for SaleAddRequest<'a> {
+impl ToJson for SaleAddRequest<'_> {
     async fn to_json<W: Write>(
         &self,
         json: &mut json::Writer<W>,

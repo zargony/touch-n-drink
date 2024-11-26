@@ -217,7 +217,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
     }
 }
 
-impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C, IRQ> {
+impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ> {
     /// Authentication: wait for id card, read it and look up the associated user. On idle timeout,
     /// enter power saving (turn off display). Any key pressed leaves power saving (turn on
     /// display).

@@ -80,7 +80,7 @@ pub struct Http<'a> {
     client: HttpClient<'a, TcpClient<'a>, DnsSocket<'a>>,
 }
 
-impl<'a> fmt::Debug for Http<'a> {
+impl fmt::Debug for Http<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Http").finish()
     }
@@ -120,7 +120,7 @@ pub struct Connection<'a> {
     resource: HttpResource<'a, TcpConnection<'a>>,
 }
 
-impl<'a> fmt::Debug for Connection<'a> {
+impl fmt::Debug for Connection<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Connection")
             .field("host", &self.resource.host)
@@ -199,7 +199,7 @@ impl<'a> Connection<'a> {
     }
 }
 
-impl<'a> Connection<'a> {
+impl Connection<'_> {
     /// Send request, check response status and return response body JSON reader
     async fn send_request<'req, 'conn, B: RequestBody>(
         request: HttpResourceRequestBuilder<'req, 'conn, TcpConnection<'conn>, B>,

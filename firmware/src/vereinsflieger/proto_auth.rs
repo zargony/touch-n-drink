@@ -40,7 +40,7 @@ pub struct SignInRequest<'a> {
     pub auth_secret: Option<&'a str>,
 }
 
-impl<'a> ToJson for SignInRequest<'a> {
+impl ToJson for SignInRequest<'_> {
     async fn to_json<W: Write>(
         &self,
         json: &mut json::Writer<W>,
@@ -91,7 +91,7 @@ pub struct UserInformationRequest<'a> {
     pub accesstoken: &'a AccessToken,
 }
 
-impl<'a> ToJson for UserInformationRequest<'a> {
+impl ToJson for UserInformationRequest<'_> {
     async fn to_json<W: Write>(
         &self,
         json: &mut json::Writer<W>,
