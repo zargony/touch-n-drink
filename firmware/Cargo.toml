@@ -1,6 +1,6 @@
 [package]
 name = "touch-n-drink"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Andreas Neuhaus <git@zargony.com>"]
 edition = "2021"
 description = "Firmware for cashless payment device for cold drinks at the aeroclub at EDLH"
