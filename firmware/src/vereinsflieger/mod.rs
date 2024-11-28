@@ -87,7 +87,10 @@ impl<'a> Vereinsflieger<'a> {
     }
 
     /// Connect to API server
-    pub async fn connect<'c>(&'c mut self, http: &'c mut Http<'_>) -> Result<Connection, Error> {
+    pub async fn connect<'conn>(
+        &'conn mut self,
+        http: &'conn mut Http<'_>,
+    ) -> Result<Connection<'conn>, Error> {
         Connection::new(self, http).await
     }
 }

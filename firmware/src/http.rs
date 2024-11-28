@@ -107,7 +107,7 @@ impl<'a> Http<'a> {
     pub async fn connect<'conn>(
         &'conn mut self,
         base_url: &'conn str,
-    ) -> Result<Connection, Error> {
+    ) -> Result<Connection<'conn>, Error> {
         let resource = self.client.resource(base_url).await?;
         debug!("HTTP: Connected {}", base_url);
 
