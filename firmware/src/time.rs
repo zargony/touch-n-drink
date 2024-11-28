@@ -1,6 +1,7 @@
 use chrono::{DateTime, TimeDelta, Utc};
 use core::cell::RefCell;
 use embassy_sync::blocking_mutex::CriticalSectionMutex;
+use embassy_time::Instant;
 use log::debug;
 
 /// Calculated time of system start
@@ -19,19 +20,38 @@ fn set_start_time(time: DateTime<Utc>) {
     });
 }
 
+/// Date and time extension for relative time types
+pub trait DateTimeExt {
+    /// Relative time in milliseconds
+    fn as_milliseconds(&self) -> u64;
+
+    /// Convert the relative time type to a chrono duration type
+    fn to_duration(&self) -> Option<TimeDelta> {
+        TimeDelta::try_milliseconds(i64::try_from(self.as_milliseconds()).ok()?)
+    }
+
+    /// Convert relative time since system start to current time
+    fn to_datetime(&self) -> Option<DateTime<Utc>> {
+        let start_time = start_time()?;
+        let duration = self.to_duration()?;
+        Some(start_time + duration)
+    }
+}
+
+impl DateTimeExt for Instant {
+    fn as_milliseconds(&self) -> u64 {
+        self.as_millis()
+    }
+}
+
 /// Duration of system run time
 pub fn uptime() -> Option<TimeDelta> {
-    let millis = esp_hal::time::now().duration_since_epoch().to_millis();
-    TimeDelta::try_milliseconds(i64::try_from(millis).ok()?)
+    Instant::now().to_duration()
 }
 
 /// Current time
 pub fn now() -> Option<DateTime<Utc>> {
-    if let (Some(start_time), Some(uptime)) = (start_time(), uptime()) {
-        Some(start_time + uptime)
-    } else {
-        None
-    }
+    Instant::now().to_datetime()
 }
 
 /// Set current time by using the given current time to calculate the time of system start
