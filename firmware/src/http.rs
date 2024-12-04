@@ -2,7 +2,7 @@ use crate::json::{self, FromJson, ToJson};
 use crate::time;
 use crate::wifi::{DnsSocket, TcpClient, TcpConnection, Wifi};
 use alloc::vec::Vec;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use core::convert::Infallible;
 use core::{fmt, str};
 use embedded_io_async::{BufRead, Read};
@@ -219,10 +219,9 @@ impl Connection<'_> {
             .headers()
             .find_map(|(k, v)| (k == "Date").then_some(v))
             .and_then(|v| str::from_utf8(v).ok())
-            .and_then(|s| DateTime::parse_from_rfc2822(s).ok())
-            .map(|d| d.with_timezone(&Utc));
+            .and_then(|s| DateTime::parse_from_rfc2822(s).ok());
         if let Some(time) = time {
-            time::set(time);
+            time::set(&time);
         }
 
         // Check HTTP response status
