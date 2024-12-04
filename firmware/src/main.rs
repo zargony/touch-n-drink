@@ -231,9 +231,6 @@ async fn main(spawner: Spawner) {
         &mut users,
     );
 
-    // Show splash screen for a while, ignore any error
-    let _ = ui.show_splash().await;
-
     loop {
         match ui.init().await {
             // Success or cancel: continue

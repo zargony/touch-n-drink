@@ -94,12 +94,8 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
 
         self.display.screen(&screen::Splash).await?;
 
-        match with_timeout(SPLASH_TIMEOUT, self.keypad.read()).await {
-            // Key pressed
-            Ok(_key) => Ok(()),
-            // User interaction timeout
-            Err(TimeoutError) => Err(Error::UserTimeout),
-        }
+        let _ = with_timeout(SPLASH_TIMEOUT, self.keypad.read()).await;
+        Ok(())
     }
 
     /// Show error screen and wait for keypress or timeout
@@ -162,6 +158,8 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         self.display
             .screen(&screen::PleaseWait::UpdatingData)
             .await?;
+
+        // Connect to Vereinsflieger API
         let mut vf = self.vereinsflieger.connect(self.http).await?;
 
         // Show authenticated user information when debugging
@@ -179,6 +177,9 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
 
     /// Initialize user interface
     pub async fn init(&mut self) -> Result<(), Error> {
+        // Show splash screen for a while
+        self.show_splash().await?;
+
         // Wait for network to become available (if not already)
         self.wait_network_up().await?;
 
@@ -192,11 +193,13 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
     pub async fn run(&mut self) -> Result<(), Error> {
         // Wait for id card and verify identification
         let user_id = self.authenticate_user().await?;
+
+        // Get user information
         let user = self.users.get(user_id);
+        let user_name = user.map_or(String::new(), |u| u.name.clone());
 
         // Ask for number of drinks
-        let name = user.map_or(String::new(), |u| u.name.clone());
-        let num_drinks = self.get_number_of_drinks(&name).await?;
+        let num_drinks = self.get_number_of_drinks(&user_name).await?;
 
         // Get article information
         let article_id = self.articles.id(0).ok_or(Error::ArticleNotFound)?.clone();
@@ -274,15 +277,15 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
             #[allow(clippy::match_same_arms)]
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
                 // Any digit 1..=9 selects number of drinks
-                Ok(Key::Digit(n)) if (1..=9).contains(&n) => return Ok(n as usize),
+                Ok(Key::Digit(n)) if (1..=9).contains(&n) => break Ok(n as usize),
                 // Ignore any other digit
                 Ok(Key::Digit(_)) => (),
                 // Cancel key cancels
-                Ok(Key::Cancel) => return Err(Error::Cancel),
+                Ok(Key::Cancel) => break Err(Error::Cancel),
                 // Ignore any other key
                 Ok(_) => (),
                 // User interaction timeout
-                Err(TimeoutError) => return Err(Error::UserTimeout),
+                Err(TimeoutError) => break Err(Error::UserTimeout),
             }
         }
     }
@@ -300,13 +303,13 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
         loop {
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
                 // Enter key confirms purchase
-                Ok(Key::Enter) => return Ok(()),
+                Ok(Key::Enter) => break Ok(()),
                 // Cancel key cancels
-                Ok(Key::Cancel) => return Err(Error::Cancel),
+                Ok(Key::Cancel) => break Err(Error::Cancel),
                 // Ignore any other key
                 Ok(_) => (),
                 // User interaction timeout
-                Err(TimeoutError) => return Err(Error::UserTimeout),
+                Err(TimeoutError) => break Err(Error::UserTimeout),
             }
         }
     }
@@ -328,6 +331,8 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
         );
 
         self.display.screen(&screen::PleaseWait::Purchasing).await?;
+
+        // Connect to Vereinsflieger API
         let mut vf = self.vereinsflieger.connect(self.http).await?;
 
         // Store purchase
