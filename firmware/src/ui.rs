@@ -228,40 +228,35 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
     async fn authenticate_user(&mut self) -> Result<UserId, Error> {
         info!("UI: Waiting for NFC card...");
 
-        let mut saving_power = false;
         loop {
-            // Show scan prompt unless power saving is active
-            if !saving_power {
-                self.display.screen(&screen::ScanId).await?;
-            }
-            // Wait for id card read, keypress or timeout
-            let uid = match with_timeout(IDLE_TIMEOUT, select(self.nfc.read(), self.keypad.read()))
-                .await
-            {
+            self.display.screen(&screen::ScanId).await?;
+
+            // Wait for id card read or timeout
+            #[allow(clippy::single_match_else)]
+            let uid = match with_timeout(IDLE_TIMEOUT, self.nfc.read()).await {
                 // Id card detected
-                Ok(Either::First(res)) => res?,
-                // Key pressed while saving power, leave power saving
-                Ok(Either::Second(_key)) if saving_power => {
-                    saving_power = false;
-                    continue;
-                }
+                Ok(res) => res?,
                 // Idle timeout, enter power saving
-                Err(TimeoutError) if !saving_power => {
+                Err(TimeoutError) => {
                     self.power_save().await?;
-                    saving_power = true;
-                    continue;
+                    // Wait for id card read or keypress
+                    match select(self.nfc.read(), self.keypad.read()).await {
+                        // Id card detected
+                        Either::First(res) => res?,
+                        // Key pressed while saving power, leave power saving
+                        Either::Second(_key) => continue,
+                    }
                 }
-                // Otherwise, do nothing
-                _ => continue,
             };
-            saving_power = false;
+
             // Look up user id by detected NFC uid
-            if let Some(id) = self.users.id(&uid) {
+            if let Some(user_id) = self.users.id(&uid) {
                 // User found, authorized
-                info!("UI: NFC card {} identified as user {}", uid, id);
+                info!("UI: NFC card {} identified as user {}", uid, user_id);
                 let _ = self.buzzer.confirm().await;
-                break Ok(id);
+                break Ok(user_id);
             }
+
             // User not found, unauthorized
             info!("UI: NFC card {} unknown, rejecting", uid);
             let _ = self.buzzer.deny().await;
