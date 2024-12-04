@@ -161,7 +161,8 @@ impl<M: fmt::Display> Screen for Failure<M> {
 /// Wait while a lengthy action is in progress
 pub enum PleaseWait {
     WifiConnecting,
-    ApiQuerying,
+    UpdatingData,
+    Purchasing,
 }
 
 impl Screen for PleaseWait {
@@ -175,7 +176,8 @@ impl Screen for PleaseWait {
             26 + 12,
             match self {
                 Self::WifiConnecting => "WLAN Verbindung\nwird aufgebaut",
-                Self::ApiQuerying => "Vereinsflieger\nAbfrage",
+                Self::UpdatingData => "Daten-Aktualisierung",
+                Self::Purchasing => "Zahlung wird\nbearbeitet",
             },
             target,
         )?;

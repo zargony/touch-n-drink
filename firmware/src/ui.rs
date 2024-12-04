@@ -160,7 +160,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         info!("UI: Refreshing articles and users...");
 
         self.display
-            .screen(&screen::PleaseWait::ApiQuerying)
+            .screen(&screen::PleaseWait::UpdatingData)
             .await?;
         let mut vf = self.vereinsflieger.connect(self.http).await?;
 
@@ -332,9 +332,7 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
             amount, article_id, total_price, user_id
         );
 
-        self.display
-            .screen(&screen::PleaseWait::ApiQuerying)
-            .await?;
+        self.display.screen(&screen::PleaseWait::Purchasing).await?;
         let mut vf = self.vereinsflieger.connect(self.http).await?;
 
         // Store purchase
