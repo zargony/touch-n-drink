@@ -4,6 +4,17 @@ Touch 'n Drink is a small device that reads NFC id cards of club members of the 
 
 <img alt="Assembled device" src="images/device-assembled.jpg" style="width: 20em;" />
 
+## Features
+
+- Fetches authorized users and list of articles for sale from [Vereinsflieger] API
+- Allows users to identify with NFC tag or id card and purchase articles
+- Optional event tracking using [Mixpanel] for usage analytics
+- Connects to 2.4 GHz WPA2/WPA3 Wifi (IPv4, DHCP)
+- Simple numeric keypad and large, bright OLED display
+- Power supply using standard USB-C cable (PD not required)
+- Ergonomically priced and widely available hardware components
+- Magnetic wall mount
+
 ## Hardware
 
 ESP32-C3, Keypad, OLED Display and NFC reader in a custom acrylic case. See [hardware] folder for details.
@@ -38,4 +49,6 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 [EDLH]: https://skyvector.com/airport/EDLH/Hamm-Lippewiesen-Airport
 [LSC Hamm]: https://flugplatz-hamm.de
 [MIT License]: https://opensource.org/license/mit
+[Mixpanel]: https://mixpanel.com
 [Rust]: https://www.rust-lang.org
+[Vereinsflieger]: https://www.vereinsflieger.de
