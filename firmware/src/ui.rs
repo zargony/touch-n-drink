@@ -5,6 +5,7 @@ use crate::error::Error;
 use crate::http::Http;
 use crate::keypad::{Key, Keypad};
 use crate::nfc::Nfc;
+use crate::schedule::Daily;
 use crate::screen;
 use crate::user::{UserId, Users};
 use crate::vereinsflieger::Vereinsflieger;
@@ -49,6 +50,7 @@ pub struct Ui<'a, RNG, I2C, IRQ> {
     vereinsflieger: &'a mut Vereinsflieger<'a>,
     articles: &'a mut Articles<1>,
     users: &'a mut Users,
+    schedule: &'a mut Daily,
 }
 
 impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C, IRQ> {
@@ -65,6 +67,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         vereinsflieger: &'a mut Vereinsflieger<'a>,
         articles: &'a mut Articles<1>,
         users: &'a mut Users,
+        schedule: &'a mut Daily,
     ) -> Self {
         Self {
             rng,
@@ -77,6 +80,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
             vereinsflieger,
             articles,
             users,
+            schedule,
         }
     }
 
@@ -191,8 +195,14 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
 
     /// Run the user interface flow
     pub async fn run(&mut self) -> Result<(), Error> {
-        // Wait for id card and verify identification
-        let user_id = self.authenticate_user().await?;
+        // Either wait for id card read or schedule time
+        let schedule_timer = self.schedule.timer();
+        let user_id = match select(self.authenticate_user(), schedule_timer).await {
+            // Id card read
+            Either::First(res) => res?,
+            // Schedule time
+            Either::Second(()) => return self.schedule().await,
+        };
 
         // Get user information
         let user = self.users.get(user_id);
@@ -220,6 +230,20 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         // Show success and affirm to take drinks
         self.show_success(num_drinks).await?;
 
+        Ok(())
+    }
+
+    /// Run schedule
+    pub async fn schedule(&mut self) -> Result<(), Error> {
+        if self.schedule.is_expired() {
+            info!("UI: Running schedule...");
+
+            // Schedule next event
+            self.schedule.schedule_next();
+
+            // Refresh article and user information
+            self.refresh_articles_and_users().await?;
+        }
         Ok(())
     }
 }
