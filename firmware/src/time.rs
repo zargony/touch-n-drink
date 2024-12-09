@@ -1,4 +1,4 @@
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, TimeDelta, TimeZone, Utc};
 use core::cell::RefCell;
 use embassy_sync::blocking_mutex::CriticalSectionMutex;
 use embassy_time::Instant;
@@ -49,13 +49,14 @@ pub fn uptime() -> Option<TimeDelta> {
     Instant::now().to_duration()
 }
 
-/// Current time
+/// Current time. Always given in UTC since the local timezone is unknown.
 pub fn now() -> Option<DateTime<Utc>> {
     Instant::now().to_datetime()
 }
 
 /// Set current time by using the given current time to calculate the time of system start
-pub fn set(now: DateTime<Utc>) {
+pub fn set<TZ: TimeZone>(now: &DateTime<TZ>) {
+    let now = now.with_timezone(&Utc);
     if let Some(uptime) = uptime() {
         set_start_time(now - uptime);
         debug!("Time: Current time set to {}", now);

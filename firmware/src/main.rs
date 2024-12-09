@@ -49,6 +49,7 @@ mod json;
 mod keypad;
 mod nfc;
 mod pn532;
+mod schedule;
 mod screen;
 mod time;
 mod ui;
@@ -217,6 +218,9 @@ async fn main(spawner: Spawner) {
     let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
     let _ = buzzer.startup().await;
 
+    // Initialize scheduler
+    let mut schedule = schedule::Daily::new();
+
     // Create UI
     let mut ui = ui::Ui::new(
         rng,
@@ -229,10 +233,8 @@ async fn main(spawner: Spawner) {
         &mut vereinsflieger,
         &mut articles,
         &mut users,
+        &mut schedule,
     );
-
-    // Show splash screen for a while, ignore any error
-    let _ = ui.show_splash().await;
 
     loop {
         match ui.init().await {
