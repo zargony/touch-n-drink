@@ -28,7 +28,7 @@ pub enum Error {
     /// Failed to purchase
     Purchase(http::Error),
     /// Failed to connect to API server
-    Connection(http::Error),
+    Connect(http::Error),
     /// Failed to sign in to API server
     SignIn(http::Error),
 }
@@ -40,7 +40,7 @@ impl fmt::Display for Error {
             Self::FetchArticles(err) => write!(f, "VF fetch articles failed ({err})"),
             Self::FetchUsers(err) => write!(f, "VF fetch users failed ({err})"),
             Self::Purchase(err) => write!(f, "VF purchase failed ({err})"),
-            Self::Connection(err) => write!(f, "VF connect failed ({err})"),
+            Self::Connect(err) => write!(f, "VF connect failed ({err})"),
             Self::SignIn(err) => write!(f, "VF sign in failed ({err})"),
         }
     }
@@ -70,7 +70,7 @@ impl fmt::Debug for Vereinsflieger<'_> {
 }
 
 impl<'a> Vereinsflieger<'a> {
-    /// Create new Vereinsflieger API client using the given TCP and DNS sockets
+    /// Create new Vereinsflieger API client using the given credentials
     pub fn new(
         username: &'a str,
         password_md5: &'a str,
@@ -254,7 +254,7 @@ impl<'a> Connection<'a> {
     /// in. Return connection for authenticated API requests.
     async fn new(vf: &'a mut Vereinsflieger<'_>, http: &'a mut Http<'_>) -> Result<Self, Error> {
         // Connect to API server
-        let mut connection = http.connect(BASE_URL).await.map_err(Error::Connection)?;
+        let mut connection = http.connect(BASE_URL).await.map_err(Error::Connect)?;
 
         // If exist, check validity of access token
         if let Some(ref accesstoken) = vf.accesstoken {
@@ -269,7 +269,7 @@ impl<'a> Connection<'a> {
                     debug!("Vereinsflieger: Access token expired");
                     vf.accesstoken = None;
                 }
-                Err(err) => return Err(Error::Connection(err)),
+                Err(err) => return Err(Error::Connect(err)),
             }
         }
 
