@@ -82,70 +82,70 @@ impl FromJsonObject for UserListResponse {
 
 /// User
 #[derive(Debug, Default)]
-pub struct User {
-    // pub uid: u32,
-    // pub title: String,
-    pub firstname: String,
-    pub lastname: String,
-    // pub careof: String,
-    // pub street: String,
-    // pub postofficebox: String, // undocumented
-    // pub zipcode: String,
-    // pub town: String,
-    // pub email: String,
-    // pub gender: String,
-    // pub birthday: String, // "dd.mm.yyyy"
-    // pub birthplace: String,
-    // pub homenumber: String,
-    // pub mobilenumber: String,
-    // pub phonenumber: String,
-    // pub phonenumber2: String,
-    // pub carlicenseplate: String,
-    // pub identification: String,
-    // pub natoid: String,
-    // pub policecert_validto: String, // "yyyy-mm-dd"
-    // pub ice_contact1: String,
-    // pub ice_contact2: String,
-    pub memberid: u32,
-    // pub msid: String, // undocumented
-    // pub memberbegin: String, // "dd.mm.yyyy"
-    // pub memberend: String, // "yyyy-mm-dd"
-    // pub lettertitle: String,
-    // pub cid: String, // undocumented
-    // pub nickname: String, // undocumented
-    // pub clid: String, // undocumented
-    // pub flightrelease: String, // undocumented
-    // pub flightreleasevalidto: String, // undocumented "yyyy-mm-dd"
-    // pub flightdiscount: String, // undocumented
-    // pub flightdiscount2: String, // undocumented
-    // pub flightdiscount3: String, // undocumented
-    // pub flightdiscount4: String, // undocumented
-    // pub flightdiscount5: String, // undocumented
-    // pub flightdiscount6: String, // undocumented
-    pub memberstatus: String,
-    // pub country: String,
-    // pub bankaccountname: String,
-    // pub bankaccountinfo: String, // undocumented
-    // pub directdebitauth: u32,
-    // pub iban: String,
-    // pub bic: String,
-    // pub mandate: String,
-    // pub roles: Vec<String>,
-    // pub mandatedate: String, // "yyyy-mm-dd"
-    // pub mailrecipient: u32,
-    // pub sector: Vec<String>,
-    // pub functions: Vec<String>,
-    // pub educations: Vec<String>,
-    // pub prop0: [String, String],
-    // pub prop1: [String, String],
-    // pub prop2: [String, String],
-    // pub accounts: Vec<UserAccountDescription>,
-    pub keymanagement: Vec<Key>,
-    // pub stateassociation: Vec<String>,
-    // pub key1designation: String, // undocumented
-    // pub key2designation: String, // undocumented
-    // pub keyrfid: String, // undocumented
-    // pub whtodo: UserWhTodoList, // undocumented
+struct User {
+    // uid: u32,
+    // title: String,
+    firstname: String,
+    lastname: String,
+    // careof: String,
+    // street: String,
+    // postofficebox: String, // undocumented
+    // zipcode: String,
+    // town: String,
+    // email: String,
+    // gender: String,
+    // birthday: String, // "dd.mm.yyyy"
+    // birthplace: String,
+    // homenumber: String,
+    // mobilenumber: String,
+    // phonenumber: String,
+    // phonenumber2: String,
+    // carlicenseplate: String,
+    // identification: String,
+    // natoid: String,
+    // policecert_validto: String, // "yyyy-mm-dd"
+    // ice_contact1: String,
+    // ice_contact2: String,
+    memberid: u32,
+    // msid: String, // undocumented
+    // memberbegin: String, // "dd.mm.yyyy"
+    // memberend: String, // "yyyy-mm-dd"
+    // lettertitle: String,
+    // cid: String, // undocumented
+    // nickname: String, // undocumented
+    // clid: String, // undocumented
+    // flightrelease: String, // undocumented
+    // flightreleasevalidto: String, // undocumented "yyyy-mm-dd"
+    // flightdiscount: String, // undocumented
+    // flightdiscount2: String, // undocumented
+    // flightdiscount3: String, // undocumented
+    // flightdiscount4: String, // undocumented
+    // flightdiscount5: String, // undocumented
+    // flightdiscount6: String, // undocumented
+    memberstatus: String,
+    // country: String,
+    // bankaccountname: String,
+    // bankaccountinfo: String, // undocumented
+    // directdebitauth: u32,
+    // iban: String,
+    // bic: String,
+    // mandate: String,
+    // roles: Vec<String>,
+    // mandatedate: String, // "yyyy-mm-dd"
+    // mailrecipient: u32,
+    // sector: Vec<String>,
+    // functions: Vec<String>,
+    // educations: Vec<String>,
+    // prop0: [String, String],
+    // prop1: [String, String],
+    // prop2: [String, String],
+    // accounts: Vec<UserAccountDescription>,
+    keymanagement: Vec<Key>,
+    // stateassociation: Vec<String>,
+    // key1designation: String, // undocumented
+    // key2designation: String, // undocumented
+    // keyrfid: String, // undocumented
+    // whtodo: UserWhTodoList, // undocumented
 }
 
 impl FromJsonObject for User {
@@ -171,12 +171,12 @@ impl FromJsonObject for User {
 
 impl User {
     /// Whether the user has/was retired ("ausgeschieden")
-    pub fn is_retired(&self) -> bool {
+    fn is_retired(&self) -> bool {
         self.memberstatus.to_lowercase().contains("ausgeschieden")
     }
 
     /// Get key numbers with the given label prefix
-    pub fn keys_named_with_prefix(&self, prefix: &str) -> Vec<&str> {
+    fn keys_named_with_prefix(&self, prefix: &str) -> Vec<&str> {
         self.keymanagement
             .iter()
             .filter(|key| key.title.starts_with(prefix))
@@ -187,12 +187,12 @@ impl User {
 
 /// User keymanagement
 #[derive(Debug, Default)]
-pub struct Key {
+struct Key {
     /// Key label
-    pub title: String,
+    title: String,
     /// Key number
-    pub keyname: String,
-    // pub rfidkey: u32, // undocumented
+    keyname: String,
+    // rfidkey: u32, // undocumented
 }
 
 impl FromJsonObject for Key {
