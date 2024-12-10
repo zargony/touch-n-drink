@@ -1,13 +1,13 @@
 // Use custom pn532 driver instead of pn532 crate
 use crate::pn532;
 
+use const_hex::FromHex;
 use core::convert::Infallible;
 use core::fmt::{self, Debug};
 use core::str::FromStr;
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
-use hex::FromHex;
 use log::{debug, info, warn};
 use pn532::{Error as Pn532Error, I2CInterfaceWithIrq, Pn532, Request, SAMMode};
 
