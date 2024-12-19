@@ -1,6 +1,8 @@
 // Use custom pn532 driver instead of pn532 crate
 use crate::pn532;
 
+use crate::json::{self, ToJson};
+use alloc::string::ToString;
 use const_hex::FromHex;
 use core::convert::Infallible;
 use core::fmt::{self, Debug};
@@ -8,6 +10,7 @@ use core::str::FromStr;
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
+use embedded_io_async::Write;
 use log::{debug, info, warn};
 use pn532::{Error as Pn532Error, I2CInterfaceWithIrq, Pn532, Request, SAMMode};
 
@@ -265,5 +268,14 @@ impl AsRef<[u8]> for Uid {
             Self::Double(bytes) => bytes,
             Self::Triple(bytes) => bytes,
         }
+    }
+}
+
+impl ToJson for Uid {
+    async fn to_json<W: Write>(
+        &self,
+        json: &mut json::Writer<W>,
+    ) -> Result<(), json::Error<W::Error>> {
+        json.write(self.to_string()).await
     }
 }

@@ -2,7 +2,6 @@ use crate::http::Http;
 use crate::mixpanel::{self, Mixpanel};
 use crate::{article, json, nfc, user};
 use alloc::collections::VecDeque;
-use alloc::string::ToString;
 use embassy_time::{Duration, Instant};
 use embedded_io_async::Write;
 use log::{debug, info, warn};
@@ -72,10 +71,10 @@ impl Event {
                     .await?;
             }
             Event::AuthenticationFailed(uid) => {
-                object.field("uid", uid.to_string()).await?;
+                object.field("uid", uid).await?;
             }
             Event::UserAuthenticated(_user_id, uid) => {
-                object.field("uid", uid.to_string()).await?;
+                object.field("uid", uid).await?;
             }
             Event::ArticlePurchased(_user_id, article_id, amount, total_price) => {
                 object
