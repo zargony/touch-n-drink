@@ -121,7 +121,12 @@ impl Screen for Splash {
         Image::new(&LOGO, Point::new(0, 13))
             .draw(target)
             .map_err(Error::DisplayError)?;
-        centered(&SPLASH_VERSION_FONT, 13 + 29, VERSION_STR, target)?;
+        centered(
+            &SPLASH_VERSION_FONT,
+            13 + 29,
+            format_args!("v{VERSION_STR}"),
+            target,
+        )?;
         #[cfg(not(debug_assertions))]
         footer("", GIT_SHA_STR, target)?;
         #[cfg(debug_assertions)]

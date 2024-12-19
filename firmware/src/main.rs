@@ -77,7 +77,7 @@ use rand_core::RngCore;
 
 extern crate alloc;
 
-static VERSION_STR: &str = concat!("v", env!("CARGO_PKG_VERSION"));
+static VERSION_STR: &str = env!("CARGO_PKG_VERSION");
 static GIT_SHA_STR: &str = env!("GIT_SHORT_SHA");
 
 /// Delay in seconds after which to restart on panic
@@ -128,7 +128,7 @@ async fn main(spawner: Spawner) {
 
     // Initialize logging
     esp_println::logger::init_logger_from_env();
-    info!("Touch 'n Drink {VERSION_STR} ({GIT_SHA_STR})");
+    info!("Touch 'n Drink v{VERSION_STR} ({GIT_SHA_STR})");
 
     // Read system configuration
     let config = config::Config::read().await;
