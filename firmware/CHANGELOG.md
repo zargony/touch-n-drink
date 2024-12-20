@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 - Automatically refresh article and user information once a day
+- Event tracking using Mixpanel for usage analytics
 
 ## 0.2.0 - 2024-11-27
 

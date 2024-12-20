@@ -158,6 +158,12 @@ impl From<Vec<Value>> for Value {
     }
 }
 
+impl<const N: usize> From<[(&str, Value); N]> for Value {
+    fn from(value: [(&str, Value); N]) -> Self {
+        Self::Object(value.map(|(k, v)| (k.into(), v)).into())
+    }
+}
+
 impl<const N: usize> From<[(String, Value); N]> for Value {
     fn from(value: [(String, Value); N]) -> Self {
         Self::Object(value.into())

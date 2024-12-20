@@ -97,14 +97,14 @@ impl<'a> Vereinsflieger<'a> {
 
 /// Vereinsflieger API client connection
 pub struct Connection<'a> {
-    connection: http::Connection<'a>,
+    http: http::Connection<'a>,
     accesstoken: &'a AccessToken,
 }
 
 impl fmt::Debug for Connection<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Connection")
-            .field("connection", &self.connection)
+            .field("http", &self.http)
             .field("accesstoken", &"<redacted>")
             .finish()
     }
@@ -117,7 +117,7 @@ impl Connection<'_> {
         use proto_auth::{UserInformationRequest, UserInformationResponse};
 
         let response: UserInformationResponse = self
-            .connection
+            .http
             .post(
                 "auth/getuser",
                 &UserInformationRequest {
@@ -145,7 +145,7 @@ impl Connection<'_> {
         .map_err(Error::FetchArticles)?;
         let mut rx_buf = [0; 4096];
         let mut json = self
-            .connection
+            .http
             .post_json("articles/list", &request_body, &mut rx_buf)
             .await
             .map_err(Error::FetchArticles)?;
@@ -185,7 +185,7 @@ impl Connection<'_> {
         .map_err(Error::FetchUsers)?;
         let mut rx_buf = [0; 4096];
         let mut json = self
-            .connection
+            .http
             .post_json("user/list", &request_body, &mut rx_buf)
             .await
             .map_err(Error::FetchUsers)?;
@@ -229,7 +229,7 @@ impl Connection<'_> {
         );
 
         let _response: SaleAddResponse = self
-            .connection
+            .http
             .post(
                 "sale/add",
                 &SaleAddRequest {
@@ -317,7 +317,7 @@ impl<'a> Connection<'a> {
 
         match vf.accesstoken {
             Some(ref accesstoken) => Ok(Self {
-                connection,
+                http: connection,
                 accesstoken,
             }),
             // Actually unreachable

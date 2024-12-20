@@ -28,7 +28,7 @@ pub struct User {
 #[derive(Debug)]
 pub struct Users {
     /// Look up NFC uid to user id
-    ids: BTreeMap<Uid, UserId>,
+    uids: BTreeMap<Uid, UserId>,
     /// Look up user id to user details
     users: BTreeMap<UserId, User>,
 }
@@ -37,7 +37,7 @@ impl Users {
     /// Create new user lookup table
     pub fn new() -> Self {
         let mut this = Self {
-            ids: BTreeMap::new(),
+            uids: BTreeMap::new(),
             users: BTreeMap::new(),
         };
         this.clear();
@@ -46,12 +46,12 @@ impl Users {
 
     /// Clear all user information
     pub fn clear(&mut self) {
-        self.ids.clear();
+        self.uids.clear();
         self.users.clear();
 
         // Add extra uids and user for testing
         for (uid, id) in &EXTRA_UIDS {
-            self.ids.insert(uid.clone(), *id);
+            self.uids.insert(uid.clone(), *id);
             self.users.entry(*id).or_insert_with(|| User {
                 name: String::from("Test-User"),
             });
@@ -60,12 +60,17 @@ impl Users {
 
     /// Add/update NFC uid for given user id
     pub fn update_uid(&mut self, uid: Uid, id: UserId) {
-        self.ids.insert(uid, id);
+        self.uids.insert(uid, id);
     }
 
     /// Add/update user with given user id
     pub fn update_user(&mut self, id: UserId, name: String) {
         self.users.insert(id, User { name });
+    }
+
+    /// Number of uids
+    pub fn count_uids(&self) -> usize {
+        self.uids.len()
     }
 
     /// Number of users
@@ -75,7 +80,7 @@ impl Users {
 
     /// Look up user id by NFC uid
     pub fn id(&self, uid: &Uid) -> Option<UserId> {
-        self.ids.get(uid).copied()
+        self.uids.get(uid).copied()
     }
 
     /// Look up user by user id

@@ -42,7 +42,7 @@ impl fmt::Display for SensitiveString {
 }
 
 impl Deref for SensitiveString {
-    type Target = String;
+    type Target = str;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -65,6 +65,8 @@ pub struct Config {
     pub wifi_ssid: String,
     /// Wifi password
     pub wifi_password: SensitiveString,
+    /// Mixpanel project token for analytics (optional)
+    pub mp_token: Option<String>,
     /// Vereinsflieger API username
     pub vf_username: String,
     /// MD5 (hex) of Vereinsflieger API password
@@ -89,6 +91,11 @@ impl FromJsonObject for Config {
         match &*key {
             "wifi-ssid" => self.wifi_ssid = json.read().await?,
             "wifi-password" => self.wifi_password = json.read().await?,
+            // Don't use telemetry in debug builds, unless explicitly specified
+            #[cfg(not(debug_assertions))]
+            "mp-token" => self.mp_token = Some(json.read().await?),
+            #[cfg(debug_assertions)]
+            "mp-token-debug" => self.mp_token = Some(json.read().await?),
             "vf-username" => self.vf_username = json.read().await?,
             "vf-password-md5" => self.vf_password_md5 = json.read().await?,
             "vf-appkey" => self.vf_appkey = json.read().await?,

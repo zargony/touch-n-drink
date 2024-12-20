@@ -73,11 +73,11 @@ impl<const N: usize> FromJsonObject for ArticleListResponse<N> {
 
 /// Article
 #[derive(Debug, Default)]
-pub struct Article {
-    pub articleid: String,
-    pub designation: String,
-    pub unittype: String,
-    pub prices: Vec<ArticlePrice>,
+struct Article {
+    articleid: String,
+    designation: String,
+    unittype: String,
+    prices: Vec<ArticlePrice>,
 }
 
 impl FromJsonObject for Article {
@@ -102,7 +102,7 @@ impl FromJsonObject for Article {
 
 impl Article {
     /// Get today's price
-    pub fn price(&self) -> Option<f32> {
+    fn price(&self) -> Option<f32> {
         // TODO: Get a current date and do a real price selection based on validity dates.
         // For now, we make sure to end up with the last entry valid until 9999-12-31, if any, or
         // any last entry otherwise.
@@ -118,11 +118,11 @@ impl Article {
 
 /// Article price
 #[derive(Debug, Default)]
-pub struct ArticlePrice {
-    pub validfrom: String, // "yyyy-mm-dd"
-    pub validto: String,   // "yyyy-mm-dd"
-    pub salestax: f32,
-    pub unitprice: f32,
+struct ArticlePrice {
+    validfrom: String, // "yyyy-mm-dd"
+    validto: String,   // "yyyy-mm-dd"
+    salestax: f32,
+    unitprice: f32,
 }
 
 impl FromJsonObject for ArticlePrice {
