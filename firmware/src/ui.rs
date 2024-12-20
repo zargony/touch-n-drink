@@ -1,7 +1,7 @@
 use crate::article::{ArticleId, Articles};
 use crate::buzzer::Buzzer;
 use crate::display::Display;
-use crate::error::Error;
+use crate::error::{Error, ErrorKind};
 use crate::http::Http;
 use crate::keypad::{Key, Keypad};
 use crate::nfc::Nfc;
@@ -13,7 +13,6 @@ use crate::vereinsflieger::Vereinsflieger;
 use crate::wifi::Wifi;
 use alloc::string::String;
 use core::convert::Infallible;
-use core::fmt;
 use embassy_futures::select::{select, Either};
 use embassy_time::{with_timeout, Duration, TimeoutError, Timer};
 use embedded_hal_async::digital::Wait;
@@ -107,15 +106,13 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
     }
 
     /// Show error screen and wait for keypress or timeout
-    pub async fn show_error<M: fmt::Display>(
-        &mut self,
-        message: M,
-        interactive: bool,
-    ) -> Result<(), Error> {
-        info!("UI: Displaying error: {}", message);
+    pub async fn show_error(&mut self, error: &Error) -> Result<(), Error> {
+        info!("UI: Displaying error: {}", error);
 
-        self.display.screen(&screen::Failure::new(message)).await?;
-        if interactive {
+        self.display.screen(&screen::Failure::new(error)).await?;
+
+        // Sound the error buzzer if the error was caused by a user's interaction
+        if error.user_id().is_some() {
             let _ = self.buzzer.error().await;
         }
 
@@ -128,7 +125,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
             // Cancel key cancels
             Ok(()) => Ok(()),
             // User interaction timeout
-            Err(TimeoutError) => Err(Error::UserTimeout),
+            Err(TimeoutError) => Err(ErrorKind::UserTimeout)?,
         }
     }
 
@@ -150,9 +147,9 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
             // Network has become available
             Ok(Either::First(())) => Ok(()),
             // Cancel key cancels
-            Ok(Either::Second(())) => Err(Error::Cancel),
+            Ok(Either::Second(())) => Err(ErrorKind::Cancel)?,
             // Timeout waiting for network
-            Err(TimeoutError) => Err(Error::NoNetwork),
+            Err(TimeoutError) => Err(ErrorKind::NoNetwork)?,
         }
     }
 
@@ -241,39 +238,49 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
             // Id card read
             Either::First(res) => res?,
             // Schedule time
-            Either::Second(()) => return self.schedule().await,
+            Either::Second(()) => {
+                self.schedule().await?;
+                return Ok(());
+            }
         };
 
-        // Get user information
-        let user = self.users.get(user_id);
-        let user_name = user.map_or(String::new(), |u| u.name.clone());
+        Error::try_with_async(user_id, async {
+            // Get user information
+            let user = self.users.get(user_id);
+            let user_name = user.map_or(String::new(), |u| u.name.clone());
 
-        // Ask for number of drinks
-        let num_drinks = self.get_number_of_drinks(&user_name).await?;
+            // Ask for number of drinks
+            let num_drinks = self.get_number_of_drinks(&user_name).await?;
 
-        // Get article information
-        let article_id = self.articles.id(0).ok_or(Error::ArticleNotFound)?.clone();
-        let article = self.articles.get(0).ok_or(Error::ArticleNotFound)?;
+            // Get article information
+            let article_id = self
+                .articles
+                .id(0)
+                .ok_or(ErrorKind::ArticleNotFound)?
+                .clone();
+            let article = self.articles.get(0).ok_or(ErrorKind::ArticleNotFound)?;
 
-        // Calculate total price. It's ok to cast num_drinks to f32 as it's always a small number.
-        #[allow(clippy::cast_precision_loss)]
-        let amount = num_drinks as f32;
-        let total_price = article.price * amount;
+            // Calculate total price. It's ok to cast num_drinks to f32 as it's always a small number.
+            #[allow(clippy::cast_precision_loss)]
+            let amount = num_drinks as f32;
+            let total_price = article.price * amount;
 
-        // Show total price and ask for confirmation
-        self.confirm_purchase(num_drinks, total_price).await?;
+            // Show total price and ask for confirmation
+            self.confirm_purchase(num_drinks, total_price).await?;
 
-        // Store purchase
-        self.purchase(&article_id, amount, user_id, total_price)
-            .await?;
+            // Store purchase
+            self.purchase(&article_id, amount, user_id, total_price)
+                .await?;
 
-        // Submit telemetry data if needed
-        self.submit_telemetry().await?;
+            // Submit telemetry data if needed
+            self.submit_telemetry().await?;
 
-        // Show success and affirm to take drinks
-        self.show_success(num_drinks).await?;
+            // Show success and affirm to take drinks
+            self.show_success(num_drinks).await?;
 
-        Ok(())
+            Ok(())
+        })
+        .await
     }
 
     /// Run schedule
@@ -350,11 +357,11 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
                 // Ignore any other digit
                 Ok(Key::Digit(_)) => (),
                 // Cancel key cancels
-                Ok(Key::Cancel) => break Err(Error::Cancel),
+                Ok(Key::Cancel) => Err(ErrorKind::Cancel)?,
                 // Ignore any other key
                 Ok(_) => (),
                 // User interaction timeout
-                Err(TimeoutError) => break Err(Error::UserTimeout),
+                Err(TimeoutError) => Err(ErrorKind::UserTimeout)?,
             }
         }
     }
@@ -374,11 +381,11 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
                 // Enter key confirms purchase
                 Ok(Key::Enter) => break Ok(()),
                 // Cancel key cancels
-                Ok(Key::Cancel) => break Err(Error::Cancel),
+                Ok(Key::Cancel) => Err(ErrorKind::Cancel)?,
                 // Ignore any other key
                 Ok(_) => (),
                 // User interaction timeout
-                Err(TimeoutError) => break Err(Error::UserTimeout),
+                Err(TimeoutError) => Err(ErrorKind::UserTimeout)?,
             }
         }
     }
@@ -435,7 +442,7 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
             // Enter key continues
             Ok(()) => Ok(()),
             // User interaction timeout
-            Err(TimeoutError) => Err(Error::UserTimeout),
+            Err(TimeoutError) => Err(ErrorKind::UserTimeout)?,
         }
     }
 }
