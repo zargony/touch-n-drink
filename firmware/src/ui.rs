@@ -11,7 +11,7 @@ use crate::telemetry::{Event, Telemetry};
 use crate::user::{UserId, Users};
 use crate::vereinsflieger::Vereinsflieger;
 use crate::wifi::Wifi;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use core::convert::Infallible;
 use embassy_futures::select::{select, Either};
 use embassy_time::{with_timeout, Duration, TimeoutError, Timer};
@@ -115,6 +115,9 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         if error.user_id().is_some() {
             let _ = self.buzzer.error().await;
         }
+
+        self.telemetry
+            .track(Event::Error(error.user_id(), error.to_string()));
 
         // Wait at least 1s without responding to keypad
         let min_time = Duration::from_secs(1);
