@@ -255,7 +255,7 @@ async fn main(spawner: Spawner) {
             // Display error to user and try again
             Err(err) => {
                 error!("Initialization error: {:?}", err);
-                let _ = ui.show_error(&err).await;
+                let _ = ui.show_error(err).await;
             }
         }
     }
@@ -273,7 +273,7 @@ async fn main(spawner: Spawner) {
             // Display error to user and start over again
             Err(err) => {
                 error!("Error: {:?}", err);
-                let _ = ui.show_error(&err).await;
+                let _ = ui.show_error(err).await;
             }
         }
     }

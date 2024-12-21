@@ -1,6 +1,6 @@
 use crate::http::Http;
 use crate::mixpanel::{self, Mixpanel};
-use crate::{article, json, nfc, user};
+use crate::{article, error, json, nfc, user};
 use alloc::collections::VecDeque;
 use embassy_time::{Duration, Instant};
 use embedded_io_async::Write;
@@ -28,6 +28,8 @@ pub enum Event {
     UserAuthenticated(user::UserId, nfc::Uid),
     /// Article purchased (user id, article id, amount, total price)
     ArticlePurchased(user::UserId, article::ArticleId, f32, f32),
+    /// Error occured
+    Error(error::Error),
 }
 
 impl Event {
@@ -39,18 +41,20 @@ impl Event {
             Event::AuthenticationFailed(..) => "authentication_failed",
             Event::UserAuthenticated(..) => "user_authenticated",
             Event::ArticlePurchased(..) => "article_purchased",
+            Event::Error(..) => "error",
         }
     }
 
     /// User id associated with this event, if any
-    pub fn user_id(&self) -> Option<&user::UserId> {
+    pub fn user_id(&self) -> Option<user::UserId> {
         #[allow(clippy::match_same_arms)]
         match self {
             Event::SystemStart => None,
             Event::DataRefreshed(..) => None,
             Event::AuthenticationFailed(..) => None,
-            Event::UserAuthenticated(user_id, ..) => Some(user_id),
-            Event::ArticlePurchased(user_id, ..) => Some(user_id),
+            Event::UserAuthenticated(user_id, ..) => Some(*user_id),
+            Event::ArticlePurchased(user_id, ..) => Some(*user_id),
+            Event::Error(err) => err.user_id(),
         }
     }
 
@@ -84,6 +88,9 @@ impl Event {
                     .await?
                     .field("total_price", total_price)
                     .await?;
+            }
+            Event::Error(err) => {
+                object.field("error_message", err.kind()).await?;
             }
         }
         Ok(())

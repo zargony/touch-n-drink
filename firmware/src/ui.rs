@@ -106,15 +106,17 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
     }
 
     /// Show error screen and wait for keypress or timeout
-    pub async fn show_error(&mut self, error: &Error) -> Result<(), Error> {
+    pub async fn show_error(&mut self, error: Error) -> Result<(), Error> {
         info!("UI: Displaying error: {}", error);
 
-        self.display.screen(&screen::Failure::new(error)).await?;
+        self.display.screen(&screen::Failure::new(&error)).await?;
 
         // Sound the error buzzer if the error was caused by a user's interaction
         if error.user_id().is_some() {
             let _ = self.buzzer.error().await;
         }
+
+        self.telemetry.track(Event::Error(error));
 
         // Wait at least 1s without responding to keypad
         let min_time = Duration::from_secs(1);

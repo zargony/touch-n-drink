@@ -32,7 +32,6 @@ impl fmt::Display for Error {
 
 impl Error {
     /// Error kind
-    #[allow(dead_code)]
     pub fn kind(&self) -> &ErrorKind {
         &self.kind
     }
