@@ -261,6 +261,8 @@ async fn main(spawner: Spawner) {
     }
 
     loop {
+        // FIXME: Ui::run is a pretty large future, but pinning it to the heap seems even worse
+        #[allow(clippy::large_futures)]
         match ui.run().await {
             // Success: start over again
             Ok(()) => (),
