@@ -1,5 +1,5 @@
-use crate::error;
 use crate::{GIT_SHA_STR, VERSION_STR};
+use core::fmt;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::image::{Image, ImageRaw};
 use embedded_graphics::pixelcolor::BinaryColor;
@@ -136,23 +136,28 @@ impl Screen for Splash {
 }
 
 /// Failure screen
-pub struct Failure<'a> {
-    error: &'a error::Error,
+pub struct Failure<M> {
+    message: M,
 }
 
-impl<'a> Failure<'a> {
-    pub fn new(error: &'a error::Error) -> Self {
-        Self { error }
+impl<M: fmt::Display> Failure<M> {
+    pub fn new(message: M) -> Self {
+        Self { message }
     }
 }
 
-impl Screen for Failure<'_> {
+impl<M: fmt::Display> Screen for Failure<M> {
     fn draw<D: DrawTarget<Color = BinaryColor>>(
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
         centered(&TITLE_FONT, 26, "FEHLER!", target)?;
-        centered(&SMALL_FONT, 26 + 12, format_args!("{}", self.error), target)?;
+        centered(
+            &SMALL_FONT,
+            26 + 12,
+            format_args!("{}", self.message),
+            target,
+        )?;
         footer("* Abbruch", "", target)?;
         Ok(())
     }
