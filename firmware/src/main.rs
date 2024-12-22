@@ -248,28 +248,34 @@ async fn main(spawner: Spawner) {
 
     loop {
         match ui.init().await {
-            // Success or cancel: continue
-            Ok(()) | Err(error::Error::Cancel) => break,
+            // Success: continue
+            Ok(()) => break,
+            // User cancelled: continue
+            Err(err) if err.is_cancel() => break,
             // Display error to user and try again
             Err(err) => {
                 error!("Initialization error: {:?}", err);
-                let _ = ui.show_error(&err, false).await;
+                let _ = ui.show_error(&err).await;
             }
         }
     }
 
     loop {
+        // FIXME: Ui::run is a pretty large future, but pinning it to the heap seems even worse
+        #[allow(clippy::large_futures)]
         match ui.run().await {
             // Success: start over again
             Ok(()) => (),
-            // Cancel: start over again
-            Err(error::Error::Cancel) => info!("User cancelled, starting over..."),
-            // Timeout: start over again
-            Err(error::Error::UserTimeout) => info!("Timeout waiting for user, starting over..."),
+            // User cancelled: start over again
+            Err(err) if err.is_cancel() => info!("User cancelled, starting over..."),
+            // User interaction timeout: start over again
+            Err(err) if err.is_user_timeout() => {
+                info!("Timeout waiting for user, starting over...");
+            }
             // Display error to user and start over again
             Err(err) => {
-                error!("User flow error: {:?}", err);
-                let _ = ui.show_error(&err, true).await;
+                error!("Error: {:?}", err);
+                let _ = ui.show_error(&err).await;
             }
         }
     }

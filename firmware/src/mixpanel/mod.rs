@@ -4,11 +4,14 @@ use crate::http::{self, Http};
 use crate::telemetry::Event;
 use crate::time;
 use core::fmt;
-use embassy_time::Instant;
+use embassy_time::{with_timeout, Duration, Instant};
 use log::{debug, warn};
 
 /// Mixpanel API base URL
 const BASE_URL: &str = "https://api-eu.mixpanel.com";
+
+/// How long to wait for a server response
+const TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Mixpanel API error
 #[derive(Debug)]
@@ -19,6 +22,14 @@ pub enum Error {
     Connect(http::Error),
     /// Failed to submit events to API server
     Submit(http::Error),
+    /// Timeout waiting for response from API server
+    Timeout,
+}
+
+impl From<embassy_time::TimeoutError> for Error {
+    fn from(_err: embassy_time::TimeoutError) -> Self {
+        Self::Timeout
+    }
 }
 
 impl fmt::Display for Error {
@@ -27,6 +38,7 @@ impl fmt::Display for Error {
             Self::CurrentTimeNotSet => write!(f, "Unknown current time"),
             Self::Connect(err) => write!(f, "MP connect failed ({err})"),
             Self::Submit(err) => write!(f, "MP submit failed ({err})"),
+            Self::Timeout => write!(f, "MP timeout"),
         }
     }
 }
@@ -72,18 +84,19 @@ impl Connection<'_> {
         }
 
         debug!("Mixpanel: Submitting {} events...", events.len());
-        let response: TrackResponse = self
-            .http
-            .post(
+        let response: TrackResponse = with_timeout(
+            TIMEOUT,
+            self.http.post(
                 "track?verbose=1",
                 &TrackRequest {
                     token: self.token,
                     device_id: self.device_id,
                     events,
                 },
-            )
-            .await
-            .map_err(Error::Submit)?;
+            ),
+        )
+        .await?
+        .map_err(Error::Submit)?;
         debug!(
             "Mixpanel: Submit successul, status {} {}",
             response.status, response.error
@@ -96,7 +109,9 @@ impl<'a> Connection<'a> {
     /// Connect to API server
     async fn new(mp: &'a Mixpanel<'_>, http: &'a mut Http<'_>) -> Result<Self, Error> {
         // Connect to API server
-        let connection = http.connect(BASE_URL).await.map_err(Error::Connect)?;
+        let connection = with_timeout(TIMEOUT, http.connect(BASE_URL))
+            .await?
+            .map_err(Error::Connect)?;
 
         Ok(Self {
             http: connection,
