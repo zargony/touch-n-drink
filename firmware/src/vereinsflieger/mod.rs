@@ -51,13 +51,13 @@ impl From<embassy_time::TimeoutError> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::FetchUserInformation(err) => write!(f, "VF user info failed ({err})"),
-            Self::FetchArticles(err) => write!(f, "VF fetch articles failed ({err})"),
-            Self::FetchUsers(err) => write!(f, "VF fetch users failed ({err})"),
-            Self::Purchase(err) => write!(f, "VF purchase failed ({err})"),
-            Self::Connect(err) => write!(f, "VF connect failed ({err})"),
-            Self::SignIn(err) => write!(f, "VF sign in failed ({err})"),
-            Self::Timeout => write!(f, "VF timeout"),
+            Self::FetchUserInformation(err) => write!(f, "Fetch user info failed ({err})"),
+            Self::FetchArticles(err) => write!(f, "Fetch articles failed ({err})"),
+            Self::FetchUsers(err) => write!(f, "Fetch users failed ({err})"),
+            Self::Purchase(err) => write!(f, "Purchase failed ({err})"),
+            Self::Connect(err) => write!(f, "Connect failed ({err})"),
+            Self::SignIn(err) => write!(f, "Sign in failed ({err})"),
+            Self::Timeout => write!(f, "Timeout"),
         }
     }
 }

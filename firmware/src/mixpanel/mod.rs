@@ -36,9 +36,9 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::CurrentTimeNotSet => write!(f, "Unknown current time"),
-            Self::Connect(err) => write!(f, "MP connect failed ({err})"),
-            Self::Submit(err) => write!(f, "MP submit failed ({err})"),
-            Self::Timeout => write!(f, "MP timeout"),
+            Self::Connect(err) => write!(f, "Connect failed ({err})"),
+            Self::Submit(err) => write!(f, "Submit failed ({err})"),
+            Self::Timeout => write!(f, "Timeout"),
         }
     }
 }
