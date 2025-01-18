@@ -1,6 +1,7 @@
 use crate::json::{self, FromJson, ToJson};
 use crate::time;
 use crate::wifi::{DnsSocket, TcpClient, TcpConnection, Wifi};
+use alloc::vec;
 use alloc::vec::Vec;
 use chrono::DateTime;
 use core::convert::Infallible;
@@ -61,16 +62,16 @@ impl fmt::Display for Error {
 
 /// HTTP client resources
 pub struct Resources {
-    read_buffer: [u8; READ_BUFFER_SIZE],
-    write_buffer: [u8; WRITE_BUFFER_SIZE],
+    read_buffer: Vec<u8>,
+    write_buffer: Vec<u8>,
 }
 
 impl Resources {
     /// Create new HTTP client resources
     pub fn new() -> Self {
         Self {
-            read_buffer: [0; READ_BUFFER_SIZE],
-            write_buffer: [0; WRITE_BUFFER_SIZE],
+            read_buffer: vec![0; READ_BUFFER_SIZE],
+            write_buffer: vec![0; WRITE_BUFFER_SIZE],
         }
     }
 }
