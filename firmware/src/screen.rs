@@ -68,6 +68,25 @@ pub trait Screen {
     ) -> Result<(), Error<D::Error>>;
 }
 
+/// Draw left aligned text on given line
+fn left<D: DrawTarget<Color = BinaryColor>>(
+    font: &FontRenderer,
+    x: i32,
+    y: i32,
+    content: impl Content,
+    target: &mut D,
+) -> Result<(), Error<D::Error>> {
+    font.render_aligned(
+        content,
+        Point::new(x, y),
+        VerticalPosition::Baseline,
+        HorizontalAlignment::Left,
+        FontColor::Transparent(BinaryColor::On),
+        target,
+    )?;
+    Ok(())
+}
+
 /// Draw centered text on given line
 fn centered<D: DrawTarget<Color = BinaryColor>>(
     font: &FontRenderer,
@@ -86,32 +105,32 @@ fn centered<D: DrawTarget<Color = BinaryColor>>(
     Ok(())
 }
 
-/// Draw common footer (bottom 7 lines, 57..64)
-fn footer<D: DrawTarget<Color = BinaryColor>>(
-    left: &str,
-    right: &str,
+/// Draw right aligned text on given line
+fn right<D: DrawTarget<Color = BinaryColor>>(
+    font: &FontRenderer,
+    y: i32,
+    content: impl Content,
     target: &mut D,
 ) -> Result<(), Error<D::Error>> {
-    if !left.is_empty() {
-        FOOTER_FONT.render_aligned(
-            left,
-            Point::new(0, HEIGHT - 1),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Left,
-            FontColor::Transparent(BinaryColor::On),
-            target,
-        )?;
-    }
-    if !right.is_empty() {
-        FOOTER_FONT.render_aligned(
-            right,
-            Point::new(WIDTH - 1, HEIGHT - 1),
-            VerticalPosition::Baseline,
-            HorizontalAlignment::Right,
-            FontColor::Transparent(BinaryColor::On),
-            target,
-        )?;
-    }
+    font.render_aligned(
+        content,
+        Point::new(WIDTH - 1, y),
+        VerticalPosition::Baseline,
+        HorizontalAlignment::Right,
+        FontColor::Transparent(BinaryColor::On),
+        target,
+    )?;
+    Ok(())
+}
+
+/// Draw common footer (bottom 7 lines, 57..64)
+fn footer<D: DrawTarget<Color = BinaryColor>>(
+    content_left: impl Content,
+    content_right: impl Content,
+    target: &mut D,
+) -> Result<(), Error<D::Error>> {
+    left(&FOOTER_FONT, 0, HEIGHT - 1, content_left, target)?;
+    right(&FOOTER_FONT, HEIGHT - 1, content_right, target)?;
     Ok(())
 }
 
