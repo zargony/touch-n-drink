@@ -23,7 +23,7 @@ impl FromJsonObject for AccessTokenResponse {
     ) -> Result<(), json::Error<R::Error>> {
         match &*key {
             "accesstoken" => self.accesstoken = json.read().await?,
-            _ => _ = json.read_any().await?,
+            _ => json.skip_any().await?,
         }
         Ok(())
     }
@@ -80,8 +80,7 @@ impl FromJsonObject for SignInResponse {
         json: &mut json::Reader<R>,
         _context: &Self::Context<'_>,
     ) -> Result<(), json::Error<R::Error>> {
-        _ = json.read_any().await?;
-        Ok(())
+        json.skip_any().await
     }
 }
 
@@ -136,7 +135,7 @@ impl FromJsonObject for UserInformationResponse {
             "status" => self.status = json.read().await?,
             "roles" => self.roles = json.read().await?,
             "email" => self.email = json.read().await?,
-            _ => _ = json.read_any().await?,
+            _ => json.skip_any().await?,
         }
         Ok(())
     }

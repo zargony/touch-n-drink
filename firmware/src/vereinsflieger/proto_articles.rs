@@ -65,7 +65,7 @@ impl<const N: usize> FromJsonObject for ArticleListResponse<N> {
                     );
                 }
             }
-            _ => _ = json.read_any().await?,
+            _ => json.skip_any().await?,
         }
         Ok(())
     }
@@ -94,7 +94,7 @@ impl FromJsonObject for Article {
             "designation" => self.designation = json.read().await?,
             "unittype" => self.unittype = json.read().await?,
             "prices" => self.prices = json.read().await?,
-            _ => _ = json.read_any().await?,
+            _ => json.skip_any().await?,
         }
         Ok(())
     }
@@ -139,7 +139,7 @@ impl FromJsonObject for ArticlePrice {
             "validto" => self.validto = json.read().await?,
             "salestax" => self.salestax = json.read_any().await?.try_into()?,
             "unitprice" => self.unitprice = json.read_any().await?.try_into()?,
-            _ => _ = json.read_any().await?,
+            _ => json.skip_any().await?,
         }
         Ok(())
     }

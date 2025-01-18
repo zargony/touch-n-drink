@@ -101,7 +101,7 @@ impl FromJsonObject for Config {
             "vf-appkey" => self.vf_appkey = json.read().await?,
             "vf-cid" => self.vf_cid = Some(json.read().await?),
             "vf-article-id" => self.vf_article_id = json.read().await?,
-            _ => _ = json.read_any().await?,
+            _ => json.skip_any().await?,
         }
         Ok(())
     }

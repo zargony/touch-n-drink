@@ -44,8 +44,8 @@ impl FromJsonObject for TrackResponse {
         json: &mut json::Reader<R>,
         _context: &Self::Context<'_>,
     ) -> Result<(), json::Error<R::Error>> {
-        _ = json.read_any().await?;
-        Ok(())
+        // FIXME: Mixpanel returns an empty body on success, which is not a valid JSON object
+        json.skip_any().await
     }
 }
 

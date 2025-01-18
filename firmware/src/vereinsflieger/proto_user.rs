@@ -74,7 +74,7 @@ impl FromJsonObject for UserListResponse {
                     }
                 }
             }
-            _ => _ = json.read_any().await?,
+            _ => json.skip_any().await?,
         }
         Ok(())
     }
@@ -163,7 +163,7 @@ impl FromJsonObject for User {
             "memberid" => self.memberid = json.read_any().await?.try_into()?,
             "memberstatus" => self.memberstatus = json.read().await?,
             "keymanagement" => self.keymanagement = json.read().await?,
-            _ => _ = json.read_any().await?,
+            _ => json.skip_any().await?,
         }
         Ok(())
     }
@@ -207,7 +207,7 @@ impl FromJsonObject for Key {
         match &*key {
             "title" => self.title = json.read().await?,
             "keyname" => self.keyname = json.read().await?,
-            _ => _ = json.read_any().await?,
+            _ => json.skip_any().await?,
         }
         Ok(())
     }

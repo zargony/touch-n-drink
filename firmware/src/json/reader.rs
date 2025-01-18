@@ -66,6 +66,27 @@ impl<R: BufRead> Reader<R> {
         }
     }
 
+    /// Skip any JSON value
+    /// A JSON value of any type is read but not parsed or stored. This allows memory-efficient
+    /// skipping of values of no interest in bigger JSON objects and arrays.
+    pub async fn skip_any(&mut self) -> Result<(), Error<R::Error>> {
+        match self.peek().await? {
+            b'{' => Box::pin(self.skip_object()).await,
+            b'[' => Box::pin(self.skip_array()).await,
+            b'"' => self.skip_string().await,
+            b'0'..=b'9' | b'-' => {
+                let _ = self.read_number().await;
+                Ok(())
+            }
+            b'f' | b't' => {
+                let _ = self.read_boolean().await?;
+                Ok(())
+            }
+            b'n' => self.read_null().await,
+            ch => Err(Error::unexpected(ch)),
+        }
+    }
+
     /// Read and parse JSON object
     /// A JSON object is read and parsed field by field. The given type is created using its
     /// `Default` implementation and its `FromJsonObject` implementation is called to read each
@@ -99,6 +120,31 @@ impl<R: BufRead> Reader<R> {
             self.expect(b':').await?;
             self.trim().await?;
             obj.read_next(key, self, context).await?;
+            self.trim().await?;
+            match self.peek().await? {
+                b',' => self.consume(),
+                b'}' => (),
+                ch => break Err(Error::unexpected(ch)),
+            }
+        }
+    }
+
+    /// Skip JSON object
+    pub async fn skip_object(&mut self) -> Result<(), Error<R::Error>> {
+        self.expect(b'{').await?;
+        loop {
+            self.trim().await?;
+            match self.peek().await? {
+                b'}' => {
+                    self.consume();
+                    break Ok(());
+                }
+                _ => self.skip_string().await?,
+            }
+            self.trim().await?;
+            self.expect(b':').await?;
+            self.trim().await?;
+            self.skip_any().await?;
             self.trim().await?;
             match self.peek().await? {
                 b',' => self.consume(),
@@ -146,6 +192,27 @@ impl<R: BufRead> Reader<R> {
         }
     }
 
+    /// Skip JSON array
+    pub async fn skip_array(&mut self) -> Result<(), Error<R::Error>> {
+        self.expect(b'[').await?;
+        loop {
+            self.trim().await?;
+            match self.peek().await? {
+                b']' => {
+                    self.consume();
+                    break Ok(());
+                }
+                _ => self.skip_any().await?,
+            }
+            self.trim().await?;
+            match self.peek().await? {
+                b',' => self.consume(),
+                b']' => (),
+                ch => break Err(Error::unexpected(ch)),
+            }
+        }
+    }
+
     /// Read and parse JSON string
     pub async fn read_string(&mut self) -> Result<String, Error<R::Error>> {
         self.expect(b'"').await?;
@@ -175,6 +242,26 @@ impl<R: BufRead> Reader<R> {
                     buf.push(ch);
                     self.consume();
                 }
+            }
+        }
+    }
+
+    /// Skip JSON string
+    pub async fn skip_string(&mut self) -> Result<(), Error<R::Error>> {
+        self.expect(b'"').await?;
+        loop {
+            match self.peek().await? {
+                // This is safe to check, even in the middle of a UTF-8 character since UTF-8
+                // guarantees that no character encoding is a substring of any other character
+                b'\\' => {
+                    self.consume();
+                    self.consume();
+                }
+                b'"' => {
+                    self.consume();
+                    break Ok(());
+                }
+                _ => self.consume(),
             }
         }
     }
@@ -528,7 +615,7 @@ mod tests {
                     "foo" => self.foo = json.read().await?,
                     "bar" => self.bar = json.read().await?,
                     "baz" => self.baz = json.read().await?,
-                    _ => _ = json.read_any().await?,
+                    _ => json.skip_any().await?,
                 }
                 Ok(())
             }

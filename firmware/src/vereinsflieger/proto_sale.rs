@@ -78,7 +78,6 @@ impl FromJsonObject for SaleAddResponse {
         json: &mut json::Reader<R>,
         _context: &Self::Context<'_>,
     ) -> Result<(), json::Error<R::Error>> {
-        _ = json.read_any().await?;
-        Ok(())
+        json.skip_any().await
     }
 }
