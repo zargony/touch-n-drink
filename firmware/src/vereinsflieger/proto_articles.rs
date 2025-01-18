@@ -30,7 +30,7 @@ impl ToJson for ArticleListRequest<'_> {
 
 /// `articles/list` response
 #[derive(Debug, Default)]
-pub struct ArticleListResponse<const N: usize> {
+pub struct ArticleListResponse {
     // pub *: Article,
     // pub httpstatuscode: u16,
     //
@@ -38,9 +38,9 @@ pub struct ArticleListResponse<const N: usize> {
     pub total_articles: u32,
 }
 
-impl<const N: usize> FromJsonObject for ArticleListResponse<N> {
+impl FromJsonObject for ArticleListResponse {
     // Mutable reference to article lookup table
-    type Context<'ctx> = RefCell<&'ctx mut Articles<N>>;
+    type Context<'ctx> = RefCell<&'ctx mut Articles>;
 
     async fn read_next<R: BufRead>(
         &mut self,

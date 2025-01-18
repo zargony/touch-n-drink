@@ -48,7 +48,7 @@ pub struct Ui<'a, RNG, I2C, IRQ> {
     wifi: &'a Wifi,
     http: &'a mut Http<'a>,
     vereinsflieger: &'a mut Vereinsflieger<'a>,
-    articles: &'a mut Articles<1>,
+    articles: &'a mut Articles,
     users: &'a mut Users,
     telemetry: &'a mut Telemetry<'a>,
     schedule: &'a mut Daily,
@@ -66,7 +66,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         wifi: &'a Wifi,
         http: &'a mut Http<'a>,
         vereinsflieger: &'a mut Vereinsflieger<'a>,
-        articles: &'a mut Articles<1>,
+        articles: &'a mut Articles,
         users: &'a mut Users,
         telemetry: &'a mut Telemetry<'a>,
         schedule: &'a mut Daily,
@@ -261,7 +261,10 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
                 .id(0)
                 .ok_or(ErrorKind::ArticleNotFound)?
                 .clone();
-            let article = self.articles.get(0).ok_or(ErrorKind::ArticleNotFound)?;
+            let article = self
+                .articles
+                .get(&article_id)
+                .ok_or(ErrorKind::ArticleNotFound)?;
 
             // Calculate total price. It's ok to cast num_drinks to f32 as it's always a small number.
             #[allow(clippy::cast_precision_loss)]
