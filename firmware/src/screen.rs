@@ -34,6 +34,11 @@ static LOGO: ImageRaw<BinaryColor> = ImageRaw::new(&[
     0b00011110, 0b00000111, 0b11100000, 0b11111100, 0b00011111, 0b10001111, 0b00011110, 0b00000001, 0b11100111, 0b11000011, 0b11111100, 0b01111001, 0b11101111, 0b01111001, 0b11110111, 0b10001111,
 ], 128);
 
+/// User greetings (chosen randomly)
+static GREETINGS: [&str; 9] = [
+    "Hi", "Hallo", "Hey", "Tach", "Servus", "Moin", "Hej", "Olá", "Ciao",
+];
+
 const SPLASH_VERSION_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_profont10_tr>();
 const TITLE_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_8x13B_tf>();
 const MEDIUM_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_6x10_tf>();
@@ -108,6 +113,25 @@ fn footer<D: DrawTarget<Color = BinaryColor>>(
         )?;
     }
     Ok(())
+}
+
+/// Draw user greeting (top 10 lines, 0..10)
+fn greeting<D: DrawTarget<Color = BinaryColor>>(
+    random: u32,
+    name: &str,
+    target: &mut D,
+) -> Result<(), Error<D::Error>> {
+    let greeting = GREETINGS[random as usize % GREETINGS.len()];
+    let greeting_len = greeting.len() + 1;
+
+    // Trim name if it's too long to display
+    let name = if name.len() + greeting_len > MEDIUM_CHARS_PER_LINE as usize {
+        &name[..(MEDIUM_CHARS_PER_LINE as usize - greeting_len)]
+    } else {
+        name
+    };
+
+    centered(&MEDIUM_FONT, 8, format_args!("{greeting} {name}"), target)
 }
 
 /// Splash screen
@@ -228,20 +252,7 @@ impl Screen for NumberOfDrinks<'_> {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        static GREETINGS: [&str; 9] = [
-            "Hi", "Hallo", "Hey", "Tach", "Servus", "Moin", "Hej", "Olá", "Ciao",
-        ];
-
-        // Trim name if it's too long to display
-        let greeting = GREETINGS[self.greeting as usize % GREETINGS.len()];
-        let greeting_len = greeting.len() + 1;
-        let name = if self.name.len() + greeting_len > MEDIUM_CHARS_PER_LINE as usize {
-            &self.name[..(MEDIUM_CHARS_PER_LINE as usize - greeting_len)]
-        } else {
-            self.name
-        };
-
-        centered(&MEDIUM_FONT, 8, format_args!("{greeting} {name}"), target)?;
+        greeting(self.greeting, self.name, target)?;
         centered(&TITLE_FONT, 8 + 22, "Anzahl Getränke\nwählen", target)?;
         footer("* Abbruch", "1-9 Weiter", target)?;
         Ok(())
