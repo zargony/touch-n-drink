@@ -123,7 +123,7 @@ async fn main(spawner: Spawner) {
     let _led = Output::new(peripherals.GPIO8, Level::High);
 
     // Initialize global allocator
-    esp_alloc::heap_allocator!(120 * 1024);
+    esp_alloc::heap_allocator!(150 * 1024);
 
     // Initialize async executor
     let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
