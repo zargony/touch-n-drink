@@ -1546,13 +1546,12 @@ checksum = "953ec861398dccce10c670dfeaf3ec4911ca479e9c02154b3a215178c5f566f2"
 
 [[package]]
 name = "pn532"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dc479202885c22ce6be2d367f4dc5ea9abb49278f2d3c026d71bc6f579bc3c3"
+checksum = "ce656b2f9335bedbd8806597f6f78e644a955366673cd9280a0fb67a0d7b35a1"
 dependencies = [
- "embedded-hal 0.2.7",
+ "embedded-hal 1.0.0",
  "nb 1.1.0",
- "void",
 ]
 
 [[package]]

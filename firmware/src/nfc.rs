@@ -68,14 +68,14 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
     pub async fn new(i2c: I2C, irq: IRQ) -> Result<Self, Error> {
         debug!("NFC: Initializing PN532...");
 
-        let mut driver = Pn532::new(I2CInterfaceWithIrq::new(i2c, irq));
+        let mut driver = Pn532::new_async(I2CInterfaceWithIrq { i2c, irq });
 
         // Abort any currently running command (just in case), ignore any error
         let _ = driver.abort().await;
 
         // Configure PN532 as initiator (normal mode)
         driver
-            .process(
+            .process_async(
                 // SAMConfiguration request (PN532 §7.2.10)
                 &Request::sam_configuration(SAMMode::Normal, true),
                 0,
@@ -84,7 +84,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
 
         // Query PN532 version and capabilities
         let version_response = driver
-            .process(
+            .process_async(
                 // GetFirmwareVersion request (PN532 §7.2.2)
                 &Request::GET_FIRMWARE_VERSION,
                 4,
@@ -119,7 +119,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
             // Detect any ISO/IEC14443 Type A target in passive mode
             let list_response = match self
                 .driver
-                .process_timeout(
+                .process_timeout_async(
                     // InListPassiveTarget request (PN532 §7.3.5)
                     &Request::INLIST_ONE_ISO_A_TARGET,
                     pn532::BUFFER_SIZE - 9, // max response length
@@ -174,7 +174,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
             // has failed, as it's required to release the target to be able to find the next
             if let Err(err) = self
                 .driver
-                .process(
+                .process_async(
                     // InRelease request (PN532 §7.3.11)
                     &Request::RELEASE_TAG_1,
                     1,
