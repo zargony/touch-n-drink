@@ -4,7 +4,7 @@ use core::fmt;
 use embassy_executor::{task, Spawner};
 use embassy_net::dns::{self, DnsQueryType};
 use embassy_net::tcp::{self, client::TcpClientState};
-use embassy_net::{Config, DhcpConfig, IpAddress, Stack, StackResources, StaticConfigV4};
+use embassy_net::{Config, DhcpConfig, IpAddress, Runner, Stack, StackResources, StaticConfigV4};
 use embassy_time::{Duration, Timer};
 use esp_hal::peripheral::Peripheral;
 use esp_hal::peripherals;
@@ -30,15 +30,12 @@ const TX_BUFFER_SIZE: usize = 2048;
 /// Size of receive buffer (per TCP socket)
 const RX_BUFFER_SIZE: usize = 4096;
 
-/// Type of Wifi device
-pub type Device = WifiDevice<'static, WifiStaDevice>;
-
 /// Type of DNS socket
-pub type DnsSocket<'d> = dns::DnsSocket<'d, Device>;
+pub type DnsSocket<'d> = dns::DnsSocket<'d>;
 
 /// Type of TCP client
 pub type TcpClient<'d> =
-    tcp::client::TcpClient<'d, Device, NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>;
+    tcp::client::TcpClient<'d, NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>;
 
 /// Type of TCP connection returned by TCP client
 pub type TcpConnection<'d> =
@@ -133,9 +130,9 @@ impl fmt::Display for DisplayNetworkConfig {
 
 /// Wifi interface
 pub struct Wifi {
-    stack: &'static Stack<Device>,
-    dns_socket: &'static DnsSocket<'static>,
-    tcp_client: &'static TcpClient<'static>,
+    stack: Stack<'static>,
+    dns_socket: DnsSocket<'static>,
+    tcp_client: TcpClient<'static>,
     last_up_state: Cell<bool>,
 }
 
@@ -151,9 +148,6 @@ impl Wifi {
         password: &str,
     ) -> Result<Self, InitializationError> {
         debug!("Wifi: Initializing controller...");
-
-        // Generate random seed
-        let random_seed = rng.next_u64();
 
         // Several resources below are allocated and leaked to get a `&'static mut` reference.
         // This is ok, since only one instance of `Wifi` can exist and it'll never be dropped.
@@ -194,13 +188,13 @@ impl Wifi {
         let resources = Box::leak(resources);
 
         // Initialize network stack
-        let config = Config::dhcpv4(DhcpConfig::default());
-        let stack = Box::new(Stack::new(device, config, resources, random_seed));
-        let stack = Box::leak(stack);
+        let net_config = Config::dhcpv4(DhcpConfig::default());
+        let random_seed = rng.next_u64();
+        let (stack, runner) = embassy_net::new(device, net_config, resources, random_seed);
 
         // Spawn task for running network stack
         debug!("Wifi: Spawning network task...");
-        match spawner.spawn(network(stack)) {
+        match spawner.spawn(network(runner)) {
             Ok(()) => (),
             // Panic on failure since failing to spawn a task indicates a serious error
             Err(err) => panic!("Failed to spawn Wifi network task: {:?}", err),
@@ -211,10 +205,8 @@ impl Wifi {
         let tcp_client_state = Box::leak(tcp_client_state);
 
         // Initialize embedded-nal-async compatible DNS socket and TCP client
-        let dns_socket = Box::new(DnsSocket::new(stack));
-        let dns_socket = Box::leak(dns_socket);
-        let tcp_client = Box::new(TcpClient::new(stack, tcp_client_state));
-        let tcp_client = Box::leak(tcp_client);
+        let dns_socket = DnsSocket::new(stack);
+        let tcp_client = TcpClient::new(stack, tcp_client_state);
 
         info!(
             "Wifi: Controller initialized. Hw: {}, {}",
@@ -245,9 +237,10 @@ impl Wifi {
             } else {
                 info!("Wifi: Network down");
             }
+
+            self.last_up_state.set(up);
         }
 
-        self.last_up_state.set(up);
         up
     }
 
@@ -285,12 +278,12 @@ impl Wifi {
 
     /// Provide an embedded-nal-async compatible DNS socket
     pub fn dns(&self) -> &'_ DnsSocket {
-        self.dns_socket
+        &self.dns_socket
     }
 
     /// Provide an embedded-nal-async compatible TCP client
     pub fn tcp(&self) -> &'_ TcpClient {
-        self.tcp_client
+        &self.tcp_client
     }
 }
 
@@ -327,8 +320,8 @@ async fn connection(mut controller: WifiController<'static>) -> ! {
 
 /// Task for running network stack
 #[task]
-async fn network(stack: &'static Stack<Device>) -> ! {
+async fn network(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>>) {
     debug!("Wifi: Start network task");
 
-    stack.run().await;
+    runner.run().await;
 }

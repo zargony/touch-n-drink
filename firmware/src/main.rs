@@ -65,14 +65,15 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
+use esp_hal::config::WatchdogConfig;
 use esp_hal::efuse::Efuse;
 use esp_hal::gpio::{Input, Level, Output, OutputOpenDrain, Pull};
-use esp_hal::i2c::master::{Config as I2cConfig, I2c};
+use esp_hal::i2c::master::{BusTimeout, Config as I2cConfig, I2c};
 use esp_hal::peripherals::Peripherals;
-use esp_hal::prelude::*;
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::{Rtc, RwdtStage};
-use esp_hal::timer::systimer::{SystemTimer, Target};
+use esp_hal::time::{Duration, RateExtU32};
+use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
 use log::{error, info};
@@ -85,9 +86,9 @@ static GIT_SHA_STR: &str = env!("GIT_SHORT_SHA");
 
 /// Delay in seconds after which to restart on panic
 #[cfg(not(debug_assertions))]
-const PANIC_RESTART_DELAY_SECS: u64 = 10;
+const PANIC_RESTART_DELAY: Duration = Duration::secs(10);
 #[cfg(debug_assertions)]
-const PANIC_RESTART_DELAY_SECS: u64 = 600;
+const PANIC_RESTART_DELAY: Duration = Duration::secs(600);
 
 /// Custom halt function for esp-backtrace. Called after panic was handled and should halt
 /// or restart the system.
@@ -101,10 +102,9 @@ unsafe fn halt() -> ! {
     // TODO: Steal display driver and show a panic message to the user
 
     // Restart automatically after a delay
-    println!("Restarting in {} seconds...", PANIC_RESTART_DELAY_SECS);
+    println!("Restarting in {} seconds...", PANIC_RESTART_DELAY.to_secs());
     let mut rtc = Rtc::new(peripherals.LPWR);
-    rtc.rwdt
-        .set_timeout(RwdtStage::Stage0, PANIC_RESTART_DELAY_SECS.secs());
+    rtc.rwdt.set_timeout(RwdtStage::Stage0, PANIC_RESTART_DELAY);
     rtc.rwdt.unlisten();
     rtc.rwdt.enable();
     loop {
@@ -112,13 +112,13 @@ unsafe fn halt() -> ! {
     }
 }
 
-#[main]
+#[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let esp_config = esp_hal::Config::default()
+        .with_cpu_clock(CpuClock::max())
+        // TODO: Enable watchdog
+        .with_watchdog(WatchdogConfig::default());
+    let peripherals = esp_hal::init(esp_config);
     let mut rng = Rng::new(peripherals.RNG);
     let _led = Output::new(peripherals.GPIO8, Level::High);
 
@@ -126,7 +126,7 @@ async fn main(spawner: Spawner) {
     esp_alloc::heap_allocator!(150 * 1024);
 
     // Initialize async executor
-    let systimer = SystemTimer::new(peripherals.SYSTIMER).split::<Target>();
+    let systimer = SystemTimer::new(peripherals.SYSTIMER);
     esp_hal_embassy::init(systimer.alarm0);
 
     // Initialize logging
@@ -141,13 +141,16 @@ async fn main(spawner: Spawner) {
     let mut users = user::Users::new();
 
     // Initialize I2C controller
-    let i2c = I2c::new(
-        peripherals.I2C0,
-        I2cConfig {
-            frequency: 400.kHz(), // Standard-Mode: 100 kHz, Fast-Mode: 400 kHz
-            timeout: Some(24),    // Reset bus after 24 bus clock cycles (60 µs) of inactivity
-        },
-    )
+    let i2c_config = I2cConfig::default()
+        // Standard-Mode: 100 kHz, Fast-Mode: 400 kHz
+        .with_frequency(400.kHz())
+        // Reset bus after 24 bus clock cycles (60 µs) of inactivity
+        .with_timeout(BusTimeout::BusCycles(24));
+    let i2c = match I2c::new(peripherals.I2C0, i2c_config) {
+        Ok(i2c) => i2c,
+        // Panic on failure since without I2C there's no reasonable way to tell the user
+        Err(err) => panic!("I2C initialization failed: {:?}", err),
+    }
     .with_sda(peripherals.GPIO9)
     .with_scl(peripherals.GPIO10)
     .into_async();

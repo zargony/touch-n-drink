@@ -4,9 +4,9 @@ EMBASSY_EXECUTOR_TASK_ARENA_SIZE = "26624"
 # Log filter for esp-println to apply at runtime. Also, a feature of the log crate strips all
 # logging above info level from release builds at compile time (feature `release_max_level_info`).
 ESP_LOG = "info,touch_n_drink=debug"
-# Settings for esp-wifi, see https://docs.esp-rs.org/esp-hal/esp-wifi/0.11.0/esp32c3/esp_wifi/#additional-configuration
-ESP_WIFI_COUNTRY_CODE = "DE"
-ESP_WIFI_PHY_ENABLE_USB = "true"
+# Settings for esp-wifi, see https://docs.esp-rs.org/esp-hal/esp-wifi/0.12.0/esp32c3/esp_wifi/#additional-configuration
+ESP_WIFI_CONFIG_COUNTRY_CODE = "DE"
+ESP_WIFI_CONFIG_PHY_ENABLE_USB = "true"
 
 [build]
 target = "riscv32imc-unknown-none-elf"

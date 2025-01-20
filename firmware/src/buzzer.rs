@@ -1,10 +1,12 @@
 use core::fmt;
 use embassy_time::{Duration, Timer};
 use esp_hal::gpio::{AnyPin, OutputPin};
-use esp_hal::ledc::{channel, timer, LSGlobalClkSource, Ledc, LowSpeed};
+use esp_hal::ledc::channel::{self, ChannelIFace};
+use esp_hal::ledc::timer::{self, TimerIFace};
+use esp_hal::ledc::{LSGlobalClkSource, Ledc, LowSpeed};
 use esp_hal::peripheral::Peripheral;
 use esp_hal::peripherals;
-use esp_hal::prelude::*;
+use esp_hal::time::RateExtU32;
 use log::{debug, info};
 
 /// PWM duty cycle to use for tones (percentage, 0-100)
@@ -69,15 +71,15 @@ impl<'a> Buzzer<'a> {
     /// Drive the buzzer with a PWM signal of given frequency and duty cycle
     pub fn drive(&mut self, frequency: u32, duty_pct: u8) -> Result<(), Error> {
         // debug!("Buzzer: driving {} Hz at {}%", frequency, duty_pct);
-        let mut timer = self.ledc.timer::<LowSpeed>(timer::Number::Timer0);
-        timer.configure(timer::config::Config {
+        let mut lstimer0 = self.ledc.timer::<LowSpeed>(timer::Number::Timer0);
+        lstimer0.configure(timer::config::Config {
             duty: timer::config::Duty::Duty13Bit,
             clock_source: timer::LSClockSource::APBClk,
             frequency: frequency.Hz(),
         })?;
-        let mut channel = self.ledc.channel(channel::Number::Channel0, &mut self.pin);
-        channel.configure(channel::config::Config {
-            timer: &timer,
+        let mut channel0 = self.ledc.channel(channel::Number::Channel0, &mut self.pin);
+        channel0.configure(channel::config::Config {
+            timer: &lstimer0,
             duty_pct,
             pin_config: channel::config::PinConfig::PushPull,
         })?;
