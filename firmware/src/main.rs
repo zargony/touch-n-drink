@@ -146,25 +146,22 @@ async fn main(spawner: Spawner) {
         .with_frequency(400.kHz())
         // Reset bus after 24 bus clock cycles (60 µs) of inactivity
         .with_timeout(BusTimeout::BusCycles(24));
-    let i2c = match I2c::new(peripherals.I2C0, i2c_config) {
-        Ok(i2c) => i2c,
+    let i2c = I2c::new(peripherals.I2C0, i2c_config)
         // Panic on failure since without I2C there's no reasonable way to tell the user
-        Err(err) => panic!("I2C initialization failed: {:?}", err),
-    }
-    .with_sda(peripherals.GPIO9)
-    .with_scl(peripherals.GPIO10)
-    .into_async();
+        .expect("I2C initialization failed")
+        .with_sda(peripherals.GPIO9)
+        .with_scl(peripherals.GPIO10)
+        .into_async();
 
     // Share I2C bus. Since the mcu is single-core and I2C is not used in interrupts, I2C access
     // cannot be preempted and we can safely use a NoopMutex for shared access.
     let i2c: Mutex<NoopRawMutex, _> = Mutex::new(i2c);
 
     // Initialize display
-    let mut display = match display::Display::new(I2cDevice::new(&i2c)).await {
-        Ok(disp) => disp,
+    let mut display = display::Display::new(I2cDevice::new(&i2c))
+        .await
         // Panic on failure since without a display there's no reasonable way to tell the user
-        Err(err) => panic!("Display initialization failed: {:?}", err),
-    };
+        .expect("Display initialization failed");
     let _ = display.screen(&screen::Splash).await;
 
     // Initialize keypad
@@ -184,15 +181,14 @@ async fn main(spawner: Spawner) {
 
     // Initialize NFC reader
     let nfc_irq = Input::new(peripherals.GPIO20, Pull::Up);
-    let mut nfc = match nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq).await {
-        Ok(nfc) => nfc,
+    let mut nfc = nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq)
+        .await
         // Panic on failure since an initialization error indicates a serious error
-        Err(err) => panic!("NFC reader initialization failed: {:?}", err),
-    };
+        .expect("NFC reader initialization failed");
 
     // Initialize Wifi
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let wifi = match wifi::Wifi::new(
+    let wifi = wifi::Wifi::new(
         timg0.timer0,
         rng,
         peripherals.RADIO_CLK,
@@ -200,11 +196,9 @@ async fn main(spawner: Spawner) {
         spawner,
         &config.wifi_ssid,
         &config.wifi_password,
-    ) {
-        Ok(wifi) => wifi,
-        // Panic on failure since an initialization error indicates a static configuration error
-        Err(err) => panic!("Wifi initialization failed: {:?}", err),
-    };
+    )
+    // Panic on failure since an initialization error indicates a static configuration error
+    .expect("Wifi initialization failed");
 
     // Initialize HTTP client
     // As this allocates quite a bit of memory (e.g. for TLS buffers), only a single http client

@@ -176,11 +176,10 @@ impl Wifi {
 
         // Spawn task for handling Wifi connection events
         debug!("Wifi: Spawning connection task...");
-        match spawner.spawn(connection(controller)) {
-            Ok(()) => (),
+        spawner
+            .spawn(connection(controller))
             // Panic on failure since failing to spawn a task indicates a serious error
-            Err(err) => panic!("Failed to spawn Wifi connection task: {:?}", err),
-        }
+            .expect("Failed to spawn Wifi connection task");
 
         // Initialize network stack resources (sockets, inflight dns queries). Needs at least one
         // socket for DHCP, one socket for DNS, plus additional sockets for connections.
@@ -194,11 +193,10 @@ impl Wifi {
 
         // Spawn task for running network stack
         debug!("Wifi: Spawning network task...");
-        match spawner.spawn(network(runner)) {
-            Ok(()) => (),
+        spawner
+            .spawn(network(runner))
             // Panic on failure since failing to spawn a task indicates a serious error
-            Err(err) => panic!("Failed to spawn Wifi network task: {:?}", err),
-        }
+            .expect("Failed to spawn Wifi network task");
 
         // Initialize TCP client state (contains tx/rx buffers for TCP sockets)
         let tcp_client_state = Box::new(TcpClientState::new());
