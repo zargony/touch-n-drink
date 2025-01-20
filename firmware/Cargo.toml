@@ -70,7 +70,7 @@ pn532 = "0.5"
 rand_core = "0.6"
 reqwless = { version = "0.13", default-features = false, features = ["alloc", "embedded-tls"] }
 ssd1306 = { version = "0.9", features = ["async"] }
-u8g2-fonts = "0.4"
+u8g2-fonts = "0.5"
 
 # FIXME: Pin maybe-async-cfg to 0.2.4 since 0.2.5 breaks ssd1306
 # See https://github.com/rust-embedded-community/ssd1306/issues/219

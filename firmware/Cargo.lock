@@ -2056,9 +2056,9 @@ checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
 name = "u8g2-fonts"
-version = "0.4.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a68775e2131c88974e3cc1da37060559090319ea140746cc1e7e7797646415c0"
+checksum = "f5cc61ab1af2876aaf5e70d6e8388d660e0a2b5db6a1f8de9312feaa2b6a051a"
 dependencies = [
  "embedded-graphics-core",
 ]
