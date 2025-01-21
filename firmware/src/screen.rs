@@ -55,7 +55,7 @@ const HCENTER: i32 = WIDTH / 2;
 const HEIGHT: i32 = 64;
 
 /// Number of characters that fit in a line
-const MEDIUM_CHARS_PER_LINE: i32 = WIDTH / 6;
+const MEDIUM_CHARS_PER_LINE: usize = WIDTH as usize / 6;
 
 /// Screen display error
 pub type Error<E> = u8g2_fonts::Error<E>;
@@ -134,6 +134,15 @@ fn footer<D: DrawTarget<Color = BinaryColor>>(
     Ok(())
 }
 
+/// Trim text if it's too long
+fn trim(text: &str, max_len: usize) -> &str {
+    if text.len() > max_len {
+        &text[..max_len]
+    } else {
+        text
+    }
+}
+
 /// Draw user greeting (top 10 lines, 0..10)
 fn greeting<D: DrawTarget<Color = BinaryColor>>(
     random: u32,
@@ -141,15 +150,8 @@ fn greeting<D: DrawTarget<Color = BinaryColor>>(
     target: &mut D,
 ) -> Result<(), Error<D::Error>> {
     let greeting = GREETINGS[random as usize % GREETINGS.len()];
-    let greeting_len = greeting.len() + 1;
-
     // Trim name if it's too long to display
-    let name = if name.len() + greeting_len > MEDIUM_CHARS_PER_LINE as usize {
-        &name[..(MEDIUM_CHARS_PER_LINE as usize - greeting_len)]
-    } else {
-        name
-    };
-
+    let name = trim(name, MEDIUM_CHARS_PER_LINE - greeting.len() - 1);
     centered(&MEDIUM_FONT, 8, format_args!("{greeting} {name}"), target)
 }
 
