@@ -48,9 +48,22 @@ impl Articles {
         }
     }
 
+    /// Number of ids
+    pub fn count_ids(&self) -> usize {
+        self.ids.len()
+    }
+
     /// Number of articles
     pub fn count(&self) -> usize {
         self.articles.len()
+    }
+
+    /// Iterate over articles in order given on initialization
+    pub fn iter(&self) -> impl Iterator<Item = (usize, &ArticleId, &Article)> {
+        self.ids
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, id)| self.get(id).map(|article| (idx, id, article)))
     }
 
     /// Look up id of article at given index

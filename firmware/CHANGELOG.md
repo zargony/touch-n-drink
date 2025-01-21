@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Allow to choose from multiple articles to purchase
 - Automatically refresh article and user information once a day
 - Event tracking using Mixpanel for usage analytics
 

@@ -1,3 +1,4 @@
+use crate::article::Articles;
 use crate::{GIT_SHA_STR, VERSION_STR};
 use core::fmt;
 use embedded_graphics::draw_target::DrawTarget;
@@ -253,49 +254,82 @@ impl Screen for ScanId {
     }
 }
 
-/// Prompt to ask for number of drinks
-pub struct NumberOfDrinks<'a> {
+/// Prompt to select article
+pub struct SelectArticle<'a> {
     greeting: u32,
     name: &'a str,
+    articles: &'a Articles,
 }
 
-impl<'a> NumberOfDrinks<'a> {
-    pub fn new<RNG: RngCore>(rng: &mut RNG, name: &'a str) -> Self {
+impl<'a> SelectArticle<'a> {
+    pub fn new<RNG: RngCore>(mut rng: RNG, name: &'a str, articles: &'a Articles) -> Self {
         Self {
             greeting: rng.next_u32(),
             name,
+            articles,
         }
     }
 }
 
-impl Screen for NumberOfDrinks<'_> {
+impl Screen for SelectArticle<'_> {
     fn draw<D: DrawTarget<Color = BinaryColor>>(
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
         greeting(self.greeting, self.name, target)?;
-        centered(&TITLE_FONT, 8 + 22, "Anzahl Getränke\nwählen", target)?;
+        for (idx, _article_id, article) in self.articles.iter() {
+            // Safe to unwrap since conversion always succeeds for these small numbers
+            let y = 8 + 18 + i32::try_from(idx).unwrap() * 12;
+            left(&TITLE_FONT, 0, y, format_args!("{}:", idx + 1), target)?;
+            left(&TITLE_FONT, 20, y, trim(&article.name, 11), target)?;
+            right(
+                &SMALL_FONT,
+                y,
+                format_args!("{:.02}", article.price),
+                target,
+            )?;
+        }
+        footer(
+            "* Abbruch",
+            format_args!("1-{} Weiter", self.articles.count_ids()),
+            target,
+        )?;
+        Ok(())
+    }
+}
+
+/// Prompt to enter amount
+pub struct EnterAmount;
+
+impl Screen for EnterAmount {
+    fn draw<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), Error<D::Error>> {
+        centered(&TITLE_FONT, 8 + 22, "Anzahl wählen", target)?;
         footer("* Abbruch", "1-9 Weiter", target)?;
         Ok(())
     }
 }
 
 /// Checkout (confirm purchase)
-pub struct Checkout {
-    num_drinks: usize,
+pub struct Checkout<'a> {
+    article_name: &'a str,
+    amount: usize,
     total_price: f32,
 }
 
-impl Checkout {
-    pub fn new(num_drinks: usize, total_price: f32) -> Self {
+impl<'a> Checkout<'a> {
+    pub fn new(article_name: &'a str, amount: usize, total_price: f32) -> Self {
         Self {
-            num_drinks,
+            article_name,
+            amount,
             total_price,
         }
     }
 }
 
-impl Screen for Checkout {
+impl Screen for Checkout<'_> {
     fn draw<D: DrawTarget<Color = BinaryColor>>(
         &self,
         target: &mut D,
@@ -304,13 +338,9 @@ impl Screen for Checkout {
             &MEDIUM_FONT,
             26,
             format_args!(
-                "{} {}",
-                self.num_drinks,
-                if self.num_drinks == 1 {
-                    "Getränk"
-                } else {
-                    "Getränke"
-                }
+                "{}x {}",
+                self.amount,
+                trim(self.article_name, MEDIUM_CHARS_PER_LINE - 3)
             ),
             target,
         )?;
@@ -327,12 +357,12 @@ impl Screen for Checkout {
 
 /// Success screen
 pub struct Success {
-    num_drinks: usize,
+    amount: usize,
 }
 
 impl Success {
-    pub fn new(num_drinks: usize) -> Self {
-        Self { num_drinks }
+    pub fn new(amount: usize) -> Self {
+        Self { amount }
     }
 }
 
@@ -345,7 +375,7 @@ impl Screen for Success {
         centered(
             &SMALL_FONT,
             26 + 12,
-            format_args!("{} Getränke genehmigt", self.num_drinks),
+            format_args!("{} Getränke genehmigt", self.amount),
             target,
         )?;
         footer("", "# Ok", target)?;
