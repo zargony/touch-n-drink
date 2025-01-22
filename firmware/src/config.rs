@@ -1,6 +1,8 @@
 use crate::article::ArticleId;
 use crate::json::{self, FromJson, FromJsonObject};
 use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
 use core::fmt;
 use core::ops::Deref;
 use embedded_io_async::BufRead;
@@ -75,8 +77,8 @@ pub struct Config {
     pub vf_appkey: SensitiveString,
     /// Vereinsflieger API cid (optional)
     pub vf_cid: Option<u32>,
-    /// Vereinsflieger article id for purchase
-    pub vf_article_id: ArticleId,
+    /// Vereinsflieger article ids for purchase
+    pub vf_article_ids: Vec<ArticleId>,
 }
 
 impl FromJsonObject for Config {
@@ -100,7 +102,8 @@ impl FromJsonObject for Config {
             "vf-password-md5" => self.vf_password_md5 = json.read().await?,
             "vf-appkey" => self.vf_appkey = json.read().await?,
             "vf-cid" => self.vf_cid = Some(json.read().await?),
-            "vf-article-id" => self.vf_article_id = json.read().await?,
+            "vf-article-id" => self.vf_article_ids = vec![json.read().await?],
+            "vf-article-ids" => self.vf_article_ids = json.read().await?,
             _ => json.skip_any().await?,
         }
         Ok(())

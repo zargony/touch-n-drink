@@ -29,7 +29,7 @@ pub struct User {
 pub struct Users {
     /// Look up NFC uid to user id
     uids: BTreeMap<Uid, UserId>,
-    /// Look up user id to user details
+    /// Look up user id to user information
     users: BTreeMap<UserId, User>,
 }
 

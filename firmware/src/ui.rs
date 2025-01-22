@@ -1,4 +1,4 @@
-use crate::article::{ArticleId, Articles};
+use crate::article::{Article, ArticleId, Articles};
 use crate::buzzer::Buzzer;
 use crate::display::Display;
 use crate::error::{Error, ErrorKind};
@@ -30,7 +30,7 @@ const NETWORK_TIMEOUT: Duration = Duration::from_secs(30);
 #[cfg(not(debug_assertions))]
 const USER_TIMEOUT: Duration = Duration::from_secs(60);
 #[cfg(debug_assertions)]
-const USER_TIMEOUT: Duration = Duration::from_secs(5);
+const USER_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Timeout for initial screen. Power saving is activated if no action is taken for this duration.
 #[cfg(not(debug_assertions))]
@@ -48,7 +48,7 @@ pub struct Ui<'a, RNG, I2C, IRQ> {
     wifi: &'a Wifi,
     http: &'a mut Http<'a>,
     vereinsflieger: &'a mut Vereinsflieger<'a>,
-    articles: &'a mut Articles<1>,
+    articles: &'a mut Articles,
     users: &'a mut Users,
     telemetry: &'a mut Telemetry<'a>,
     schedule: &'a mut Daily,
@@ -66,7 +66,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         wifi: &'a Wifi,
         http: &'a mut Http<'a>,
         vereinsflieger: &'a mut Vereinsflieger<'a>,
-        articles: &'a mut Articles<1>,
+        articles: &'a mut Articles,
         users: &'a mut Users,
         telemetry: &'a mut Telemetry<'a>,
         schedule: &'a mut Daily,
@@ -252,34 +252,41 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
             let user = self.users.get(user_id);
             let user_name = user.map_or(String::new(), |u| u.name.clone());
 
-            // Ask for number of drinks
-            let num_drinks = self.get_number_of_drinks(&user_name).await?;
+            // Ask for article to purchase
+            let article_idx = self.select_article(&user_name).await?;
 
             // Get article information
             let article_id = self
                 .articles
-                .id(0)
+                .id(article_idx)
                 .ok_or(ErrorKind::ArticleNotFound)?
                 .clone();
-            let article = self.articles.get(0).ok_or(ErrorKind::ArticleNotFound)?;
+            let article = self
+                .articles
+                .get(&article_id)
+                .ok_or(ErrorKind::ArticleNotFound)?
+                .clone();
 
-            // Calculate total price. It's ok to cast num_drinks to f32 as it's always a small number.
+            // Ask for amount to purchase
+            let amount = self.select_amount(&article).await?;
+
+            // Calculate total price. It's ok to cast amount to f32 as it's always a small number.
             #[allow(clippy::cast_precision_loss)]
-            let amount = num_drinks as f32;
-            let total_price = article.price * amount;
+            let total_price = article.price * amount as f32;
 
             // Show total price and ask for confirmation
-            self.confirm_purchase(num_drinks, total_price).await?;
+            self.confirm_purchase(&article, amount, total_price).await?;
 
             // Store purchase
-            self.purchase(&article_id, amount, user_id, total_price)
+            #[allow(clippy::cast_precision_loss)]
+            self.purchase(&article_id, amount as f32, user_id, total_price)
                 .await?;
 
             // Submit telemetry data if needed
             self.submit_telemetry().await?;
 
-            // Show success and affirm to take drinks
-            self.show_success(num_drinks).await?;
+            // Show success and affirm to take items
+            self.show_success(amount).await?;
 
             Ok(())
         })
@@ -345,17 +352,51 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
         }
     }
 
-    /// Ask for number of drinks
-    async fn get_number_of_drinks(&mut self, name: &str) -> Result<usize, Error> {
-        info!("UI: Asking for number of drinks...");
+    /// Ask for article to purchase
+    async fn select_article(&mut self, name: &str) -> Result<usize, Error> {
+        info!("UI: Asking to select article...");
 
         self.display
-            .screen(&screen::NumberOfDrinks::new(&mut self.rng, name))
+            .screen(&screen::SelectArticle::new(
+                &mut self.rng,
+                name,
+                self.articles,
+            ))
+            .await?;
+        let num_articles = self.articles.count_ids();
+        loop {
+            #[allow(clippy::match_same_arms)]
+            match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
+                // Any digit 1..=num_articles selects article
+                Ok(Key::Digit(n)) if n >= 1 && n as usize <= num_articles => {
+                    break Ok(n as usize - 1)
+                }
+                // Ignore any other digit
+                Ok(Key::Digit(_)) => (),
+                // Cancel key cancels
+                Ok(Key::Cancel) => Err(ErrorKind::Cancel)?,
+                // Ignore any other key
+                Ok(_) => (),
+                // User interaction timeout
+                Err(TimeoutError) => Err(ErrorKind::UserTimeout)?,
+            }
+        }
+    }
+
+    /// Ask for amount to purchase
+    async fn select_amount(&mut self, article: &Article) -> Result<usize, Error> {
+        info!(
+            "UI: Asking to enter amount for {}, {:.02} EUR...",
+            article.name, article.price
+        );
+
+        self.display
+            .screen(&screen::EnterAmount::new(article))
             .await?;
         loop {
             #[allow(clippy::match_same_arms)]
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
-                // Any digit 1..=9 selects number of drinks
+                // Any digit 1..=9 selects amount
                 Ok(Key::Digit(n)) if (1..=9).contains(&n) => break Ok(n as usize),
                 // Ignore any other digit
                 Ok(Key::Digit(_)) => (),
@@ -370,14 +411,19 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
     }
 
     /// Show total price and ask for confirmation
-    async fn confirm_purchase(&mut self, num_drinks: usize, total_price: f32) -> Result<(), Error> {
+    async fn confirm_purchase(
+        &mut self,
+        article: &Article,
+        amount: usize,
+        total_price: f32,
+    ) -> Result<(), Error> {
         info!(
-            "UI: Asking for purchase confirmation of {} drinks, {:.02} EUR...",
-            num_drinks, total_price
+            "UI: Asking for purchase confirmation of {}x {}, {:.02} EUR...",
+            amount, article.name, total_price
         );
 
         self.display
-            .screen(&screen::Checkout::new(num_drinks, total_price))
+            .screen(&screen::Checkout::new(article, amount, total_price))
             .await?;
         loop {
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
@@ -428,12 +474,10 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
     }
 
     /// Show success screen and wait for keypress or timeout
-    async fn show_success(&mut self, num_drinks: usize) -> Result<(), Error> {
-        info!("UI: Displaying success, {} drinks", num_drinks);
+    async fn show_success(&mut self, amount: usize) -> Result<(), Error> {
+        info!("UI: Displaying success, {} items", amount);
 
-        self.display
-            .screen(&screen::Success::new(num_drinks))
-            .await?;
+        self.display.screen(&screen::Success::new(amount)).await?;
         let _ = self.buzzer.confirm().await;
 
         // Wait at least 1s without responding to keypad

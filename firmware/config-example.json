@@ -17,6 +17,7 @@
   "vf-appkey": "00000000000000000000000000000000",
   "vf-cid": 0,
 
-  // Vereinsflieger article id to use for purchases
-  "vf-article-id": "1234"
+  // Vereinsflieger article ids to offer for purchase. Only up to 4 articles
+  // are currently supported.
+  "vf-article-ids": ["1234", "2345"]
 }

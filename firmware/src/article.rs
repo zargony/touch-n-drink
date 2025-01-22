@@ -1,4 +1,7 @@
+use alloc::collections::BTreeMap;
 use alloc::string::String;
+use alloc::vec::Vec;
+use core::borrow::Borrow;
 
 /// Article id
 /// Equivalent to the Vereinsflieger `articleid` attribute
@@ -18,40 +21,50 @@ pub struct Article {
 /// list of article ids is given on initialization (from static system configuration), while
 /// article information is fetched later from Vereinsflieger.
 #[derive(Debug)]
-pub struct Articles<const N: usize> {
-    ids: [ArticleId; N],
-    articles: [Option<Article>; N],
+pub struct Articles {
+    /// Look up index to article id
+    ids: Vec<ArticleId>,
+    /// Look up article id to article information
+    articles: BTreeMap<ArticleId, Article>,
 }
 
-impl<const N: usize> Articles<N> {
+impl Articles {
     /// Create new article lookup table
-    pub fn new(ids: [ArticleId; N]) -> Self {
+    pub fn new(ids: Vec<ArticleId>) -> Self {
         Self {
             ids,
-            articles: [const { None }; N],
+            articles: BTreeMap::new(),
         }
     }
 
     /// Clear all article information
     pub fn clear(&mut self) {
-        self.articles = [const { None }; N];
+        self.articles.clear();
     }
 
     /// Update article with given article id. Ignores article ids not in list.
     pub fn update(&mut self, id: &ArticleId, name: String, price: f32) {
-        if let Some(idx) = self.find(id) {
-            self.articles[idx] = Some(Article { name, price });
+        if self.ids.contains(id) {
+            self.articles.insert(id.clone(), Article { name, price });
         }
+    }
+
+    /// Number of ids
+    pub fn count_ids(&self) -> usize {
+        self.ids.len()
     }
 
     /// Number of articles
     pub fn count(&self) -> usize {
-        self.articles.iter().filter(|a| a.is_some()).count()
+        self.articles.len()
     }
 
-    /// Find index of article with given id
-    pub fn find(&self, id: &ArticleId) -> Option<usize> {
-        self.ids.iter().position(|i| i == id)
+    /// Iterate over articles in order given on initialization
+    pub fn iter(&self) -> impl Iterator<Item = (usize, &ArticleId, &Article)> {
+        self.ids
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, id)| self.get(id).map(|article| (idx, id, article)))
     }
 
     /// Look up id of article at given index
@@ -59,11 +72,12 @@ impl<const N: usize> Articles<N> {
         self.ids.get(index)
     }
 
-    /// Look up article information at given index
-    pub fn get(&self, index: usize) -> Option<&Article> {
-        match self.articles.get(index) {
-            Some(Some(article)) => Some(article),
-            _ => None,
-        }
+    /// Look up article by article id
+    pub fn get<Q>(&self, id: &Q) -> Option<&Article>
+    where
+        ArticleId: Borrow<Q> + Ord,
+        Q: Ord + ?Sized,
+    {
+        self.articles.get(id)
     }
 }

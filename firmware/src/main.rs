@@ -137,7 +137,7 @@ async fn main(spawner: Spawner) {
     let config = config::Config::read().await;
 
     // Initialize article and user look up tables
-    let mut articles = article::Articles::new([config.vf_article_id]);
+    let mut articles = article::Articles::new(config.vf_article_ids);
     let mut users = user::Users::new();
 
     // Initialize I2C controller

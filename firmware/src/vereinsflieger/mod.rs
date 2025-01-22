@@ -148,10 +148,7 @@ impl Connection<'_> {
     }
 
     /// Fetch list of articles and update article lookup table
-    pub async fn refresh_articles<const N: usize>(
-        &mut self,
-        articles: &mut Articles<N>,
-    ) -> Result<(), Error> {
+    pub async fn refresh_articles(&mut self, articles: &mut Articles) -> Result<(), Error> {
         use proto_articles::{ArticleListRequest, ArticleListResponse};
 
         debug!("Vereinsflieger: Refreshing articles...");
@@ -172,7 +169,7 @@ impl Connection<'_> {
         articles.clear();
         let articles = RefCell::new(articles);
 
-        let response: ArticleListResponse<N> =
+        let response: ArticleListResponse =
             with_timeout(FETCH_TIMEOUT, json.read_object_with_context(&articles))
                 .await?
                 .map_err(http::Error::MalformedResponse)

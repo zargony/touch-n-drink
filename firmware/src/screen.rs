@@ -1,3 +1,4 @@
+use crate::article::{Article, Articles};
 use crate::{GIT_SHA_STR, VERSION_STR};
 use core::fmt;
 use embedded_graphics::draw_target::DrawTarget;
@@ -55,7 +56,7 @@ const HCENTER: i32 = WIDTH / 2;
 const HEIGHT: i32 = 64;
 
 /// Number of characters that fit in a line
-const MEDIUM_CHARS_PER_LINE: i32 = WIDTH / 6;
+const MEDIUM_CHARS_PER_LINE: usize = WIDTH as usize / 6;
 
 /// Screen display error
 pub type Error<E> = u8g2_fonts::Error<E>;
@@ -134,6 +135,15 @@ fn footer<D: DrawTarget<Color = BinaryColor>>(
     Ok(())
 }
 
+/// Trim text if it's too long
+fn trim(text: &str, max_len: usize) -> &str {
+    if text.len() > max_len {
+        &text[..max_len]
+    } else {
+        text
+    }
+}
+
 /// Draw user greeting (top 10 lines, 0..10)
 fn greeting<D: DrawTarget<Color = BinaryColor>>(
     random: u32,
@@ -141,15 +151,8 @@ fn greeting<D: DrawTarget<Color = BinaryColor>>(
     target: &mut D,
 ) -> Result<(), Error<D::Error>> {
     let greeting = GREETINGS[random as usize % GREETINGS.len()];
-    let greeting_len = greeting.len() + 1;
-
     // Trim name if it's too long to display
-    let name = if name.len() + greeting_len > MEDIUM_CHARS_PER_LINE as usize {
-        &name[..(MEDIUM_CHARS_PER_LINE as usize - greeting_len)]
-    } else {
-        name
-    };
-
+    let name = trim(name, MEDIUM_CHARS_PER_LINE - greeting.len() - 1);
     centered(&MEDIUM_FONT, 8, format_args!("{greeting} {name}"), target)
 }
 
@@ -251,70 +254,121 @@ impl Screen for ScanId {
     }
 }
 
-/// Prompt to ask for number of drinks
-pub struct NumberOfDrinks<'a> {
+/// Prompt to select article
+pub struct SelectArticle<'a> {
     greeting: u32,
     name: &'a str,
+    articles: &'a Articles,
 }
 
-impl<'a> NumberOfDrinks<'a> {
-    pub fn new<RNG: RngCore>(rng: &mut RNG, name: &'a str) -> Self {
+impl<'a> SelectArticle<'a> {
+    pub fn new<RNG: RngCore>(mut rng: RNG, name: &'a str, articles: &'a Articles) -> Self {
         Self {
             greeting: rng.next_u32(),
             name,
+            articles,
         }
     }
 }
 
-impl Screen for NumberOfDrinks<'_> {
+impl Screen for SelectArticle<'_> {
     fn draw<D: DrawTarget<Color = BinaryColor>>(
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
         greeting(self.greeting, self.name, target)?;
-        centered(&TITLE_FONT, 8 + 22, "Anzahl Getränke\nwählen", target)?;
-        footer("* Abbruch", "1-9 Weiter", target)?;
+
+        // Safe to unwrap since conversion always succeeds for these small numbers
+        let num_articles = i32::try_from(self.articles.count_ids()).unwrap();
+        let y0 = 40 + num_articles * -5;
+        for (idx, _article_id, article) in self.articles.iter() {
+            // Safe to unwrap since conversion always succeeds for these small numbers
+            let y = y0 + i32::try_from(idx).unwrap() * 12;
+            left(&TITLE_FONT, 0, y, format_args!("{}:", idx + 1), target)?;
+            left(&TITLE_FONT, 20, y, trim(&article.name, 11), target)?;
+            right(
+                &SMALL_FONT,
+                y,
+                format_args!("{:.02}", article.price),
+                target,
+            )?;
+        }
+        footer(
+            "* Abbruch",
+            format_args!("1-{} Weiter", self.articles.count_ids()),
+            target,
+        )?;
         Ok(())
     }
 }
 
-/// Checkout (confirm purchase)
-pub struct Checkout {
-    num_drinks: usize,
-    total_price: f32,
+/// Prompt to enter amount
+pub struct EnterAmount<'a> {
+    article: &'a Article,
 }
 
-impl Checkout {
-    pub fn new(num_drinks: usize, total_price: f32) -> Self {
-        Self {
-            num_drinks,
-            total_price,
-        }
+impl<'a> EnterAmount<'a> {
+    pub fn new(article: &'a Article) -> Self {
+        Self { article }
     }
 }
 
-impl Screen for Checkout {
+impl Screen for EnterAmount<'_> {
     fn draw<D: DrawTarget<Color = BinaryColor>>(
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
         centered(
             &MEDIUM_FONT,
-            26,
+            23,
             format_args!(
-                "{} {}",
-                self.num_drinks,
-                if self.num_drinks == 1 {
-                    "Getränk"
-                } else {
-                    "Getränke"
-                }
+                "{} {:.02}",
+                trim(&self.article.name, MEDIUM_CHARS_PER_LINE - 3),
+                self.article.price
+            ),
+            target,
+        )?;
+        centered(&TITLE_FONT, 23 + 16, "Anzahl wählen", target)?;
+        footer("* Abbruch", "1-9 Weiter", target)?;
+        Ok(())
+    }
+}
+
+/// Checkout (confirm purchase)
+pub struct Checkout<'a> {
+    article: &'a Article,
+    amount: usize,
+    total_price: f32,
+}
+
+impl<'a> Checkout<'a> {
+    pub fn new(article: &'a Article, amount: usize, total_price: f32) -> Self {
+        Self {
+            article,
+            amount,
+            total_price,
+        }
+    }
+}
+
+impl Screen for Checkout<'_> {
+    fn draw<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), Error<D::Error>> {
+        centered(
+            &MEDIUM_FONT,
+            23,
+            format_args!(
+                "{}x {}",
+                self.amount,
+                trim(&self.article.name, MEDIUM_CHARS_PER_LINE - 3)
             ),
             target,
         )?;
         centered(
             &TITLE_FONT,
-            26 + 16,
+            23 + 16,
             format_args!("{:.02} EUR", self.total_price),
             target,
         )?;
@@ -325,12 +379,12 @@ impl Screen for Checkout {
 
 /// Success screen
 pub struct Success {
-    num_drinks: usize,
+    amount: usize,
 }
 
 impl Success {
-    pub fn new(num_drinks: usize) -> Self {
-        Self { num_drinks }
+    pub fn new(amount: usize) -> Self {
+        Self { amount }
     }
 }
 
@@ -343,7 +397,7 @@ impl Screen for Success {
         centered(
             &SMALL_FONT,
             26 + 12,
-            format_args!("{} Getränke genehmigt", self.num_drinks),
+            format_args!("{} Getränke genehmigt", self.amount),
             target,
         )?;
         footer("", "# Ok", target)?;
