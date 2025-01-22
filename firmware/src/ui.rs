@@ -282,11 +282,11 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
             self.purchase(&article_id, amount as f32, user_id, total_price)
                 .await?;
 
-            // Submit telemetry data if needed
-            self.submit_telemetry().await?;
-
             // Show success and affirm to take items
             self.show_success(amount).await?;
+
+            // Submit telemetry data if needed
+            self.submit_telemetry().await?;
 
             Ok(())
         })
