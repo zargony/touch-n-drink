@@ -223,9 +223,55 @@ impl<R: BufRead> Reader<R> {
                 // guarantees that no character encoding is a substring of any other character
                 b'\\' => {
                     self.consume();
-                    let ch = self.peek().await?;
-                    buf.push(ch);
-                    self.consume();
+                    // Parse escape sequence
+                    match self.peek().await? {
+                        b'n' => {
+                            buf.push(0x0a);
+                            self.consume();
+                        }
+                        b'r' => {
+                            buf.push(0x0d);
+                            self.consume();
+                        }
+                        b't' => {
+                            buf.push(0x09);
+                            self.consume();
+                        }
+                        // Unicode code point
+                        b'u' => {
+                            self.consume();
+                            let hex: [u8; 4] = self.read_exact().await?;
+                            #[allow(clippy::match_same_arms)]
+                            match const_hex::decode_to_array(hex) {
+                                // FIXME: Hack for Latin-1 as Unicode code point for German characters
+                                Ok([0x00, 0xc4]) => buf.extend("Ä".bytes()),
+                                Ok([0x00, 0xd6]) => buf.extend("Ö".bytes()),
+                                Ok([0x00, 0xdc]) => buf.extend("Ü".bytes()),
+                                Ok([0x00, 0xdf]) => buf.extend("ß".bytes()),
+                                Ok([0x00, 0xe4]) => buf.extend("ä".bytes()),
+                                Ok([0x00, 0xe9]) => buf.extend("é".bytes()),
+                                Ok([0x00, 0xf6]) => buf.extend("ö".bytes()),
+                                Ok([0x00, 0xfc]) => buf.extend("ü".bytes()),
+                                // FIXME: Hack for UTF-8 code point for German characters
+                                Ok([0xc3, 0x84]) => buf.extend("Ä".bytes()),
+                                Ok([0xc3, 0x96]) => buf.extend("Ö".bytes()),
+                                Ok([0xc3, 0x9c]) => buf.extend("Ü".bytes()),
+                                Ok([0xc3, 0x9f]) => buf.extend("ß".bytes()),
+                                Ok([0xc3, 0xa4]) => buf.extend("ä".bytes()),
+                                Ok([0xc3, 0xa9]) => buf.extend("é".bytes()),
+                                Ok([0xc3, 0xb6]) => buf.extend("ö".bytes()),
+                                Ok([0xc3, 0xbc]) => buf.extend("ü".bytes()),
+                                // Replace unknown characters with "?"
+                                Ok(_) => buf.push(b'?'),
+                                Err(_) => break Err(Error::InvalidType),
+                            }
+                        }
+                        // Take any other character literally
+                        ch => {
+                            buf.push(ch);
+                            self.consume();
+                        }
+                    }
                 }
                 b'"' => {
                     self.consume();
@@ -398,6 +444,16 @@ impl<R: BufRead> Reader<R> {
                 Err(err) => break Err(err),
             }
         }
+    }
+
+    /// Read exact number of characters
+    async fn read_exact<const N: usize>(&mut self) -> Result<[u8; N], Error<R::Error>> {
+        let mut s = [0; N];
+        for ch in &mut s {
+            *ch = self.peek().await?;
+            self.consume();
+        }
+        Ok(s)
     }
 }
 
@@ -691,6 +747,7 @@ mod tests {
             read_string,
             Ok("hello \"world\"".into())
         );
+        assert_read_eq!(r#""h\u00e9ll\u00f6""#, read_string, Ok("héllö".into()));
         assert_read_eq!("\"hello", read_string, Err(Error::Eof));
     }
 
