@@ -1,6 +1,6 @@
 [package]
 name = "touch-n-drink"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Andreas Neuhaus <git@zargony.com>"]
 edition = "2021"
 description = "Firmware for cashless payment device for cold drinks at the aeroclub at EDLH"
@@ -50,7 +50,12 @@ display-interface = "0.5"
 embassy-embedded-hal = "0.3"
 embassy-executor = "0.7"
 embassy-futures = "0.1"
-embassy-net = { version = "0.6", features = ["dhcpv4", "dns", "proto-ipv4", "tcp"] }
+embassy-net = { version = "0.6", features = [
+    "dhcpv4",
+    "dns",
+    "proto-ipv4",
+    "tcp",
+] }
 embassy-sync = "0.6"
 embassy-time = "0.4"
 embedded-graphics = "0.8"
@@ -58,17 +63,31 @@ embedded-hal-async = "1.0"
 embedded-io-async = { version = "0.6", features = ["alloc"] }
 embedded-storage = "0.3"
 esp-alloc = "0.6"
-esp-backtrace = { version = "0.15", features = ["esp32c3", "custom-halt", "panic-handler", "exception-handler", "println"] }
+esp-backtrace = { version = "0.15", features = [
+    "esp32c3",
+    "custom-halt",
+    "panic-handler",
+    "exception-handler",
+    "println",
+] }
 esp-hal = { version = "0.23", features = ["esp32c3"] }
 esp-hal-embassy = { version = "0.6", features = ["esp32c3"] }
 esp-partition-table = "0.1"
 esp-println = { version = "0.13", features = ["esp32c3", "log"] }
 esp-storage = { version = "0.4", features = ["esp32c3"] }
-esp-wifi = { version = "0.12", default-features = false, features = ["esp32c3", "esp-alloc", "log", "wifi"] }
+esp-wifi = { version = "0.12", default-features = false, features = [
+    "esp32c3",
+    "esp-alloc",
+    "log",
+    "wifi",
+] }
 log = { version = "0.4", features = ["release_max_level_info"] }
 pn532 = "0.5"
 rand_core = "0.6"
-reqwless = { version = "0.13", default-features = false, features = ["alloc", "embedded-tls"] }
+reqwless = { version = "0.13", default-features = false, features = [
+    "alloc",
+    "embedded-tls",
+] }
 ssd1306 = { version = "0.9", features = ["async"] }
 u8g2-fonts = "0.5"
 
@@ -81,6 +100,11 @@ maybe-async-cfg = "=0.2.4"
 default = []
 # Enable additional logging of dependencies
 log = [
-    "embassy-executor/log", "embassy-net/log", "embassy-sync/log", "embassy-time/log",
-    "esp-hal/log", "esp-hal-embassy/log", "reqwless/log",
+    "embassy-executor/log",
+    "embassy-net/log",
+    "embassy-sync/log",
+    "embassy-time/log",
+    "esp-hal/log",
+    "esp-hal-embassy/log",
+    "reqwless/log",
 ]
