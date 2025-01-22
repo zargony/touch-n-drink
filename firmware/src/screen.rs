@@ -303,14 +303,32 @@ impl Screen for SelectArticle<'_> {
 }
 
 /// Prompt to enter amount
-pub struct EnterAmount;
+pub struct EnterAmount<'a> {
+    article: &'a Article,
+}
 
-impl Screen for EnterAmount {
+impl<'a> EnterAmount<'a> {
+    pub fn new(article: &'a Article) -> Self {
+        Self { article }
+    }
+}
+
+impl Screen for EnterAmount<'_> {
     fn draw<D: DrawTarget<Color = BinaryColor>>(
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        centered(&TITLE_FONT, 30, "Anzahl wählen", target)?;
+        centered(
+            &MEDIUM_FONT,
+            23,
+            format_args!(
+                "{} {:.02}",
+                trim(&self.article.name, MEDIUM_CHARS_PER_LINE - 3),
+                self.article.price
+            ),
+            target,
+        )?;
+        centered(&TITLE_FONT, 23 + 16, "Anzahl wählen", target)?;
         footer("* Abbruch", "1-9 Weiter", target)?;
         Ok(())
     }

@@ -268,7 +268,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
                 .clone();
 
             // Ask for amount to purchase
-            let amount = self.select_amount().await?;
+            let amount = self.select_amount(&article).await?;
 
             // Calculate total price. It's ok to cast amount to f32 as it's always a small number.
             #[allow(clippy::cast_precision_loss)]
@@ -384,10 +384,15 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
     }
 
     /// Ask for amount to purchase
-    async fn select_amount(&mut self) -> Result<usize, Error> {
-        info!("UI: Asking to enter amount...");
+    async fn select_amount(&mut self, article: &Article) -> Result<usize, Error> {
+        info!(
+            "UI: Asking to enter amount for {}, {:.02} EUR...",
+            article.name, article.price
+        );
 
-        self.display.screen(&screen::EnterAmount).await?;
+        self.display
+            .screen(&screen::EnterAmount::new(article))
+            .await?;
         loop {
             #[allow(clippy::match_same_arms)]
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
