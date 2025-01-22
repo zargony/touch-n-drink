@@ -1,6 +1,7 @@
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::borrow::Borrow;
 
 /// Article id
 /// Equivalent to the Vereinsflieger `articleid` attribute
@@ -72,7 +73,11 @@ impl Articles {
     }
 
     /// Look up article by article id
-    pub fn get(&self, id: &ArticleId) -> Option<&Article> {
+    pub fn get<Q>(&self, id: &Q) -> Option<&Article>
+    where
+        ArticleId: Borrow<Q> + Ord,
+        Q: Ord + ?Sized,
+    {
         self.articles.get(id)
     }
 }
