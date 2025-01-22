@@ -1,4 +1,4 @@
-use crate::article::Articles;
+use crate::article::{Article, Articles};
 use crate::{GIT_SHA_STR, VERSION_STR};
 use core::fmt;
 use embedded_graphics::draw_target::DrawTarget;
@@ -280,7 +280,7 @@ impl Screen for SelectArticle<'_> {
 
         // Safe to unwrap since conversion always succeeds for these small numbers
         let num_articles = i32::try_from(self.articles.count_ids()).unwrap();
-        let y0 = 8 + 32 + num_articles * -5;
+        let y0 = 40 + num_articles * -5;
         for (idx, _article_id, article) in self.articles.iter() {
             // Safe to unwrap since conversion always succeeds for these small numbers
             let y = y0 + i32::try_from(idx).unwrap() * 12;
@@ -310,7 +310,7 @@ impl Screen for EnterAmount {
         &self,
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
-        centered(&TITLE_FONT, 8 + 22, "Anzahl wählen", target)?;
+        centered(&TITLE_FONT, 30, "Anzahl wählen", target)?;
         footer("* Abbruch", "1-9 Weiter", target)?;
         Ok(())
     }
@@ -318,15 +318,15 @@ impl Screen for EnterAmount {
 
 /// Checkout (confirm purchase)
 pub struct Checkout<'a> {
-    article_name: &'a str,
+    article: &'a Article,
     amount: usize,
     total_price: f32,
 }
 
 impl<'a> Checkout<'a> {
-    pub fn new(article_name: &'a str, amount: usize, total_price: f32) -> Self {
+    pub fn new(article: &'a Article, amount: usize, total_price: f32) -> Self {
         Self {
-            article_name,
+            article,
             amount,
             total_price,
         }
@@ -340,17 +340,17 @@ impl Screen for Checkout<'_> {
     ) -> Result<(), Error<D::Error>> {
         centered(
             &MEDIUM_FONT,
-            26,
+            23,
             format_args!(
                 "{}x {}",
                 self.amount,
-                trim(self.article_name, MEDIUM_CHARS_PER_LINE - 3)
+                trim(&self.article.name, MEDIUM_CHARS_PER_LINE - 3)
             ),
             target,
         )?;
         centered(
             &TITLE_FONT,
-            26 + 16,
+            23 + 16,
             format_args!("{:.02} EUR", self.total_price),
             target,
         )?;

@@ -1,4 +1,4 @@
-use crate::article::{ArticleId, Articles};
+use crate::article::{Article, ArticleId, Articles};
 use crate::buzzer::Buzzer;
 use crate::display::Display;
 use crate::error::{Error, ErrorKind};
@@ -275,8 +275,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
             let total_price = article.price * amount as f32;
 
             // Show total price and ask for confirmation
-            self.confirm_purchase(&article.name, amount, total_price)
-                .await?;
+            self.confirm_purchase(&article, amount, total_price).await?;
 
             // Store purchase
             #[allow(clippy::cast_precision_loss)]
@@ -409,17 +408,17 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
     /// Show total price and ask for confirmation
     async fn confirm_purchase(
         &mut self,
-        article_name: &str,
+        article: &Article,
         amount: usize,
         total_price: f32,
     ) -> Result<(), Error> {
         info!(
             "UI: Asking for purchase confirmation of {}x {}, {:.02} EUR...",
-            amount, article_name, total_price
+            amount, article.name, total_price
         );
 
         self.display
-            .screen(&screen::Checkout::new(article_name, amount, total_price))
+            .screen(&screen::Checkout::new(article, amount, total_price))
             .await?;
         loop {
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
