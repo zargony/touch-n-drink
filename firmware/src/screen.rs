@@ -277,9 +277,13 @@ impl Screen for SelectArticle<'_> {
         target: &mut D,
     ) -> Result<(), Error<D::Error>> {
         greeting(self.greeting, self.name, target)?;
+
+        // Safe to unwrap since conversion always succeeds for these small numbers
+        let num_articles = i32::try_from(self.articles.count_ids()).unwrap();
+        let y0 = 8 + 32 + num_articles * -5;
         for (idx, _article_id, article) in self.articles.iter() {
             // Safe to unwrap since conversion always succeeds for these small numbers
-            let y = 8 + 18 + i32::try_from(idx).unwrap() * 12;
+            let y = y0 + i32::try_from(idx).unwrap() * 12;
             left(&TITLE_FONT, 0, y, format_args!("{}:", idx + 1), target)?;
             left(&TITLE_FONT, 20, y, trim(&article.name, 11), target)?;
             right(
