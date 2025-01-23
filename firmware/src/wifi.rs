@@ -309,7 +309,11 @@ async fn connection(mut controller: WifiController<'static>) -> ! {
         match controller.connect_async().await {
             Ok(()) => info!("Wifi: Connected"),
             Err(err) => {
-                warn!("Wifi: Failed to connect: {:?}", err);
+                warn!(
+                    "Wifi: Failed to connect: {:?}, state {:?}",
+                    err,
+                    wifi::wifi_state()
+                );
                 Timer::after(CONNECT_RETRY_DELAY).await;
             }
         }

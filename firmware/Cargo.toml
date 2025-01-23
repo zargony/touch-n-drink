@@ -64,7 +64,7 @@ esp-hal-embassy = { version = "0.6", features = ["esp32c3"] }
 esp-partition-table = "0.1"
 esp-println = { version = "0.13", features = ["esp32c3", "log"] }
 esp-storage = { version = "0.4", features = ["esp32c3"] }
-esp-wifi = { version = "0.12", default-features = false, features = ["esp32c3", "esp-alloc", "log", "wifi"] }
+esp-wifi = { version = "0.12", features = ["esp32c3", "log", "wifi"] }
 log = { version = "0.4", features = ["release_max_level_info"] }
 pn532 = "0.5"
 rand_core = "0.6"
