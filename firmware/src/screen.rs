@@ -41,7 +41,7 @@ static GREETINGS: [&str; 9] = [
 ];
 
 const SPLASH_VERSION_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_profont10_tr>();
-const TITLE_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_8x13B_tf>();
+const TITLE_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_7x13B_tf>();
 const MEDIUM_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_6x10_tf>();
 const SMALL_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_5x7_tf>();
 const FOOTER_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_5x7_tf>();
@@ -302,7 +302,7 @@ impl Screen for SelectArticle<'_> {
             let y = y0 + i32::try_from(idx).unwrap() * 12;
             left(&TITLE_FONT, 0, y, format_args!("{}:", idx + 1), target)?;
             let article_name = trim_prefixes(&article.name, &["Getränke", "Getränk"]);
-            left(&TITLE_FONT, 20, y, trim(article_name, 11), target)?;
+            left(&TITLE_FONT, 16, y, trim(article_name, 13), target)?;
             right(
                 &SMALL_FONT,
                 y,
