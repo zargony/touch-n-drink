@@ -20,7 +20,7 @@ pub use pn532::requests::{Command, SAMMode};
 pub use pn532::{Error, Request};
 
 /// Response buffer size (32 is the PN532 default)
-pub const BUFFER_SIZE: usize = 32;
+pub const BUFFER_SIZE: usize = 64;
 
 /// Command ACK timeout
 const ACK_TIMEOUT: Duration = Duration::from_millis(50);

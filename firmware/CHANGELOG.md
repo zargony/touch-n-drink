@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix "Buffer too small" NFC error with some cards
+
 ## 0.3.0 - 2025-01-22
 
 - Allow to choose from multiple articles to purchase
