@@ -273,6 +273,30 @@ impl<R: BufRead> Reader<R> {
                         }
                     }
                 }
+                b'&' => {
+                    self.consume();
+                    // Parse HTML entities
+                    match self.peek().await? {
+                        // HTML entity with numeric code
+                        b'#' => {
+                            self.consume();
+                            let n = self.read_integer().await?;
+                            self.expect(b';').await?;
+                            buf.push(u8::try_from(n).map_err(|_| Error::InvalidType)?);
+                        }
+                        // TODO: Other entities (&auml; etc) are not supported yet
+                        _ch => {
+                            loop {
+                                self.consume();
+                                if self.peek().await? == b';' {
+                                    break;
+                                }
+                            }
+                            self.expect(b';').await?;
+                            buf.push(b'?');
+                        }
+                    }
+                }
                 b'"' => {
                     self.consume();
                     let s = match String::from_utf8_lossy(&buf) {
@@ -748,6 +772,7 @@ mod tests {
             Ok("hello \"world\"".into())
         );
         assert_read_eq!(r#""h\u00e9ll\u00f6""#, read_string, Ok("héllö".into()));
+        assert_read_eq!("\"hello&#47;world\"", read_string, Ok("hello/world".into()));
         assert_read_eq!("\"hello", read_string, Err(Error::Eof));
     }
 
