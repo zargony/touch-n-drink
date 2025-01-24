@@ -144,6 +144,22 @@ fn trim(text: &str, max_len: usize) -> &str {
     }
 }
 
+/// Trim prefixes from text
+fn trim_prefixes<'a>(text: &'a str, prefixes: &[&str]) -> &'a str {
+    let mut result = text;
+    for prefix in prefixes {
+        if result.starts_with(prefix) {
+            result = &result[prefix.len()..];
+        }
+    }
+    result = result.trim_start();
+    if result.is_empty() {
+        text
+    } else {
+        result
+    }
+}
+
 /// Draw user greeting (top 10 lines, 0..10)
 fn greeting<D: DrawTarget<Color = BinaryColor>>(
     random: u32,
@@ -285,7 +301,8 @@ impl Screen for SelectArticle<'_> {
             // Safe to unwrap since conversion always succeeds for these small numbers
             let y = y0 + i32::try_from(idx).unwrap() * 12;
             left(&TITLE_FONT, 0, y, format_args!("{}:", idx + 1), target)?;
-            left(&TITLE_FONT, 20, y, trim(&article.name, 11), target)?;
+            let article_name = trim_prefixes(&article.name, &["Getränke", "Getränk"]);
+            left(&TITLE_FONT, 20, y, trim(article_name, 11), target)?;
             right(
                 &SMALL_FONT,
                 y,
