@@ -9,6 +9,7 @@ use crate::time;
 use crate::user::{UserId, Users};
 use alloc::format;
 use alloc::string::String;
+use alloc::vec;
 use core::cell::RefCell;
 use core::fmt;
 use embassy_time::{with_timeout, Duration};
@@ -157,7 +158,7 @@ impl Connection<'_> {
         })
         .await
         .map_err(Error::FetchArticles)?;
-        let mut rx_buf = [0; 4096];
+        let mut rx_buf = vec![0; 2048];
         let mut json = with_timeout(
             TIMEOUT,
             self.http
@@ -199,7 +200,7 @@ impl Connection<'_> {
         })
         .await
         .map_err(Error::FetchUsers)?;
-        let mut rx_buf = [0; 4096];
+        let mut rx_buf = vec![0; 2048];
         let mut json = with_timeout(
             TIMEOUT,
             self.http.post_json("user/list", &request_body, &mut rx_buf),

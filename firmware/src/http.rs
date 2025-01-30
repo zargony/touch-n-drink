@@ -14,8 +14,8 @@ use reqwless::headers::ContentType;
 use reqwless::request::{RequestBody, RequestBuilder};
 use reqwless::response::{BodyReader, StatusCode};
 
-/// Maximum size of response from server
-const MAX_RESPONSE_SIZE: usize = 4096;
+/// Maximum size of response headers from server
+const MAX_RESPONSE_HEADER_SIZE: usize = 2048;
 
 /// TLS read buffer size
 const READ_BUFFER_SIZE: usize = 16640;
@@ -133,7 +133,7 @@ impl fmt::Debug for Connection<'_> {
 impl<'a> Connection<'a> {
     /// Send GET request, deserialize JSON response
     pub async fn get<T: FromJson>(&mut self, path: &str) -> Result<T, Error> {
-        let mut rx_buf = [0; MAX_RESPONSE_SIZE];
+        let mut rx_buf = vec![0; MAX_RESPONSE_HEADER_SIZE];
         let mut json = self.get_json(path, &mut rx_buf).await?;
         json.read().await.map_err(Error::MalformedResponse)
     }
@@ -159,7 +159,7 @@ impl<'a> Connection<'a> {
     /// Serialize data to JSON, send POST request, deserialize JSON response
     pub async fn post<T: ToJson, U: FromJson>(&mut self, path: &str, data: &T) -> Result<U, Error> {
         let body = Self::prepare_body(data).await?;
-        let mut rx_buf = [0; MAX_RESPONSE_SIZE];
+        let mut rx_buf = vec![0; MAX_RESPONSE_HEADER_SIZE];
         let mut json = self.post_json(path, &body, &mut rx_buf).await?;
         json.read().await.map_err(Error::MalformedResponse)
     }

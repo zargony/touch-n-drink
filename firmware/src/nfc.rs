@@ -60,7 +60,7 @@ impl fmt::Display for Error {
 /// NFC reader
 #[derive(Debug)]
 pub struct Nfc<I2C, IRQ> {
-    driver: Pn532<I2CInterfaceWithIrq<I2C, IRQ>>,
+    driver: Pn532<I2CInterfaceWithIrq<I2C, IRQ>, 64>,
 }
 
 impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {

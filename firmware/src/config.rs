@@ -134,7 +134,7 @@ impl Config {
         };
 
         // Read first sector (4 kb) of config data partition
-        let mut bytes = [0; FlashStorage::SECTOR_SIZE as usize];
+        let mut bytes = vec![0; FlashStorage::SECTOR_SIZE as usize];
         if let Err(_err) = storage.read(config_offset, &mut bytes) {
             warn!("Config: Unable to read config partition");
             return Self::default();
