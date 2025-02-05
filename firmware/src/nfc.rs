@@ -14,6 +14,9 @@ use embedded_io_async::Write;
 use log::{debug, info, warn};
 use pn532::{Error as Pn532Error, I2CInterfaceWithIrq, Pn532, Request, SAMMode};
 
+/// Response buffer size (32 is the PN532 default)
+const BUFFER_SIZE: usize = 64;
+
 /// NFC reader read loop timeout
 const READ_TIMEOUT: Duration = Duration::from_millis(100);
 
@@ -60,7 +63,7 @@ impl fmt::Display for Error {
 /// NFC reader
 #[derive(Debug)]
 pub struct Nfc<I2C, IRQ> {
-    driver: Pn532<I2CInterfaceWithIrq<I2C, IRQ>, 64>,
+    driver: Pn532<I2CInterfaceWithIrq<I2C, IRQ>, BUFFER_SIZE>,
 }
 
 impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
@@ -122,7 +125,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
                 .process_timeout_async(
                     // InListPassiveTarget request (PN532 §7.3.5)
                     &Request::INLIST_ONE_ISO_A_TARGET,
-                    pn532::BUFFER_SIZE - 9, // max response length
+                    BUFFER_SIZE - 9, // max response length
                     READ_TIMEOUT,
                 )
                 .await

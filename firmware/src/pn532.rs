@@ -19,9 +19,6 @@ use pn532::requests::BorrowedRequest;
 pub use pn532::requests::{Command, SAMMode};
 pub use pn532::{Error, Request};
 
-/// Response buffer size (32 is the PN532 default)
-pub const BUFFER_SIZE: usize = 32;
-
 /// Command ACK timeout
 const ACK_TIMEOUT: Duration = Duration::from_millis(50);
 
@@ -90,7 +87,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Interface for I2CInterfaceWithIrq<
 /// This is mostly a re-implementation of `pn532::Pn532`, but for asynchronous interfaces
 // TODO: Switch to `pn532::Pn532` once the pn532 crate supports async interfaces
 #[derive(Debug)]
-pub struct Pn532<I, const N: usize = BUFFER_SIZE> {
+pub struct Pn532<I, const N: usize = 32> {
     interface: I,
     buf: [u8; N],
 }
