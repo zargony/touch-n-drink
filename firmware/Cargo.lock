@@ -2015,7 +2015,7 @@ dependencies = [
 
 [[package]]
 name = "touch-n-drink"
-version = "0.3.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "const-hex",
