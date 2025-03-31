@@ -1,5 +1,2 @@
 [toolchain]
-channel = "stable"
-profile = "default"
-components = ["rust-analyzer", "rust-src"]
 targets = ["riscv32imc-unknown-none-elf"]
