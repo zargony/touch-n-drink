@@ -34,10 +34,10 @@ Create a custom configuration, e.g. `config.json`. See `config-example.json` for
 jq -c < config.json > config.min.json
 ```
 
-Store the minimized configuration to the device's `config` partition at 0xc000 using `espflash`:
+Store the minimized configuration to the device's `config` partition using `espflash`:
 
 ```sh
-espflash write-bin 0xc000 config.min.json
+espflash write-bin config config.min.json
 ```
 
 ## Contributions
