@@ -9,8 +9,8 @@
 	(paper "A4")
 	(title_block
 		(title "Touch 'n Drink")
-		(date "2024-10-14")
-		(rev "1.0")
+		(date "2025-05-27")
+		(rev "1.1")
 	)
 	(layers
 		(0 "F.Cu" signal)
@@ -3306,37 +3306,39 @@
 		)
 	)
 	(gr_text "Rev. ${REVISION}"
-		(at 113 112.5 0)
+		(at 122 117 90)
 		(layer "F.SilkS")
 		(uuid "d8a7b56e-7440-4d2f-afc4-d81fc65dfea3")
 		(effects
 			(font
-				(size 0.8 0.8)
-				(thickness 0.1)
+				(size 1 1)
+				(thickness 0.2)
+				(bold yes)
 			)
 			(justify left bottom)
 		)
 	)
 	(gr_text "github.com/zargony/touch-n-drink"
-		(at 113 114 0)
+		(at 124 117 90)
 		(layer "F.SilkS")
 		(uuid "de542949-ec9c-4627-bce9-316d3bc0dfb2")
 		(effects
 			(font
-				(size 0.8 0.5)
-				(thickness 0.1)
+				(size 1 0.8)
+				(thickness 0.16)
+				(bold yes)
 			)
 			(justify left bottom)
 		)
 	)
 	(gr_text "Touch 'n Drink"
-		(at 113 111 0)
+		(at 120 117 90)
 		(layer "F.SilkS")
 		(uuid "f40d8694-bc66-4f75-86fc-7adb5349270d")
 		(effects
 			(font
-				(size 1 1)
-				(thickness 0.25)
+				(size 2 2)
+				(thickness 0.5)
 				(bold yes)
 			)
 			(justify left bottom)
