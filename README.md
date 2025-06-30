@@ -33,9 +33,7 @@ If you like this project, want to use it at your club, or if you want to discuss
 
 ## License
 
-Hardware licensed under [CERN Open Hardware License Version 2 (Permissive)]. Software licensed under either of [Apache License 2.0] or [MIT License], at your option.
-
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be licensed as above, without any additional terms or conditions.
+Hardware licensed under the [CERN Open Hardware License (Strongly Reciprocal)][OHL]. Software licensed under the [European Union Public License (EUPL)][EUPL]. Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, shall be licensed as above, without any additional terms or conditions.
 
 [hardware]: ./hardware
 [firmware]: ./firmware
@@ -44,11 +42,10 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 [discussions]: https://github.com/zargony/touch-n-drink/discussions
 [issues]: https://github.com/zargony/touch-n-drink/issues
 
-[Apache License 2.0]: https://opensource.org/license/apache-2-0
-[CERN Open Hardware License Version 2 (Permissive)]: https://opensource.org/license/cern-ohl-p
 [EDLH]: https://skyvector.com/airport/EDLH/Hamm-Lippewiesen-Airport
+[EUPL]: https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12
 [LSC Hamm]: https://flugplatz-hamm.de
-[MIT License]: https://opensource.org/license/mit
 [Mixpanel]: https://mixpanel.com
+[OHL]: https://cern-ohl.web.cern.ch/home
 [Rust]: https://www.rust-lang.org
 [Vereinsflieger]: https://www.vereinsflieger.de
