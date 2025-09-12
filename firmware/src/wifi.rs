@@ -275,12 +275,12 @@ impl Wifi {
     }
 
     /// Provide an embedded-nal-async compatible DNS socket
-    pub fn dns(&self) -> &'_ DnsSocket {
+    pub fn dns(&self) -> &'_ DnsSocket<'_> {
         &self.dns_socket
     }
 
     /// Provide an embedded-nal-async compatible TCP client
-    pub fn tcp(&self) -> &'_ TcpClient {
+    pub fn tcp(&self) -> &'_ TcpClient<'_> {
         &self.tcp_client
     }
 }

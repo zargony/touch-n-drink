@@ -59,7 +59,7 @@ impl<W: Write> Writer<W> {
     }
 
     /// Write JSON object
-    pub async fn write_object(&mut self) -> Result<ObjectWriter<W>, Error<W::Error>> {
+    pub async fn write_object(&mut self) -> Result<ObjectWriter<'_, W>, Error<W::Error>> {
         ObjectWriter::new(self).await
     }
 
