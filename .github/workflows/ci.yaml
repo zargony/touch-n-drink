@@ -86,7 +86,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install pkg-config libudev-dev
       - name: Install espflash
         if: steps.cache-espflash.outputs.cache-hit != 'true'
-        run: cargo install espflash
+        # FIXME: pin espflash to 3.3.0 until images are built with proper esp-idf app descriptor
+        run: cargo install espflash@3.3.0
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:

@@ -131,8 +131,9 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
                 .await
             {
                 Ok(bytes) => bytes,
-                // On timeout (no target detected), restart detection
-                Err(Pn532Error::TimeoutResponse) => continue,
+                // On timeout (no target detected) or bad response frame (happens occasionally),
+                // restart detection
+                Err(Pn532Error::TimeoutResponse | Pn532Error::BadResponseFrame) => continue,
                 // Error listing targets, cancel loop and return
                 Err(err) => return Err(err.into()),
             };
