@@ -126,7 +126,7 @@ impl Config {
             .find(|partition| partition.type_ == PartitionType::User(0x54, 0x44))
             .map(|partition| partition.offset)
         {
-            debug!("Config: Found config partition at offset 0x{:x}", offset);
+            debug!("Config: Found config partition at offset 0x{offset:x}");
             offset
         } else {
             warn!("Config: Unable to find config partition");
@@ -144,15 +144,12 @@ impl Config {
         let config = match json::Reader::new(&bytes[..]).read().await {
             Ok(config) => config,
             Err(err) => {
-                warn!(
-                    "Config: Unable to parse configuration in config partition: {}",
-                    err
-                );
+                warn!("Config: Unable to parse configuration in config partition: {err}");
                 return Self::default();
             }
         };
 
-        debug!("Config: System configuration: {:?}", config);
+        debug!("Config: System configuration: {config:?}");
         info!("Config: Configuration loaded from config partition");
         config
     }

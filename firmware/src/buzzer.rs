@@ -70,7 +70,7 @@ impl<'a> Buzzer<'a> {
 
     /// Drive the buzzer with a PWM signal of given frequency and duty cycle
     pub fn drive(&mut self, frequency: u32, duty_pct: u8) -> Result<(), Error> {
-        // debug!("Buzzer: driving {} Hz at {}%", frequency, duty_pct);
+        // debug!("Buzzer: driving {frequency} Hz at {duty_pct}%");
         let mut lstimer0 = self.ledc.timer::<LowSpeed>(timer::Number::Timer0);
         lstimer0.configure(timer::config::Config {
             duty: timer::config::Duty::Duty13Bit,
@@ -95,7 +95,7 @@ impl<'a> Buzzer<'a> {
 
     /// Output the given tone for given duration
     pub async fn tone(&mut self, frequency: u32, duration: Duration) -> Result<(), Error> {
-        // debug!("Buzzer: playing {} Hz for {}", frequency, duration);
+        // debug!("Buzzer: playing {frequency} Hz for {duration}");
         self.drive(frequency, TONE_DUTY_CYCLE)?;
         Timer::after(duration).await;
         self.off()?;

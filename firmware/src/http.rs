@@ -110,7 +110,7 @@ impl<'a> Http<'a> {
         base_url: &'conn str,
     ) -> Result<Connection<'conn>, Error> {
         let resource = self.client.resource(base_url).await?;
-        debug!("HTTP: Connected {}", base_url);
+        debug!("HTTP: Connected {base_url}");
 
         Ok(Connection { resource })
     }

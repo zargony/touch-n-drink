@@ -260,7 +260,7 @@ impl Wifi {
     pub async fn dns_query(&self, name: &str) -> Result<IpAddress, dns::Error> {
         match self.stack.dns_query(name, DnsQueryType::A).await {
             Ok(addrs) if addrs.is_empty() => {
-                warn!("Wifi: DNS query {} returned empty result", name);
+                warn!("Wifi: DNS query {name} returned empty result");
                 Err(dns::Error::Failed)
             }
             Ok(addrs) => {
@@ -268,7 +268,7 @@ impl Wifi {
                 Ok(addrs[0])
             }
             Err(err) => {
-                warn!("Wifi: DNS query {} error: {:?}", name, err);
+                warn!("Wifi: DNS query {name} error: {err:?}");
                 Err(err)
             }
         }

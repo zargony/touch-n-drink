@@ -107,7 +107,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
 
     /// Show error screen and wait for keypress or timeout
     pub async fn show_error(&mut self, error: &Error) -> Result<(), Error> {
-        info!("UI: Displaying error: {}", error);
+        info!("UI: Displaying error: {error}");
 
         self.display.screen(&screen::Failure::new(error)).await?;
 
@@ -339,14 +339,14 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
             // Look up user id by detected NFC uid
             if let Some(user_id) = self.users.id(&uid) {
                 // User found, authorized
-                info!("UI: NFC card {} identified as user {}", uid, user_id);
+                info!("UI: NFC card {uid} identified as user {user_id}");
                 self.telemetry.track(Event::UserAuthenticated(user_id, uid));
                 let _ = self.buzzer.confirm().await;
                 break Ok(user_id);
             }
 
             // User not found, unauthorized
-            info!("UI: NFC card {} unknown, rejecting", uid);
+            info!("UI: NFC card {uid} unknown, rejecting");
             self.telemetry.track(Event::AuthenticationFailed(uid));
             let _ = self.buzzer.deny().await;
         }
@@ -450,10 +450,7 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
         // Wait for network to become available (if not already)
         self.wait_network_up().await?;
 
-        info!(
-            "UI: Purchasing {}x {}, {:.02} EUR for user {}...",
-            amount, article_id, total_price, user_id
-        );
+        info!("UI: Purchasing {amount}x {article_id}, {total_price:.02} EUR for user {user_id}...");
 
         self.display.screen(&screen::PleaseWait::Purchasing).await?;
 
@@ -475,7 +472,7 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
 
     /// Show success screen and wait for keypress or timeout
     async fn show_success(&mut self, amount: usize) -> Result<(), Error> {
-        info!("UI: Displaying success, {} items", amount);
+        info!("UI: Displaying success, {amount} items");
 
         self.display.screen(&screen::Success::new(amount)).await?;
         let _ = self.buzzer.confirm().await;

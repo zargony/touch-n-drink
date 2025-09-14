@@ -143,7 +143,7 @@ impl Keypad<'_, 3, 4> {
     pub async fn read(&mut self) -> Key {
         let scancode = self.read_scancode().await;
         let key = Self::KEYS[scancode];
-        debug!("Keypad: {:?} pressed", key);
+        debug!("Keypad: {key:?} pressed");
         key
     }
 }
@@ -177,7 +177,7 @@ impl Keypad<'_, 4, 4> {
     pub async fn read(&mut self) -> Key {
         let scancode = self.read_scancode().await;
         let key = Self::KEYS[scancode];
-        debug!("Keypad: {:?} pressed", key);
+        debug!("Keypad: {key:?} pressed");
         key
     }
 }

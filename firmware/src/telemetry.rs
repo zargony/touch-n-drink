@@ -110,7 +110,7 @@ impl<'a> Telemetry<'a> {
     /// Create new telemetry
     pub fn new(mp_token: Option<&'a str>, device_id: &'a str) -> Self {
         let mixpanel = if let Some(token) = mp_token {
-            info!("Telemetry: Initialized with Mixpanel token {}", token);
+            info!("Telemetry: Initialized with Mixpanel token {token}");
             Some(Mixpanel::new(token, device_id))
         } else {
             warn!("Telemetry: Disabled! No Mixpanel token.");
@@ -126,7 +126,7 @@ impl<'a> Telemetry<'a> {
     /// Track event
     pub fn track(&mut self, event: Event) {
         if self.mixpanel.is_some() {
-            debug!("Telemetry: tracking event {:?}", event);
+            debug!("Telemetry: tracking event {event:?}");
             self.events.push_back((Instant::now(), event));
         }
     }

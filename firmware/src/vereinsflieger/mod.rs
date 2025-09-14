@@ -144,7 +144,7 @@ impl Connection<'_> {
         )
         .await?
         .map_err(Error::FetchUserInformation)?;
-        debug!("Vereinsflieger: Got user information: {:?}", response);
+        debug!("Vereinsflieger: Got user information: {response:?}");
         Ok(())
     }
 
@@ -241,10 +241,7 @@ impl Connection<'_> {
     ) -> Result<(), Error> {
         use proto_sale::{SaleAddRequest, SaleAddResponse};
 
-        debug!(
-            "Vereinsflieger: Purchasing {}x {}, {:.02} EUR for user {}",
-            amount, article_id, total_price, user_id
-        );
+        debug!("Vereinsflieger: Purchasing {amount}x {article_id}, {total_price:.02} EUR for user {user_id}");
 
         let _response: SaleAddResponse = with_timeout(
             TIMEOUT,
@@ -306,7 +303,7 @@ impl<'a> Connection<'a> {
                     .await?
                     .map_err(Error::SignIn)?;
             let accesstoken = response.accesstoken;
-            // debug!("Vereinsflieger: Got access token {}", accesstoken);
+            // debug!("Vereinsflieger: Got access token {accesstoken}");
             debug!(
                 "Vereinsflieger: Got access token (length {})",
                 accesstoken.len()
@@ -334,7 +331,7 @@ impl<'a> Connection<'a> {
                     info!("Vereinsflieger: Signed in as {}", vf.username);
                 }
                 Err(err) => {
-                    warn!("Vereinsflieger: Sign in failed: {}", err);
+                    warn!("Vereinsflieger: Sign in failed: {err}");
                     return Err(Error::SignIn(err));
                 }
             }

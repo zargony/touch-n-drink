@@ -167,7 +167,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
             let maybe_uid = match Uid::try_from(nfcid) {
                 Ok(uid) => Some(uid),
                 Err(_err) => {
-                    warn!("NFC: Target has invalid NFCID: {:02x?}", nfcid);
+                    warn!("NFC: Target has invalid NFCID: {nfcid:02x?}");
                     None
                 }
             };
@@ -184,12 +184,12 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
                 )
                 .await
             {
-                warn!("NFC: Failed to release target: {:?}", err);
+                warn!("NFC: Failed to release target: {err:?}");
             }
 
             // Return UID if retrieved, continue looping otherwise
             if let Some(uid) = maybe_uid {
-                debug!("NFC: Detected NFC card: {}", uid);
+                debug!("NFC: Detected NFC card: {uid}");
                 return Ok(uid);
             }
         }

@@ -59,6 +59,6 @@ pub fn set<TZ: TimeZone>(now: &DateTime<TZ>) {
     let now = now.with_timezone(&Utc);
     if let Some(uptime) = uptime() {
         set_start_time(now - uptime);
-        debug!("Time: Current time set to {}", now);
+        debug!("Time: Current time set to {now}");
     }
 }
