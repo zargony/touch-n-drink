@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use alloc::string::ToString;
 use core::cell::Cell;
 use core::fmt;
 use embassy_executor::{task, Spawner};
@@ -6,13 +7,11 @@ use embassy_net::dns::{self, DnsQueryType};
 use embassy_net::tcp::{self, client::TcpClientState};
 use embassy_net::{Config, DhcpConfig, IpAddress, Runner, Stack, StackResources, StaticConfigV4};
 use embassy_time::{Duration, Timer};
-use esp_hal::peripheral::Peripheral;
 use esp_hal::peripherals;
 use esp_hal::rng::Rng;
 use esp_wifi::wifi::{
     self, AuthMethod, ClientConfiguration as WifiClientConfiguration,
-    Configuration as WifiConfiguration, WifiController, WifiDevice, WifiEvent, WifiStaDevice,
-    WifiState,
+    Configuration as WifiConfiguration, WifiController, WifiDevice, WifiEvent, WifiState,
 };
 use esp_wifi::EspWifiTimerSource;
 use log::{debug, info, warn};
@@ -139,10 +138,9 @@ pub struct Wifi {
 impl Wifi {
     /// Create and initialize Wifi interface
     pub fn new(
-        timer: impl Peripheral<P = impl EspWifiTimerSource> + 'static,
+        timer: impl EspWifiTimerSource + 'static,
         mut rng: Rng,
-        radio_clocks: peripherals::RADIO_CLK,
-        wifi: peripherals::WIFI,
+        wifi: peripherals::WIFI<'static>,
         spawner: Spawner,
         ssid: &str,
         password: &str,
@@ -153,26 +151,22 @@ impl Wifi {
         // This is ok, since only one instance of `Wifi` can exist and it'll never be dropped.
 
         // Initialize and start ESP32 Wifi controller
-        let init = Box::new(esp_wifi::init(timer, rng, radio_clocks)?);
-        let init = Box::leak(init);
+        let esp_wifi_ctrl = Box::new(esp_wifi::init(timer, rng)?);
+        let esp_wifi_ctrl = Box::leak(esp_wifi_ctrl);
+        let (mut controller, interfaces) = esp_wifi::wifi::new(esp_wifi_ctrl, wifi)?;
         let client_config = WifiClientConfiguration {
-            ssid: ssid
-                .try_into()
-                .map_err(|()| InitializationError::General(0))?,
+            ssid: ssid.to_string(),
             auth_method: if password.is_empty() {
                 AuthMethod::None
             } else {
                 AuthMethod::WPA2Personal
             },
-            password: password
-                .try_into()
-                .map_err(|()| InitializationError::General(0))?,
+            password: password.to_string(),
             ..Default::default()
         };
-        let (device, controller) = wifi::new_with_config(init, wifi, client_config)?;
-        let wifi_config = controller
-            .configuration()
-            .unwrap_or(WifiConfiguration::None);
+        let wifi_config = WifiConfiguration::Client(client_config);
+        controller.set_configuration(&wifi_config)?;
+        let wifi_interface = interfaces.sta;
 
         // Spawn task for handling Wifi connection events
         debug!("Wifi: Spawning connection task...");
@@ -189,7 +183,7 @@ impl Wifi {
         // Initialize network stack
         let net_config = Config::dhcpv4(DhcpConfig::default());
         let random_seed = rng.next_u64();
-        let (stack, runner) = embassy_net::new(device, net_config, resources, random_seed);
+        let (stack, runner) = embassy_net::new(wifi_interface, net_config, resources, random_seed);
 
         // Spawn task for running network stack
         debug!("Wifi: Spawning network task...");
@@ -322,7 +316,7 @@ async fn connection(mut controller: WifiController<'static>) -> ! {
 
 /// Task for running network stack
 #[task]
-async fn network(mut runner: Runner<'static, WifiDevice<'static, WifiStaDevice>>) {
+async fn network(mut runner: Runner<'static, WifiDevice<'static>>) {
     debug!("Wifi: Start network task");
 
     runner.run().await;

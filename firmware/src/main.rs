@@ -67,12 +67,12 @@ use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
 use esp_hal::config::WatchdogConfig;
 use esp_hal::efuse::Efuse;
-use esp_hal::gpio::{Input, Level, Output, OutputOpenDrain, Pull};
+use esp_hal::gpio::{DriveMode, Input, InputConfig, Level, Output, OutputConfig, Pull};
 use esp_hal::i2c::master::{BusTimeout, Config as I2cConfig, I2c};
 use esp_hal::peripherals::Peripherals;
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::{Rtc, RwdtStage};
-use esp_hal::time::{Duration, RateExtU32};
+use esp_hal::time::{Duration, Rate};
 use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
@@ -81,14 +81,16 @@ use rand_core::RngCore;
 
 extern crate alloc;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 static VERSION_STR: &str = env!("CARGO_PKG_VERSION");
 static GIT_SHA_STR: &str = env!("GIT_SHORT_SHA");
 
 /// Delay in seconds after which to restart on panic
 #[cfg(not(debug_assertions))]
-const PANIC_RESTART_DELAY: Duration = Duration::secs(10);
+const PANIC_RESTART_DELAY: Duration = Duration::from_secs(10);
 #[cfg(debug_assertions)]
-const PANIC_RESTART_DELAY: Duration = Duration::secs(600);
+const PANIC_RESTART_DELAY: Duration = Duration::from_secs(600);
 
 /// Custom halt function for esp-backtrace. Called after panic was handled and should halt
 /// or restart the system.
@@ -102,7 +104,7 @@ unsafe fn halt() -> ! {
     // TODO: Steal display driver and show a panic message to the user
 
     // Restart automatically after a delay
-    println!("Restarting in {} seconds...", PANIC_RESTART_DELAY.to_secs());
+    println!("Restarting in {} seconds...", PANIC_RESTART_DELAY.as_secs());
     let mut rtc = Rtc::new(peripherals.LPWR);
     rtc.rwdt.set_timeout(RwdtStage::Stage0, PANIC_RESTART_DELAY);
     rtc.rwdt.unlisten();
@@ -120,10 +122,10 @@ async fn main(spawner: Spawner) {
         .with_watchdog(WatchdogConfig::default());
     let peripherals = esp_hal::init(esp_config);
     let mut rng = Rng::new(peripherals.RNG);
-    let _led = Output::new(peripherals.GPIO8, Level::High);
+    let _led = Output::new(peripherals.GPIO8, Level::High, OutputConfig::default());
 
     // Initialize global allocator
-    esp_alloc::heap_allocator!(150 * 1024);
+    esp_alloc::heap_allocator!(size: 150 * 1024);
 
     // Initialize async executor
     let systimer = SystemTimer::new(peripherals.SYSTIMER);
@@ -143,7 +145,7 @@ async fn main(spawner: Spawner) {
     // Initialize I2C controller
     let i2c_config = I2cConfig::default()
         // Standard-Mode: 100 kHz, Fast-Mode: 400 kHz
-        .with_frequency(400.kHz())
+        .with_frequency(Rate::from_khz(400))
         // Reset bus after 24 bus clock cycles (60 µs) of inactivity
         .with_timeout(BusTimeout::BusCycles(24));
     let i2c = I2c::new(peripherals.I2C0, i2c_config)
@@ -165,22 +167,25 @@ async fn main(spawner: Spawner) {
     let _ = display.screen(&screen::Splash).await;
 
     // Initialize keypad
+    let keypad_input_config = InputConfig::default().with_pull(Pull::Up);
+    let keypad_output_config = OutputConfig::default().with_drive_mode(DriveMode::OpenDrain);
     let mut keypad = keypad::Keypad::new(
         [
-            Input::new(peripherals.GPIO5, Pull::Up),
-            Input::new(peripherals.GPIO6, Pull::Up),
-            Input::new(peripherals.GPIO7, Pull::Up),
+            Input::new(peripherals.GPIO5, keypad_input_config),
+            Input::new(peripherals.GPIO6, keypad_input_config),
+            Input::new(peripherals.GPIO7, keypad_input_config),
         ],
         [
-            OutputOpenDrain::new(peripherals.GPIO0, Level::High, Pull::None),
-            OutputOpenDrain::new(peripherals.GPIO1, Level::High, Pull::None),
-            OutputOpenDrain::new(peripherals.GPIO2, Level::High, Pull::None),
-            OutputOpenDrain::new(peripherals.GPIO3, Level::High, Pull::None),
+            Output::new(peripherals.GPIO0, Level::High, keypad_output_config),
+            Output::new(peripherals.GPIO1, Level::High, keypad_output_config),
+            Output::new(peripherals.GPIO2, Level::High, keypad_output_config),
+            Output::new(peripherals.GPIO3, Level::High, keypad_output_config),
         ],
     );
 
     // Initialize NFC reader
-    let nfc_irq = Input::new(peripherals.GPIO20, Pull::Up);
+    let nfc_irq_input_config = InputConfig::default().with_pull(Pull::Up);
+    let nfc_irq = Input::new(peripherals.GPIO20, nfc_irq_input_config);
     let mut nfc = nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq)
         .await
         // Panic on failure since an initialization error indicates a serious error
@@ -191,7 +196,6 @@ async fn main(spawner: Spawner) {
     let wifi = wifi::Wifi::new(
         timg0.timer0,
         rng,
-        peripherals.RADIO_CLK,
         peripherals.WIFI,
         spawner,
         &config.wifi_ssid,

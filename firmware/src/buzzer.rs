@@ -4,9 +4,8 @@ use esp_hal::gpio::{AnyPin, OutputPin};
 use esp_hal::ledc::channel::{self, ChannelIFace};
 use esp_hal::ledc::timer::{self, TimerIFace};
 use esp_hal::ledc::{LSGlobalClkSource, Ledc, LowSpeed};
-use esp_hal::peripheral::Peripheral;
-use esp_hal::peripherals;
-use esp_hal::time::RateExtU32;
+use esp_hal::peripherals::LEDC;
+use esp_hal::time::Rate;
 use log::{debug, info};
 
 /// PWM duty cycle to use for tones (percentage, 0-100)
@@ -50,12 +49,12 @@ impl fmt::Display for Error {
 /// Passive buzzer (driven by PWM signal on GPIO)
 pub struct Buzzer<'a> {
     ledc: Ledc<'a>,
-    pin: AnyPin,
+    pin: AnyPin<'a>,
 }
 
 impl<'a> Buzzer<'a> {
     /// Create new buzzer driver
-    pub fn new(ledc: impl Peripheral<P = peripherals::LEDC> + 'a, pin: impl OutputPin) -> Self {
+    pub fn new(ledc: LEDC<'a>, pin: impl OutputPin + 'a) -> Self {
         debug!("Buzzer: Initializing PWM controller...");
 
         let mut ledc = Ledc::new(ledc);
@@ -75,9 +74,11 @@ impl<'a> Buzzer<'a> {
         lstimer0.configure(timer::config::Config {
             duty: timer::config::Duty::Duty13Bit,
             clock_source: timer::LSClockSource::APBClk,
-            frequency: frequency.Hz(),
+            frequency: Rate::from_hz(frequency),
         })?;
-        let mut channel0 = self.ledc.channel(channel::Number::Channel0, &mut self.pin);
+        let mut channel0 = self
+            .ledc
+            .channel(channel::Number::Channel0, self.pin.reborrow());
         channel0.configure(channel::config::Config {
             timer: &lstimer0,
             duty_pct,

@@ -1,6 +1,6 @@
 use embassy_futures::select::select_array;
 use embassy_time::{Duration, Timer};
-use esp_hal::gpio::{Input, OutputOpenDrain};
+use esp_hal::gpio::{Input, Output};
 use log::{debug, info};
 
 /// Time to wait for an output pin to settle before scanning inputs
@@ -55,12 +55,12 @@ impl Key {
 /// Matrix keypad driver
 pub struct Keypad<'a, const COLS: usize, const ROWS: usize> {
     cols: [Input<'a>; COLS],
-    rows: [OutputOpenDrain<'a>; ROWS],
+    rows: [Output<'a>; ROWS],
 }
 
 impl<'a, const COLS: usize, const ROWS: usize> Keypad<'a, COLS, ROWS> {
     /// Create matrix keypad from given input columns and output rows
-    pub fn new(cols: [Input<'a>; COLS], rows: [OutputOpenDrain<'a>; ROWS]) -> Self {
+    pub fn new(cols: [Input<'a>; COLS], rows: [Output<'a>; ROWS]) -> Self {
         info!("Keypad: {ROWS}x{COLS} matrix initialized");
         Self { cols, rows }
     }
