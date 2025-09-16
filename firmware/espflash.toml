@@ -1,5 +1,3 @@
+# FIXME: Rename section to `idf` once espflash 4.0.2 is released and fixes naming
+[idf_format_args]
 partition_table = "partitions.csv"
-
-[[usb_device]]
-vid = "303a"
-pid = "1001"
