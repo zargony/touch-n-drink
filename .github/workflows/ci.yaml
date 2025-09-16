@@ -24,7 +24,7 @@ jobs:
           targets: riscv32imc-unknown-none-elf
           components: clippy, rustfmt
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Cache cargo data
         uses: actions/cache@v4
         with:
@@ -44,13 +44,18 @@ jobs:
     name: Build
     needs: [check]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - riscv32imc-unknown-none-elf
     steps:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: riscv32imc-unknown-none-elf
+          targets: ${{ matrix.target }}
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Cache cargo data
         uses: actions/cache@v4
         with:
@@ -62,18 +67,26 @@ jobs:
       - name: Build everything
         run: cargo build --workspace --all-targets --release
         working-directory: firmware
+      - name: Copy ELF file
+        run: cp target/${{ matrix.target }}/release/touch-n-drink target/release/touch-n-drink-${{ matrix.target }}.elf
+        working-directory: firmware
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: touch-n-drink-elf
+          name: touch-n-drink-${{ matrix.target }}
           path: |
-            firmware/target/riscv32imc-unknown-none-elf/release/touch-n-drink
+            firmware/target/release/touch-n-drink-${{ matrix.target }}.elf
           if-no-files-found: error
 
   image:
     name: Image
     needs: [build]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: riscv32imc-unknown-none-elf, chip: esp32c3 }
     steps:
       - name: Cache espflash
         id: cache-espflash
@@ -83,25 +96,40 @@ jobs:
           key: ${{ runner.os }}-espflash
       - name: Install dependencies
         if: steps.cache-espflash.outputs.cache-hit != 'true'
-        run: sudo apt-get update && sudo apt-get install pkg-config libudev-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install pkg-config libudev-dev
       - name: Install espflash
         if: steps.cache-espflash.outputs.cache-hit != 'true'
-        # FIXME: pin espflash to 3.3.0 until images are built with proper esp-idf app descriptor
-        run: cargo install espflash@3.3.0
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+        run: cargo install espflash
+      - name: Check out repository
+        uses: actions/checkout@v5
         with:
-          name: touch-n-drink-elf
-      - name: Generate ESP32 image
-        run: espflash save-image --chip esp32c3 --merge --skip-padding touch-n-drink touch-n-drink-esp32c3.bin
-      - name: Generate SHA-256 checksum
-        run: shasum -a 256 touch-n-drink-esp32c3.bin >touch-n-drink-esp32c3.sha256
+          sparse-checkout: |
+            firmware/espflash.toml
+            firmware/partitions.csv
+      - name: Download build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: touch-n-drink-${{ matrix.target }}
+          path: firmware/images
+      - name: Generate OTA image
+        run: |
+          espflash save-image --chip ${{ matrix.chip }} images/touch-n-drink-${{ matrix.target }}.elf images/touch-n-drink-${{ matrix.chip }}.bin
+          cd images && shasum -a 256 touch-n-drink-${{ matrix.chip }}.bin >touch-n-drink-${{ matrix.chip }}.sha256
+        working-directory: firmware
+      - name: Generate factory image
+        run: |
+          espflash save-image --chip ${{ matrix.chip }} --merge --skip-padding --partition-table partitions.csv images/touch-n-drink-${{ matrix.target }}.elf images/touch-n-drink-${{ matrix.chip }}.factory.bin
+          cd images && shasum -a 256 touch-n-drink-${{ matrix.chip }}.factory.bin >touch-n-drink-${{ matrix.chip }}.factory.sha256
+        working-directory: firmware
       - name: Upload image artifact
         uses: actions/upload-artifact@v4
         with:
-          name: touch-n-drink-esp32c3
+          name: touch-n-drink-${{ matrix.chip }}
           path: |
-            touch-n-drink-esp32c3*
+            firmware/images/touch-n-drink-*.bin
+            firmware/images/touch-n-drink-*.sha256
           if-no-files-found: error
 
   release:
@@ -113,19 +141,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           sparse-checkout: |
             firmware/CHANGELOG.md
-      - name: Download image artifact
-        uses: actions/download-artifact@v4
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v5
         with:
-          name: touch-n-drink-esp32c3
+          path: firmware/images
+          merge-multiple: true
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           body_path: firmware/CHANGELOG.md
           draft: true
           files: |
-            touch-n-drink*
+            firmware/images/touch-n-drink-*.bin
+            firmware/images/touch-n-drink-*.sha256
           fail_on_unmatched_files: true
