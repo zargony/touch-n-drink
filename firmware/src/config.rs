@@ -7,9 +7,12 @@ use core::fmt;
 use core::ops::Deref;
 use embedded_io_async::BufRead;
 use embedded_storage::ReadStorage;
-use esp_partition_table::{PartitionTable, PartitionType};
+use esp_bootloader_esp_idf::partitions;
 use esp_storage::FlashStorage;
 use log::{debug, info, warn};
+
+// Config partition type (custom partition type 0x54, subtype 0x44)
+const CONFIG_PARTITION_TYPE: [u8; 2] = [0x54, 0x44];
 
 /// String with sensitive content (debug and display output redacted)
 #[derive(Default)]
@@ -115,21 +118,29 @@ impl Config {
     pub async fn read() -> Self {
         let mut storage = FlashStorage::new();
 
-        // Read partition table (at 0x8000 by default)
-        let table = PartitionTable::default();
-        debug!("Config: Reading partition table at 0x{:x}", table.addr);
+        // Read partition table
+        let mut buf = [0; partitions::PARTITION_TABLE_MAX_LEN];
+        let table = match partitions::read_partition_table(&mut storage, &mut buf) {
+            Ok(table) => {
+                debug!("Config: Read partition table with {} entries", table.len());
+                table
+            }
+            Err(err) => {
+                warn!("Config: Unable to read partition table: {err}");
+                return Self::default();
+            }
+        };
 
-        // Look up config data partition (custom partition type 0x54, subtype 0x44)
-        let config_offset = if let Some(offset) = table
-            .iter_storage(&mut storage, false)
-            .flatten()
-            .find(|partition| partition.type_ == PartitionType::User(0x54, 0x44))
-            .map(|partition| partition.offset)
+        // Look up config data partition
+        let config_offset = if let Some(entry) = (0..table.len())
+            .filter_map(|i| table.get_partition(i).ok())
+            .find(|entry| [entry.raw_type(), entry.raw_subtype()] == CONFIG_PARTITION_TYPE)
         {
+            let offset = entry.offset();
             debug!("Config: Found config partition at offset 0x{offset:x}");
             offset
         } else {
-            warn!("Config: Unable to find config partition");
+            warn!("Config: No config partition found, using default configuration");
             return Self::default();
         };
 
