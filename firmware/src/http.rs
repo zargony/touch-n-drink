@@ -153,7 +153,26 @@ impl<'a> Connection<'a> {
             .get(path)
             .headers(&[("Accept", "application/json")]);
 
-        Self::send_request(request, rx_buf).await
+        Self::send_request_json(request, rx_buf).await
+    }
+
+    /// Send GET request, return response body raw reader
+    #[allow(dead_code)]
+    pub async fn get_raw<'req>(
+        &'req mut self,
+        path: &'req str,
+        rx_buf: &'req mut [u8],
+    ) -> Result<BodyReader<impl Read + BufRead + use<'a, 'req>>, Error> {
+        // FIXME: Return type of this function shouldn't be generic, but reqwless hides the
+        // inner type `BufferingReader` so we can't use the full type signature for now
+
+        debug!("HTTP: GET {}/{}", self.resource.base_path, path);
+        let request = self
+            .resource
+            .get(path)
+            .headers(&[("Accept", "application/octet-stream")]);
+
+        Self::send_request_raw(request, rx_buf).await
     }
 
     /// Serialize data to JSON, send POST request, deserialize JSON response
@@ -187,7 +206,7 @@ impl<'a> Connection<'a> {
             .headers(&[("Accept", "application/json")])
             .body(data);
 
-        Self::send_request(request, rx_buf).await
+        Self::send_request_json(request, rx_buf).await
     }
 
     /// Serialize data to JSON for request body
@@ -202,10 +221,20 @@ impl<'a> Connection<'a> {
 
 impl Connection<'_> {
     /// Send request, check response status and return response body JSON reader
-    async fn send_request<'req, 'conn, B: RequestBody>(
+    async fn send_request_json<'req, 'conn, B: RequestBody>(
         request: HttpResourceRequestBuilder<'req, 'conn, TcpConnection<'conn>, B>,
         rx_buf: &'req mut [u8],
     ) -> Result<json::Reader<BodyReader<impl Read + BufRead + use<'req, 'conn, B>>>, Error> {
+        Ok(json::Reader::new(
+            Self::send_request_raw(request, rx_buf).await?,
+        ))
+    }
+
+    /// Send request, check response status and return response body raw reader
+    async fn send_request_raw<'req, 'conn, B: RequestBody>(
+        request: HttpResourceRequestBuilder<'req, 'conn, TcpConnection<'conn>, B>,
+        rx_buf: &'req mut [u8],
+    ) -> Result<BodyReader<impl Read + BufRead + use<'req, 'conn, B>>, Error> {
         // FIXME: Return type of this function shouldn't be generic, but reqwless hides the
         // inner type `BufferingReader` so we can't use the full type signature for now
 
@@ -240,6 +269,6 @@ impl Connection<'_> {
         //     return Err(Error::InvalidResponse);
         // }
 
-        Ok(json::Reader::new(response.body().reader()))
+        Ok(response.body().reader())
     }
 }
