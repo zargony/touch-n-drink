@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Enabled system hardware watchdog (RWDT) to recover from unresponsive states
 - Adjust partition scheme for larger app image and optional persistent data
 - App image now contains ESP-IDF application description
 - Provide app image (`.bin`) and factory image (`.factory.bin`, includes bootloader and partition table)
