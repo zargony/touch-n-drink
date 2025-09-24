@@ -1,6 +1,7 @@
 use crate::json::{self, FromJson, ToJson};
 use crate::time;
 use crate::wifi::{DnsSocket, TcpClient, TcpConnection, Wifi};
+use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 use chrono::DateTime;
@@ -30,6 +31,10 @@ pub enum Error {
     Network(reqwless::Error),
     /// Request could not be built
     MalformedRequest(json::Error<Infallible>),
+    /// Server returned redirect (HTTP status 3xx)
+    Redirected(String),
+    /// Redirect response could not be parsed
+    MalformedRedirect,
     /// Authorization required (HTTP status 401)
     Unauthorized,
     /// Server returned an error (HTTP status 4xx)
@@ -52,6 +57,8 @@ impl fmt::Display for Error {
         match self {
             Self::Network(_err) => write!(f, "Network error"),
             Self::MalformedRequest(_err) => write!(f, "Malformed request"),
+            Self::Redirected(_location) => write!(f, "Redirected"),
+            Self::MalformedRedirect => write!(f, "Malformed redirect"),
             Self::Unauthorized => write!(f, "Unauthorized"),
             Self::BadRequest(status) => write!(f, "Bad request ({})", status.0),
             Self::ServerError(status) => write!(f, "Server error ({})", status.0),
@@ -257,6 +264,15 @@ impl Connection<'_> {
         // Check HTTP response status
         if response.status.0 == 401 {
             return Err(Error::Unauthorized);
+        } else if response.status.is_redirection() {
+            match response
+                .headers()
+                .find_map(|(k, v)| (k == "Location").then_some(v))
+                .and_then(|v| str::from_utf8(v).ok())
+            {
+                Some(location) => return Err(Error::Redirected(location.to_string())),
+                None => return Err(Error::MalformedRedirect),
+            }
         } else if response.status.is_server_error() {
             return Err(Error::ServerError(response.status));
         } else if !response.status.is_successful() {
