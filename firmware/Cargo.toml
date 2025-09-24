@@ -59,10 +59,9 @@ embedded-io-async = { version = "0.6", features = ["alloc"] }
 embedded-storage = "0.3"
 esp-alloc = "0.8"
 esp-backtrace = { version = "0.17", features = ["esp32c3", "custom-halt", "panic-handler", "exception-handler", "println"] }
-esp-bootloader-esp-idf = "0.1"
+esp-bootloader-esp-idf = { version = "0.2", features = ["esp32c3"] }
 esp-hal = { version = "1.0.0-rc", features = ["esp32c3", "unstable"] }
 esp-hal-embassy = { version = "0.9", features = ["esp32c3"] }
-esp-partition-table = "0.1"
 esp-println = { version = "0.15", features = ["esp32c3", "log-04"] }
 esp-storage = { version = "0.7", features = ["esp32c3"] }
 esp-wifi = { version = "0.15", features = ["esp32c3", "log-04", "wifi"] }

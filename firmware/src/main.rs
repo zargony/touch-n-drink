@@ -60,12 +60,13 @@ mod vereinsflieger;
 mod wifi;
 
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
-use embassy_executor::Spawner;
+use embassy_executor::{task, Spawner};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
+use embassy_time::Timer;
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
-use esp_hal::config::WatchdogConfig;
+use esp_hal::config::{WatchdogConfig, WatchdogStatus};
 use esp_hal::efuse::Efuse;
 use esp_hal::gpio::{DriveMode, Input, InputConfig, Level, Output, OutputConfig, Pull};
 use esp_hal::i2c::master::{BusTimeout, Config as I2cConfig, I2c};
@@ -75,8 +76,9 @@ use esp_hal::rtc_cntl::{Rtc, RwdtStage};
 use esp_hal::time::{Duration, Rate};
 use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::timer::timg::TimerGroup;
+use esp_hal_embassy::main;
 use esp_println::println;
-use log::{error, info};
+use log::{debug, error, info};
 use rand_core::RngCore;
 
 extern crate alloc;
@@ -91,6 +93,9 @@ static GIT_SHA_STR: &str = env!("GIT_SHORT_SHA");
 const PANIC_RESTART_DELAY: Duration = Duration::from_secs(10);
 #[cfg(debug_assertions)]
 const PANIC_RESTART_DELAY: Duration = Duration::from_secs(600);
+
+/// Hardware watchdog timeout. RWDT will reset the system if not fed within this time.
+const WATCHDOG_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Custom halt function for esp-backtrace. Called after panic was handled and should halt
 /// or restart the system.
@@ -114,12 +119,24 @@ unsafe fn halt() -> ! {
     }
 }
 
-#[esp_hal_embassy::main]
+#[task]
+async fn feed_watchdog(mut rtc: Rtc<'static>) -> ! {
+    debug!("Start watchdog feed task");
+
+    let timeout = embassy_time::Duration::from_micros(WATCHDOG_TIMEOUT.as_micros() / 2);
+    loop {
+        Timer::after(timeout).await;
+        rtc.rwdt.feed();
+    }
+}
+
+#[main]
 async fn main(spawner: Spawner) {
+    let watchdog_config =
+        WatchdogConfig::default().with_rwdt(WatchdogStatus::Enabled(WATCHDOG_TIMEOUT));
     let esp_config = esp_hal::Config::default()
         .with_cpu_clock(CpuClock::max())
-        // TODO: Enable watchdog
-        .with_watchdog(WatchdogConfig::default());
+        .with_watchdog(watchdog_config);
     let peripherals = esp_hal::init(esp_config);
     let mut rng = Rng::new(peripherals.RNG);
     let _led = Output::new(peripherals.GPIO8, Level::High, OutputConfig::default());
@@ -134,6 +151,14 @@ async fn main(spawner: Spawner) {
     // Initialize logging
     esp_println::logger::init_logger_from_env();
     info!("Touch 'n Drink v{VERSION_STR} ({GIT_SHA_STR})");
+
+    // Start feeding the watchdog
+    let rtc = Rtc::new(peripherals.LPWR);
+    debug!("Spawning watchdog feed task...");
+    spawner
+        .spawn(feed_watchdog(rtc))
+        // Panic on failure since failing to spawn a task indicates a serious error
+        .expect("Failed to spawn watchdog feed task");
 
     // Read system configuration
     let config = config::Config::read().await;
