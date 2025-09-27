@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## 1.0.1 - 2025-09-27
+
 - Enabled system hardware watchdog (RWDT) to recover from unresponsive states
 - Adjust partition scheme for larger app image and optional persistent data
 - App image now contains ESP-IDF application description
