@@ -1,6 +1,6 @@
 use core::fmt;
-use embassy_time::{Duration, Timer};
-use esp_hal::gpio::{AnyPin, OutputPin};
+use embassy_time::Timer;
+use esp_hal::gpio::{AnyPin, DriveMode, OutputPin};
 use esp_hal::ledc::channel::{self, ChannelIFace};
 use esp_hal::ledc::timer::{self, TimerIFace};
 use esp_hal::ledc::{LSGlobalClkSource, Ledc, LowSpeed};
@@ -82,7 +82,7 @@ impl<'a> Buzzer<'a> {
         channel0.configure(channel::config::Config {
             timer: &lstimer0,
             duty_pct,
-            pin_config: channel::config::PinConfig::PushPull,
+            drive_mode: DriveMode::PushPull,
         })?;
         Ok(())
     }
@@ -95,10 +95,10 @@ impl<'a> Buzzer<'a> {
     }
 
     /// Output the given tone for given duration
-    pub async fn tone(&mut self, frequency: u32, duration: Duration) -> Result<(), Error> {
-        // debug!("Buzzer: playing {frequency} Hz for {duration}");
+    pub async fn tone(&mut self, frequency: u32, duration: u64) -> Result<(), Error> {
+        // debug!("Buzzer: playing {frequency} Hz for {duration} ms");
         self.drive(frequency, TONE_DUTY_CYCLE)?;
-        Timer::after(duration).await;
+        Timer::after_millis(duration).await;
         self.off()?;
         Ok(())
     }
@@ -106,32 +106,32 @@ impl<'a> Buzzer<'a> {
     /// Output startup/testing tone
     pub async fn startup(&mut self) -> Result<(), Error> {
         debug!("Buzzer: Playing startup tone");
-        self.tone(3136, Duration::from_millis(1000)).await // G7
+        self.tone(3136, 1000).await // G7
     }
 
     /// Output a short confirmation tone
     pub async fn confirm(&mut self) -> Result<(), Error> {
         debug!("Buzzer: Playing confirm tone");
-        self.tone(3136, Duration::from_millis(100)).await // G7
+        self.tone(3136, 100).await // G7
     }
 
     /// Output a long denying tone
     pub async fn deny(&mut self) -> Result<(), Error> {
         debug!("Buzzer: Playing deny tone");
-        self.tone(392, Duration::from_millis(500)).await?; // G4
-        Timer::after(Duration::from_millis(1000)).await;
+        self.tone(392, 500).await?; // G4
+        Timer::after_millis(1000).await;
         Ok(())
     }
 
     /// Output an error tone
     pub async fn error(&mut self) -> Result<(), Error> {
         debug!("Buzzer: Playing error tone");
-        self.tone(784, Duration::from_millis(200)).await?; // G5
-        Timer::after(Duration::from_millis(10)).await;
-        self.tone(587, Duration::from_millis(200)).await?; // D5
-        Timer::after(Duration::from_millis(10)).await;
-        self.tone(392, Duration::from_millis(500)).await?; // G4
-        Timer::after(Duration::from_millis(1000)).await;
+        self.tone(784, 200).await?; // G5
+        Timer::after_millis(10).await;
+        self.tone(587, 200).await?; // D5
+        Timer::after_millis(10).await;
+        self.tone(392, 500).await?; // G4
+        Timer::after_millis(1000).await;
         Ok(())
     }
 }

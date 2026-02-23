@@ -8,6 +8,7 @@ use core::ops::Deref;
 use embedded_io_async::BufRead;
 use embedded_storage::ReadStorage;
 use esp_bootloader_esp_idf::partitions;
+use esp_hal::peripherals::FLASH as Flash;
 use esp_storage::FlashStorage;
 use log::{debug, info, warn};
 
@@ -115,8 +116,8 @@ impl FromJsonObject for Config {
 
 impl Config {
     /// Read configuration from `config` flash data partition
-    pub async fn read() -> Self {
-        let mut storage = FlashStorage::new();
+    pub async fn read(flash: Flash<'_>) -> Self {
+        let mut storage = FlashStorage::new(flash);
 
         // Read partition table
         let mut buf = [0; partitions::PARTITION_TABLE_MAX_LEN];

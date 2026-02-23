@@ -2,18 +2,19 @@ use alloc::boxed::Box;
 use alloc::string::ToString;
 use core::cell::Cell;
 use core::fmt;
-use embassy_executor::{task, Spawner};
+use embassy_executor::Spawner;
 use embassy_net::dns::{self, DnsQueryType};
 use embassy_net::tcp::{self, client::TcpClientState};
-use embassy_net::{Config, DhcpConfig, IpAddress, Runner, Stack, StackResources, StaticConfigV4};
+use embassy_net::{
+    Config as NetConfig, DhcpConfig, IpAddress, Runner, Stack, StackResources, StaticConfigV4,
+};
 use embassy_time::{Duration, Timer};
 use esp_hal::peripherals;
 use esp_hal::rng::Rng;
-use esp_wifi::wifi::{
-    self, AuthMethod, ClientConfiguration as WifiClientConfiguration,
-    Configuration as WifiConfiguration, WifiController, WifiDevice, WifiEvent, WifiState,
+use esp_radio::wifi::{
+    self, AuthMethod, ClientConfig, Config as WifiConfig, ModeConfig, WifiController, WifiDevice,
+    WifiEvent, WifiStaState,
 };
-use esp_wifi::EspWifiTimerSource;
 use log::{debug, info, warn};
 use rand_core::RngCore;
 
@@ -41,7 +42,7 @@ pub type TcpConnection<'d> =
     tcp::client::TcpConnection<'d, NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>;
 
 /// Wifi initialization error
-pub use esp_wifi::InitializationError;
+pub use esp_radio::InitializationError;
 
 /// Option display helper
 struct DisplayOption<T: fmt::Display>(Option<T>);
@@ -75,39 +76,34 @@ impl<T: fmt::Display> fmt::Display for DisplayList<'_, T> {
 }
 
 /// Wifi configuration display helper
-struct DisplayWifiConfig(WifiConfiguration);
+struct DisplayModeConfig(ModeConfig);
 
-impl fmt::Display for DisplayWifiConfig {
+impl fmt::Display for DisplayModeConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
-            WifiConfiguration::None => write!(f, "None"),
-            WifiConfiguration::Client(client) => write!(f,
+            ModeConfig::None => write!(f, "None"),
+            ModeConfig::Client(client) => write!(f,
                 "Client, auth: {:?}, ssid: {}, channel: {}",
-                client.auth_method,
-                client.ssid,
-                DisplayOption(client.channel),
+                client.auth_method(),
+                client.ssid(),
+                DisplayOption(client.channel()),
             ),
-            WifiConfiguration::AccessPoint(ap) => write!(f,
+            ModeConfig::AccessPoint(ap) => write!(f,
                 "AP, auth: {:?}, ssid: {}, channel: {}",
-                ap.auth_method,
-                ap.ssid,
-                ap.channel,
+                ap.auth_method(),
+                ap.ssid(),
+                ap.channel(),
             ),
-            WifiConfiguration::Mixed(client, ap) => write!(f,
-                "Client+AP, auth: {:?}, ssid: {}, channel: {}, AP auth: {:?}, ssid: {}, channel: {}",
-                client.auth_method,
-                client.ssid,
-                DisplayOption(client.channel),
-                ap.auth_method,
-                ap.ssid,
-                ap.channel,
+            ModeConfig::ApSta(client, ap) => write!(f,
+                "AP+Client, auth: {:?}, ssid: {}, channel: {}, AP auth: {:?}, ssid: {}, channel: {}",
+                client.auth_method(),
+                client.ssid(),
+                DisplayOption(client.channel()),
+                ap.auth_method(),
+                ap.ssid(),
+                ap.channel(),
             ),
-            WifiConfiguration::EapClient(eap) => write!(f,
-                "EAP Client, auth: {:?}, ssid: {}, channel: {}",
-                eap.auth_method,
-                eap.ssid,
-                DisplayOption(eap.channel)
-            ),
+            _ => write!(f, "Unknown mode")
         }
     }
 }
@@ -138,7 +134,6 @@ pub struct Wifi {
 impl Wifi {
     /// Create and initialize Wifi interface
     pub fn new(
-        timer: impl EspWifiTimerSource + 'static,
         mut rng: Rng,
         wifi: peripherals::WIFI<'static>,
         spawner: Spawner,
@@ -151,21 +146,21 @@ impl Wifi {
         // This is ok, since only one instance of `Wifi` can exist and it'll never be dropped.
 
         // Initialize and start ESP32 Wifi controller
-        let esp_wifi_ctrl = Box::new(esp_wifi::init(timer, rng)?);
+        let esp_wifi_ctrl = Box::new(esp_radio::init()?);
         let esp_wifi_ctrl = Box::leak(esp_wifi_ctrl);
-        let (mut controller, interfaces) = esp_wifi::wifi::new(esp_wifi_ctrl, wifi)?;
-        let client_config = WifiClientConfiguration {
-            ssid: ssid.to_string(),
-            auth_method: if password.is_empty() {
+        // TODO: Make country code configurable
+        let wifi_config = WifiConfig::default().with_country_code(*b"DE");
+        let (mut controller, interfaces) = esp_radio::wifi::new(esp_wifi_ctrl, wifi, wifi_config)?;
+        let client_config = ClientConfig::default()
+            .with_ssid(ssid.to_string())
+            .with_auth_method(if password.is_empty() {
                 AuthMethod::None
             } else {
-                AuthMethod::WPA2Personal
-            },
-            password: password.to_string(),
-            ..Default::default()
-        };
-        let wifi_config = WifiConfiguration::Client(client_config);
-        controller.set_configuration(&wifi_config)?;
+                AuthMethod::Wpa2Personal
+            })
+            .with_password(password.to_string());
+        let mode_config = ModeConfig::Client(client_config);
+        controller.set_config(&mode_config)?;
         let wifi_interface = interfaces.sta;
 
         // Spawn task for handling Wifi connection events
@@ -181,9 +176,9 @@ impl Wifi {
         let resources = Box::leak(resources);
 
         // Initialize network stack
-        let net_config = Config::dhcpv4(DhcpConfig::default());
-        let random_seed = rng.next_u64();
-        let (stack, runner) = embassy_net::new(wifi_interface, net_config, resources, random_seed);
+        let net_config = NetConfig::dhcpv4(DhcpConfig::default());
+        let seed = rng.next_u64();
+        let (stack, runner) = embassy_net::new(wifi_interface, net_config, resources, seed);
 
         // Spawn task for running network stack
         debug!("Wifi: Spawning network task...");
@@ -203,7 +198,7 @@ impl Wifi {
         info!(
             "Wifi: Controller initialized. Hw: {}, {}",
             stack.hardware_address(),
-            DisplayWifiConfig(wifi_config),
+            DisplayModeConfig(mode_config),
         );
         Ok(Self {
             stack,
@@ -280,13 +275,13 @@ impl Wifi {
 }
 
 /// Task for handling Wifi connection events
-#[task]
+#[embassy_executor::task]
 async fn connection(mut controller: WifiController<'static>) -> ! {
     debug!("Wifi: Start connection task");
 
     loop {
         // If connected, wait for disconnect
-        if wifi::wifi_state() == WifiState::StaConnected {
+        if wifi::sta_state() == WifiStaState::Connected {
             controller.wait_for_event(WifiEvent::StaDisconnected).await;
             warn!("Wifi: Disconnected");
             Timer::after(CONNECT_RETRY_DELAY).await;
@@ -306,7 +301,7 @@ async fn connection(mut controller: WifiController<'static>) -> ! {
                 warn!(
                     "Wifi: Failed to connect: {:?}, state {:?}",
                     err,
-                    wifi::wifi_state()
+                    wifi::sta_state()
                 );
                 Timer::after(CONNECT_RETRY_DELAY).await;
             }
@@ -315,7 +310,7 @@ async fn connection(mut controller: WifiController<'static>) -> ! {
 }
 
 /// Task for running network stack
-#[task]
+#[embassy_executor::task]
 async fn network(mut runner: Runner<'static, WifiDevice<'static>>) {
     debug!("Wifi: Start network task");
 

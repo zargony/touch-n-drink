@@ -19,17 +19,6 @@ pedantic = "warn"
 # Rust debug code is slow, so always build with some optimization
 opt-level = "s"
 
-[profile.dev.package.esp-hal]
-# Build esp-hal with release optimizations as it recommends
-debug-assertions = false
-opt-level = 3
-
-[profile.dev.package.esp-wifi]
-# Build esp-wifi with release optimizations as it recommends
-opt-level = 3
-# Additionally turn off overflow checks as these seem to cause random esp-wifi panics
-overflow-checks = false
-
 [profile.release]
 # LLVM can perform better optimizations using a single thread
 codegen-units = 1
@@ -48,34 +37,39 @@ chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 const-hex = { version = "1.14", default-features = false }
 display-interface = "0.5"
 embassy-embedded-hal = "0.5"
-embassy-executor = "0.7"
+embassy-executor = "0.9"
 embassy-futures = "0.1"
-embassy-net = { version = "0.7", features = ["dhcpv4", "dns", "proto-ipv4", "tcp"] }
+embassy-net = { version = "0.8", features = ["dhcpv4", "dns", "proto-ipv4", "tcp"] }
 embassy-sync = "0.7"
 embassy-time = "0.5"
 embedded-graphics = "0.8"
 embedded-hal-async = "1.0"
-embedded-io-async = { version = "0.6", features = ["alloc"] }
+embedded-io-async = { version = "0.7", features = ["alloc"] }
 embedded-storage = "0.3"
-esp-alloc = "0.8"
-esp-backtrace = { version = "0.17", features = ["esp32c3", "custom-halt", "panic-handler", "exception-handler", "println"] }
-esp-bootloader-esp-idf = { version = "0.2", features = ["esp32c3"] }
-esp-hal = { version = "1.0.0-rc", features = ["esp32c3", "unstable"] }
-esp-hal-embassy = { version = "0.9", features = ["esp32c3"] }
-esp-println = { version = "0.15", features = ["esp32c3", "log-04"] }
-esp-storage = { version = "0.7", features = ["esp32c3"] }
-esp-wifi = { version = "0.15", features = ["esp32c3", "log-04", "wifi"] }
+esp-alloc = { version = "0.9", features = ["esp32c3"] }
+esp-backtrace = { version = "0.18", features = ["esp32c3", "custom-halt", "panic-handler", "println"] }
+esp-bootloader-esp-idf = { version = "0.4", features = ["esp32c3"] }
+esp-hal = { version = "1.0", features = ["esp32c3", "unstable"] }
+esp-println = { version = "0.16", features = ["esp32c3", "log-04"] }
+esp-radio = { version = "0.17", features = ["esp32c3", "unstable", "wifi"] }
+esp-rtos = { version = "0.2", features = ["embassy", "esp-alloc", "esp-radio", "esp32c3"] }
+esp-storage = { version = "0.8", features = ["esp32c3"] }
 log = { version = "0.4", features = ["release_max_level_info"] }
 pn532 = "0.5"
 rand_core = "0.9"
-reqwless = { version = "0.13", default-features = false, features = ["alloc", "embedded-tls"] }
+reqwless = { version = "0.14", default-features = false, features = ["alloc", "embedded-tls"] }
 ssd1306 = { version = "0.10", features = ["async"] }
 u8g2-fonts = "0.7"
+
+# FIXME: Fix for compile failure of embedded-tls 0.18.0, see https://github.com/drogue-iot/embedded-tls/pull/182
+# Becomes obsolete once reqwless starts to use embedded-tls 0.19
+der = { version = "0.8", features = ["heapless"] }
 
 [features]
 default = []
 # Enable additional logging of dependencies
 log = [
     "embassy-executor/log", "embassy-net/log", "embassy-sync/log", "embassy-time/log",
-    "esp-hal/log-04", "esp-hal-embassy/log-04", "reqwless/log",
+    "esp-bootloader-esp-idf/log-04", "esp-hal/log-04", "esp-radio/log-04", "esp-rtos/log-04",
+    "reqwless/log",
 ]

@@ -1,12 +1,7 @@
 [env]
-# Task arena size of embassy-executor, see https://docs.embassy.dev/embassy-executor/git/cortex-m/index.html#task-arena
-EMBASSY_EXECUTOR_TASK_ARENA_SIZE = "14336"
 # Log filter for esp-println to apply at runtime. Also, a feature of the log crate strips all
 # logging above info level from release builds at compile time (feature `release_max_level_info`).
 ESP_LOG = "info,touch_n_drink=debug"
-# Settings for esp-wifi, see https://docs.esp-rs.org/esp-hal/esp-wifi/0.12.0/esp32c3/esp_wifi/#additional-configuration
-ESP_WIFI_CONFIG_COUNTRY_CODE = "DE"
-ESP_WIFI_CONFIG_PHY_ENABLE_USB = "true"
 
 [build]
 target = "riscv32imc-unknown-none-elf"
