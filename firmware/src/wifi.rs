@@ -82,19 +82,22 @@ impl fmt::Display for DisplayModeConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
             ModeConfig::None => write!(f, "None"),
-            ModeConfig::Client(client) => write!(f,
+            ModeConfig::Client(client) => write!(
+                f,
                 "Client, auth: {:?}, ssid: {}, channel: {}",
                 client.auth_method(),
                 client.ssid(),
                 DisplayOption(client.channel()),
             ),
-            ModeConfig::AccessPoint(ap) => write!(f,
+            ModeConfig::AccessPoint(ap) => write!(
+                f,
                 "AP, auth: {:?}, ssid: {}, channel: {}",
                 ap.auth_method(),
                 ap.ssid(),
                 ap.channel(),
             ),
-            ModeConfig::ApSta(client, ap) => write!(f,
+            ModeConfig::ApSta(client, ap) => write!(
+                f,
                 "AP+Client, auth: {:?}, ssid: {}, channel: {}, AP auth: {:?}, ssid: {}, channel: {}",
                 client.auth_method(),
                 client.ssid(),
@@ -103,7 +106,7 @@ impl fmt::Display for DisplayModeConfig {
                 ap.ssid(),
                 ap.channel(),
             ),
-            _ => write!(f, "Unknown mode")
+            _ => write!(f, "Unknown mode"),
         }
     }
 }

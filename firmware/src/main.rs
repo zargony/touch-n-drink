@@ -97,23 +97,25 @@ const WATCHDOG_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Custom halt function for esp-backtrace. Called after panic was handled and should halt
 /// or restart the system.
-#[export_name = "custom_halt"]
+#[unsafe(export_name = "custom_halt")]
 unsafe fn halt() -> ! {
-    // System may be in any state at this time, thus everything is unsafe here. Stealing the
-    // peripherals handle allows us to try to notify the user about this abnormal state and
-    // restart the system. Any error should be ignored.
-    let peripherals = Peripherals::steal();
+    unsafe {
+        // System may be in any state at this time, thus everything is unsafe here. Stealing the
+        // peripherals handle allows us to try to notify the user about this abnormal state and
+        // restart the system. Any error should be ignored.
+        let peripherals = Peripherals::steal();
 
-    // TODO: Steal display driver and show a panic message to the user
+        // TODO: Steal display driver and show a panic message to the user
 
-    // Restart automatically after a delay
-    println!("Restarting in {} seconds...", PANIC_RESTART_DELAY.as_secs());
-    let mut rtc = Rtc::new(peripherals.LPWR);
-    rtc.rwdt.set_timeout(RwdtStage::Stage0, PANIC_RESTART_DELAY);
-    rtc.rwdt.unlisten();
-    rtc.rwdt.enable();
-    loop {
-        esp_hal::riscv::asm::wfi();
+        // Restart automatically after a delay
+        println!("Restarting in {} seconds...", PANIC_RESTART_DELAY.as_secs());
+        let mut rtc = Rtc::new(peripherals.LPWR);
+        rtc.rwdt.set_timeout(RwdtStage::Stage0, PANIC_RESTART_DELAY);
+        rtc.rwdt.unlisten();
+        rtc.rwdt.enable();
+        loop {
+            esp_hal::riscv::asm::wfi();
+        }
     }
 }
 

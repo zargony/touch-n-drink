@@ -12,7 +12,7 @@ use alloc::string::String;
 use alloc::vec;
 use core::cell::RefCell;
 use core::fmt;
-use embassy_time::{with_timeout, Duration};
+use embassy_time::{Duration, with_timeout};
 use log::{debug, info, warn};
 
 /// Vereinsflieger API base URL
@@ -241,7 +241,9 @@ impl Connection<'_> {
     ) -> Result<(), Error> {
         use proto_sale::{SaleAddRequest, SaleAddResponse};
 
-        debug!("Vereinsflieger: Purchasing {amount}x {article_id}, {total_price:.02} EUR for user {user_id}");
+        debug!(
+            "Vereinsflieger: Purchasing {amount}x {article_id}, {total_price:.02} EUR for user {user_id}"
+        );
 
         let _response: SaleAddResponse = with_timeout(
             TIMEOUT,

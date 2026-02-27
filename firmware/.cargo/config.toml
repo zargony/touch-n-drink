@@ -6,7 +6,7 @@ ESP_LOG = "info,touch_n_drink=debug"
 [build]
 target = "riscv32imc-unknown-none-elf"
 
-[target.'cfg(any(target_arch = "riscv32", target_arch = "xtensa"))']
+[target.'cfg(all(target_arch = "riscv32", target_os = "none"))']
 runner = "espflash flash --monitor"
 rustflags = [
     # Required by esp-backtrace, but may negatively impact code performance
