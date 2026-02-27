@@ -133,21 +133,21 @@ impl Config {
         };
 
         // Look up config data partition
-        let config_offset = if let Some(entry) = (0..table.len())
-            .filter_map(|i| table.get_partition(i).ok())
+        let mut partition = if let Some(entry) = table
+            .iter()
             .find(|entry| [entry.raw_type(), entry.raw_subtype()] == CONFIG_PARTITION_TYPE)
         {
             let offset = entry.offset();
             debug!("Config: Found config partition at offset 0x{offset:x}");
-            offset
+            entry.as_embedded_storage(&mut storage)
         } else {
             warn!("Config: No config partition found, using default configuration");
             return Self::default();
         };
 
-        // Read first sector (4 kb) of config data partition
-        let mut bytes = vec![0; FlashStorage::SECTOR_SIZE as usize];
-        if let Err(_err) = storage.read(config_offset, &mut bytes) {
+        // Read config data partition
+        let mut bytes = vec![0; partition.capacity()];
+        if let Err(_err) = partition.read(0, &mut bytes) {
             warn!("Config: Unable to read config partition");
             return Self::default();
         }
