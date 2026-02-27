@@ -14,7 +14,7 @@ use log::{debug, info};
 #[cfg(not(debug_assertions))]
 const TONE_DUTY_CYCLE: u8 = 75;
 #[cfg(debug_assertions)]
-const TONE_DUTY_CYCLE: u8 = 95;
+const TONE_DUTY_CYCLE: u8 = 97;
 
 /// Buzzer error
 #[derive(Debug)]
@@ -68,7 +68,7 @@ impl<'a> Buzzer<'a> {
     }
 
     /// Drive the buzzer with a PWM signal of given frequency and duty cycle
-    pub fn drive(&mut self, frequency: u32, duty_pct: u8) -> Result<(), Error> {
+    fn drive(&mut self, frequency: u32, duty_pct: u8) -> Result<(), Error> {
         // debug!("Buzzer: driving {frequency} Hz at {duty_pct}%");
         let mut lstimer0 = self.ledc.timer::<LowSpeed>(timer::Number::Timer0);
         lstimer0.configure(timer::config::Config {
@@ -88,9 +88,23 @@ impl<'a> Buzzer<'a> {
     }
 
     /// Stop driving the buzzer
+    #[allow(clippy::unused_self, clippy::unnecessary_wraps)]
     pub fn off(&mut self) -> Result<(), Error> {
-        // To turn off the buzzer, use 100% duty cycle so the output keeps staying high
-        self.drive(1, 100)?;
+        // debug!("Buzzer: turning off");
+        // Turn off buzzer by disabling LEDC signal output, keep the output high
+        // FIXME: Unfortunately, esp-hal doesn't provide methods, so we modify registers directly
+        #[rustfmt::skip]
+        LEDC::regs().ch(0).conf0().modify(|_, w| w
+            .sig_out_en().clear_bit()
+            .idle_lv().set_bit()
+            .para_up().set_bit()
+        );
+        #[rustfmt::skip]
+        LEDC::regs().timer(0).conf().modify(|_, w| w
+            .pause().set_bit()
+            .rst().set_bit()
+            .para_up().set_bit()
+        );
         Ok(())
     }
 
