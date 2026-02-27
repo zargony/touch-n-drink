@@ -16,6 +16,8 @@ bench = false
 pedantic = "warn"
 
 [profile.dev]
+# FIXME: LTO slows down linking a lot! But it's required to keep the app image small enough :-(
+lto = "fat"
 # Rust debug code is slow, so always build with some optimization
 opt-level = "s"
 
@@ -23,11 +25,8 @@ opt-level = "s"
 # LLVM can perform better optimizations using a single thread
 codegen-units = 1
 debug = 2
-debug-assertions = false
-incremental = false
 lto = "fat"
 opt-level = "s"
-overflow-checks = false
 
 [build-dependencies]
 git2 = { version = "0.20", default-features = false }
