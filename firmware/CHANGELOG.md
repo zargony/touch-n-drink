@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Switched from custom JSON (de)serialization to serde and serde_json
 - Updated code to Rust Edition 2024
 - Make sure turning off the buzzer completely stops LEDC timers and output driving
 - Updated to latest esp-rs and embassy versions

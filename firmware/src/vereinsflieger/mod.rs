@@ -5,15 +5,16 @@ mod proto_user;
 
 use crate::article::{ArticleId, Articles};
 use crate::http::{self, Http};
+use crate::nfc::Uid;
 use crate::time;
 use crate::user::{UserId, Users};
 use alloc::format;
 use alloc::string::String;
-use alloc::vec;
-use core::cell::RefCell;
 use core::fmt;
+use core::str::FromStr;
 use embassy_time::{Duration, with_timeout};
 use log::{debug, info, warn};
+use serde::Deserialize;
 
 /// Vereinsflieger API base URL
 const BASE_URL: &str = "https://www.vereinsflieger.de/interface/rest";
@@ -150,84 +151,107 @@ impl Connection<'_> {
 
     /// Fetch list of articles and update article lookup table
     pub async fn refresh_articles(&mut self, articles: &mut Articles) -> Result<(), Error> {
-        use proto_articles::{ArticleListRequest, ArticleListResponse};
+        use proto_articles::{Article, ArticleListRequest};
+
+        #[derive(Debug, Deserialize)]
+        #[serde(untagged)]
+        enum ArticleOrStatus {
+            Article(Article),
+            #[allow(dead_code)]
+            Status(u16),
+        }
 
         debug!("Vereinsflieger: Refreshing articles...");
-        let request_body = http::Connection::prepare_body(&ArticleListRequest {
-            accesstoken: self.accesstoken,
-        })
-        .await
-        .map_err(Error::FetchArticles)?;
-        let mut rx_buf = vec![0; 2048];
-        let mut json = with_timeout(
-            TIMEOUT,
-            self.http
-                .post_json("articles/list", &request_body, &mut rx_buf),
+        articles.clear();
+
+        let mut total_articles: usize = 0;
+        with_timeout(
+            FETCH_TIMEOUT,
+            self.http.post_fn(
+                "articles/list",
+                &ArticleListRequest {
+                    accesstoken: self.accesstoken,
+                },
+                |_key, article_or_status: ArticleOrStatus| {
+                    if let ArticleOrStatus::Article(article) = article_or_status {
+                        total_articles += 1;
+                        if let Some(price) = article.price() {
+                            articles.update(&article.articleid, article.designation, price);
+                        } else {
+                            warn!(
+                                "Ignoring article with no valid price ({}): {}",
+                                article.articleid, article.designation
+                            );
+                        }
+                    }
+                },
+            ),
         )
         .await?
         .map_err(Error::FetchArticles)?;
 
-        articles.clear();
-        let articles = RefCell::new(articles);
-
-        let response: ArticleListResponse =
-            with_timeout(FETCH_TIMEOUT, json.read_object_with_context(&articles))
-                .await?
-                .map_err(http::Error::MalformedResponse)
-                .map_err(Error::FetchArticles)?;
         info!(
             "Vereinsflieger: Refreshed {} of {} articles",
-            articles.borrow().count(),
-            response.total_articles
+            articles.count(),
+            total_articles
         );
-
-        // Discard remaining body (needed to make the next pipelined request work)
-        json.discard_to_end()
-            .await
-            .map_err(http::Error::MalformedResponse)
-            .map_err(Error::FetchUsers)?;
-
         Ok(())
     }
 
     /// Fetch list of users and update user lookup table
     pub async fn refresh_users(&mut self, users: &mut Users) -> Result<(), Error> {
-        use proto_user::{UserListRequest, UserListResponse};
+        use proto_user::{User, UserListRequest};
+
+        #[derive(Debug, Deserialize)]
+        #[serde(untagged)]
+        enum UserOrStatus {
+            User(User),
+            #[allow(dead_code)]
+            Status(u16),
+        }
 
         debug!("Vereinsflieger: Refreshing users...");
-        let request_body = http::Connection::prepare_body(&UserListRequest {
-            accesstoken: self.accesstoken,
-        })
-        .await
-        .map_err(Error::FetchUsers)?;
-        let mut rx_buf = vec![0; 2048];
-        let mut json = with_timeout(
-            TIMEOUT,
-            self.http.post_json("user/list", &request_body, &mut rx_buf),
+        users.clear();
+
+        let mut total_users: usize = 0;
+        with_timeout(
+            FETCH_TIMEOUT,
+            self.http.post_fn(
+                "user/list",
+                &UserListRequest {
+                    accesstoken: self.accesstoken,
+                },
+                |_key, user_or_status: UserOrStatus| {
+                    if let UserOrStatus::User(user) = user_or_status {
+                        total_users += 1;
+                        if !user.is_retired() {
+                            let keys = user.keys_named_with_prefix("NFC Transponder");
+                            if !keys.is_empty() {
+                                for key in keys {
+                                    if let Ok(uid) = Uid::from_str(key) {
+                                        users.update_uid(uid, user.memberid);
+                                    } else {
+                                        warn!(
+                                            "Ignoring user key with invalid NFC uid ({}): {}",
+                                            user.memberid, key
+                                        );
+                                    }
+                                }
+                                users.update_user(user.memberid, user.firstname);
+                            }
+                        }
+                    }
+                },
+            ),
         )
         .await?
         .map_err(Error::FetchUsers)?;
 
-        users.clear();
-        let users = RefCell::new(users);
-
-        let response: UserListResponse =
-            with_timeout(FETCH_TIMEOUT, json.read_object_with_context(&users))
-                .await?
-                .map_err(http::Error::MalformedResponse)
-                .map_err(Error::FetchUsers)?;
         info!(
             "Vereinsflieger: Refreshed {} of {} users",
-            users.borrow().count(),
-            response.total_users
+            users.count(),
+            total_users
         );
-
-        // Discard remaining body (needed to make the next pipelined request work)
-        json.discard_to_end()
-            .await
-            .map_err(http::Error::MalformedResponse)
-            .map_err(Error::FetchUsers)?;
-
         Ok(())
     }
 

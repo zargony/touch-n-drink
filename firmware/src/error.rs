@@ -1,10 +1,7 @@
-use crate::json::{self, ToJson};
 use crate::user::UserId;
 use crate::{display, nfc, vereinsflieger};
-use alloc::string::ToString;
 use core::fmt;
 use core::future::Future;
-use embedded_io_async::Write;
 
 /// Main error type
 #[derive(Debug)]
@@ -80,7 +77,6 @@ impl Error {
 
 /// Error kind with optional embedded causing error type
 #[derive(Debug)]
-#[allow(clippy::module_name_repetitions)]
 pub enum ErrorKind {
     /// Display output error
     DisplayError(display::Error),
@@ -127,14 +123,5 @@ impl fmt::Display for ErrorKind {
             Self::NoNetwork => write!(f, "No network connection"),
             Self::ArticleNotFound => write!(f, "Article not found"),
         }
-    }
-}
-
-impl ToJson for ErrorKind {
-    async fn to_json<W: Write>(
-        &self,
-        json: &mut json::Writer<W>,
-    ) -> Result<(), json::Error<W::Error>> {
-        json.write(self.to_string()).await
     }
 }
