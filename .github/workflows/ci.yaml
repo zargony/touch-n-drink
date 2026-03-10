@@ -101,7 +101,7 @@ jobs:
           sudo apt-get install pkg-config libudev-dev
       - name: Install espflash
         if: steps.cache-espflash.outputs.cache-hit != 'true'
-        run: cargo install espflash
+        run: cargo install --locked espflash
       - name: Check out repository
         uses: actions/checkout@v5
         with:
