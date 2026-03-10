@@ -1,10 +1,9 @@
 use crate::http::Http;
 use crate::mixpanel::{self, Mixpanel};
-use crate::{article, json, nfc, user};
+use crate::{article, nfc, user};
 use alloc::collections::VecDeque;
 use alloc::string::String;
 use embassy_time::{Duration, Instant};
-use embedded_io_async::Write;
 use log::{debug, info, warn};
 
 /// Time after which events are flushed even when queue isn't filled yet
@@ -57,44 +56,6 @@ impl Event {
             Event::ArticlePurchased(user_id, ..) => Some(*user_id),
             Event::Error(user_id, ..) => *user_id,
         }
-    }
-
-    /// Add event attributes to given JSON object
-    pub async fn add_event_attributes<W: Write>(
-        &self,
-        object: &mut json::ObjectWriter<'_, W>,
-    ) -> Result<(), json::Error<W::Error>> {
-        match self {
-            Event::SystemStart => (),
-            Event::DataRefreshed(article_count, uid_count, user_count) => {
-                object
-                    .field("article_count", article_count)
-                    .await?
-                    .field("uid_count", uid_count)
-                    .await?
-                    .field("user_count", user_count)
-                    .await?;
-            }
-            Event::AuthenticationFailed(uid) => {
-                object.field("uid", uid).await?;
-            }
-            Event::UserAuthenticated(_user_id, uid) => {
-                object.field("uid", uid).await?;
-            }
-            Event::ArticlePurchased(_user_id, article_id, amount, total_price) => {
-                object
-                    .field("article_id", article_id)
-                    .await?
-                    .field("amount", amount)
-                    .await?
-                    .field("total_price", total_price)
-                    .await?;
-            }
-            Event::Error(_user_id, message) => {
-                object.field("error_message", message).await?;
-            }
-        }
-        Ok(())
     }
 }
 

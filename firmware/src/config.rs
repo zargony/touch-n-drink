@@ -1,31 +1,23 @@
 use crate::article::ArticleId;
-use crate::json::{self, FromJson, FromJsonObject};
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 use core::ops::Deref;
-use embedded_io_async::BufRead;
 use embedded_storage::ReadStorage;
 use esp_bootloader_esp_idf::partitions;
 use esp_hal::peripherals::FLASH as Flash;
 use esp_storage::FlashStorage;
 use log::{debug, info, warn};
+use serde::Deserialize;
 
 // Config partition type (custom partition type 0x54, subtype 0x44)
 const CONFIG_PARTITION_TYPE: [u8; 2] = [0x54, 0x44];
 
 /// String with sensitive content (debug and display output redacted)
-#[derive(Default)]
+#[derive(Default, Deserialize)]
+#[serde(transparent)]
 pub struct SensitiveString(String);
-
-impl FromJson for SensitiveString {
-    async fn from_json<R: BufRead>(
-        json: &mut json::Reader<R>,
-    ) -> Result<Self, json::Error<R::Error>> {
-        Ok(Self(json.read().await?))
-    }
-}
 
 impl fmt::Debug for SensitiveString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -65,13 +57,16 @@ impl Deref for SensitiveString {
 ///
 /// If there is no valid JSON or no valid `config` data partition, a default configuration is
 /// provided (which isn't very useful, but at least doesn't prevent the device from starting).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct Config {
     /// Wifi SSID to connect to
     pub wifi_ssid: String,
     /// Wifi password
     pub wifi_password: SensitiveString,
     /// Mixpanel project token for analytics (optional)
+    // Use a different token in debug builds
+    #[cfg_attr(debug_assertions, serde(rename = "mp-token-debug"))]
     pub mp_token: Option<String>,
     /// Vereinsflieger API username
     pub vf_username: String,
@@ -85,38 +80,9 @@ pub struct Config {
     pub vf_article_ids: Vec<ArticleId>,
 }
 
-impl FromJsonObject for Config {
-    type Context<'ctx> = ();
-
-    async fn read_next<R: BufRead>(
-        &mut self,
-        key: String,
-        json: &mut json::Reader<R>,
-        _context: &Self::Context<'_>,
-    ) -> Result<(), json::Error<R::Error>> {
-        match &*key {
-            "wifi-ssid" => self.wifi_ssid = json.read().await?,
-            "wifi-password" => self.wifi_password = json.read().await?,
-            // Don't use telemetry in debug builds, unless explicitly specified
-            #[cfg(not(debug_assertions))]
-            "mp-token" => self.mp_token = Some(json.read().await?),
-            #[cfg(debug_assertions)]
-            "mp-token-debug" => self.mp_token = Some(json.read().await?),
-            "vf-username" => self.vf_username = json.read().await?,
-            "vf-password-md5" => self.vf_password_md5 = json.read().await?,
-            "vf-appkey" => self.vf_appkey = json.read().await?,
-            "vf-cid" => self.vf_cid = Some(json.read().await?),
-            "vf-article-id" => self.vf_article_ids = vec![json.read().await?],
-            "vf-article-ids" => self.vf_article_ids = json.read().await?,
-            _ => json.skip_any().await?,
-        }
-        Ok(())
-    }
-}
-
 impl Config {
     /// Read configuration from `config` flash data partition
-    pub async fn read(flash: Flash<'_>) -> Self {
+    pub fn read(flash: Flash<'_>) -> Self {
         let mut storage = FlashStorage::new(flash);
 
         // Read partition table
@@ -152,8 +118,9 @@ impl Config {
             return Self::default();
         }
 
-        // Parse JSON config
-        let config = match json::Reader::new(&bytes[..]).read().await {
+        // Parse JSON config, ignore trailing junk
+        let mut de = serde_json::Deserializer::from_slice(&bytes);
+        let config = match Deserialize::deserialize(&mut de) {
             Ok(config) => config,
             Err(err) => {
                 warn!("Config: Unable to parse configuration in config partition: {err}");

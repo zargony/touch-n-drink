@@ -1,125 +1,98 @@
-use crate::json::{self, FromJsonObject, ToJson};
-use crate::telemetry;
-use crate::time::DateTimeExt;
+use crate::nfc::Uid;
+use crate::user::UserId;
 use alloc::string::String;
-use embassy_time::Instant;
-use embedded_io_async::{BufRead, Write};
+use alloc::vec::Vec;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_with::{DisplayFromStr, TimestampMilliSeconds, serde_as};
 
 /// `track` request
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
+#[serde(transparent)]
 pub struct TrackRequest<'a> {
-    pub token: &'a str,
-    pub device_id: &'a str,
-    pub events: &'a [(Instant, telemetry::Event)],
-}
-
-impl ToJson for TrackRequest<'_> {
-    async fn to_json<W: Write>(
-        &self,
-        json: &mut json::Writer<W>,
-    ) -> Result<(), json::Error<W::Error>> {
-        json.write_array(self.events.iter().map(|(time, event)| Event {
-            token: self.token,
-            device_id: self.device_id,
-            time,
-            telemetry: event,
-        }))
-        .await
-    }
+    pub events: Vec<Event<'a>>,
 }
 
 /// `track` response
-#[derive(Debug, Default)]
+#[derive(Debug, Deserialize)]
 pub struct TrackResponse {
-    pub error: String,
+    pub error: Option<String>,
     pub status: u32,
 }
 
-impl FromJsonObject for TrackResponse {
-    type Context<'ctx> = ();
-
-    async fn read_next<R: BufRead>(
-        &mut self,
-        _key: String,
-        json: &mut json::Reader<R>,
-        _context: &Self::Context<'_>,
-    ) -> Result<(), json::Error<R::Error>> {
-        // FIXME: Mixpanel returns an empty body on success, which is not a valid JSON object
-        json.skip_any().await
-    }
-}
-
 /// Event
-#[derive(Debug)]
-struct Event<'a> {
-    token: &'a str,
-    device_id: &'a str,
-    time: &'a Instant,
-    telemetry: &'a telemetry::Event,
-}
-
-impl ToJson for Event<'_> {
-    async fn to_json<W: Write>(
-        &self,
-        json: &mut json::Writer<W>,
-    ) -> Result<(), json::Error<W::Error>> {
-        json.write_object()
-            .await?
-            .field("event", self.telemetry.event_name())
-            .await?
-            .field("properties", EventProperties { event: self })
-            .await?
-            .finish()
-            .await
-    }
+#[derive(Debug, Serialize)]
+pub struct Event<'a> {
+    pub event: &'a str,
+    pub properties: EventProperties<'a>,
 }
 
 /// Event properties
-#[derive(Debug)]
-struct EventProperties<'a> {
-    event: &'a Event<'a>,
+#[serde_as]
+#[derive(Debug, Serialize)]
+pub struct EventProperties<'a> {
+    // Reserved properties, see https://docs.mixpanel.com/docs/data-structure/property-reference/reserved-properties
+    pub token: &'a str,
+    #[serde_as(as = "TimestampMilliSeconds<i64>")]
+    pub time: DateTime<Utc>,
+    pub distinct_id: DistinctId<'a>,
+
+    // Global custom properties
+    pub firmware_version: &'a str,
+    pub firmware_git_sha: &'a str,
+    pub device_id: &'a str,
+
+    // Event-specific custom properties
+    #[serde(flatten)]
+    pub extra: EventPropertiesExtra<'a>,
 }
 
-impl ToJson for EventProperties<'_> {
-    async fn to_json<W: Write>(
-        &self,
-        json: &mut json::Writer<W>,
-    ) -> Result<(), json::Error<W::Error>> {
-        // Convert relative `Instant` time to absolute `DateTime` (needs current time set)
-        let time = self
-            .event
-            .time
-            .to_datetime()
-            .ok_or(json::Error::InvalidType)?;
+/// Distinct id is either a user id (if present) or the device id
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum DistinctId<'a> {
+    User(UserId),
+    Device(&'a str),
+}
 
-        let mut object = json.write_object().await?;
+/// Event-specific custom properties
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum EventPropertiesExtra<'a> {
+    None,
+    DataRefresh(EventPropertiesExtraDataRefresh),
+    Authentication(EventPropertiesExtraAuthentication<'a>),
+    Purchase(EventPropertiesExtraPurchase<'a>),
+    Error(EventPropertiesExtraError<'a>),
+}
 
-        // Reserved properties, see https://docs.mixpanel.com/docs/data-structure/property-reference/reserved-properties
-        object
-            .field("token", self.event.token)
-            .await?
-            .field("time", time.timestamp_millis())
-            .await?;
-        // Use user id as distinct id if event is associated with a user, use device id otherwise
-        match self.event.telemetry.user_id() {
-            Some(user_id) => object.field("distinct_id", user_id).await?,
-            None => object.field("distinct_id", self.event.device_id).await?,
-        };
+/// Event-specific custom properties (data refresh)
+#[derive(Debug, Serialize)]
+#[allow(clippy::struct_field_names)]
+pub struct EventPropertiesExtraDataRefresh {
+    pub article_count: usize,
+    pub uid_count: usize,
+    pub user_count: usize,
+}
 
-        // Global custom properties
-        object
-            .field("firmware_version", crate::VERSION_STR)
-            .await?
-            .field("firmware_git_sha", crate::GIT_SHA_STR)
-            .await?
-            .field("device_id", self.event.device_id)
-            .await?;
-        // Event-specific custom properties
-        self.event
-            .telemetry
-            .add_event_attributes(&mut object)
-            .await?;
+// Event-specific custom properties (authentication)
+#[serde_as]
+#[derive(Debug, Serialize)]
+pub struct EventPropertiesExtraAuthentication<'a> {
+    #[serde_as(as = "DisplayFromStr")]
+    pub uid: &'a Uid,
+}
 
-        object.finish().await
-    }
+/// Event-specific custom properties (purchase)
+#[derive(Debug, Serialize)]
+pub struct EventPropertiesExtraPurchase<'a> {
+    pub article_id: &'a str,
+    pub amount: f32,
+    pub total_price: f32,
+}
+
+/// Event-specific custom properties (error)
+#[derive(Debug, Serialize)]
+pub struct EventPropertiesExtraError<'a> {
+    pub error_message: &'a str,
 }

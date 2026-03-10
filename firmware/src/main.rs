@@ -165,7 +165,7 @@ async fn main(spawner: Spawner) {
         .expect("Failed to spawn watchdog task");
 
     // Read system configuration
-    let config = config::Config::read(peripherals.FLASH).await;
+    let config = config::Config::read(peripherals.FLASH);
 
     // Initialize article and user look up tables
     let mut articles = article::Articles::new(config.vf_article_ids);
