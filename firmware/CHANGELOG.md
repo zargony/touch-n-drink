@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Added more user greetings
 - Added configuration to set Wifi country
 - Switched from custom JSON (de)serialization to serde and serde_json
 - Updated code to Rust Edition 2024

@@ -36,8 +36,9 @@ static LOGO: ImageRaw<BinaryColor> = ImageRaw::new(&[
 ], 128);
 
 /// User greetings (chosen randomly)
-static GREETINGS: [&str; 9] = [
-    "Hi", "Hallo", "Hey", "Tach", "Servus", "Moin", "Hej", "Olá", "Ciao",
+static GREETINGS: [&str; 20] = [
+    "Hi", "Hallo", "Hey", "Tach", "Servus", "Moin", "Hej", "Olá", "Ciao", "Yo", "Ahoi", "Hola",
+    "Salut", "Cheers", "Salve", "Hoi", "Hiya", "Sup", "Hiho", "Oi",
 ];
 
 const SPLASH_VERSION_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_profont10_tr>();
