@@ -4,7 +4,7 @@ use crate::http::{self, Http};
 use crate::telemetry::Event;
 use crate::time;
 use core::fmt;
-use embassy_time::{with_timeout, Duration, Instant};
+use embassy_time::{Duration, Instant, with_timeout};
 use log::{debug, warn};
 
 /// Mixpanel API base URL

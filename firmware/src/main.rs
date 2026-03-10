@@ -59,24 +59,22 @@ mod user;
 mod vereinsflieger;
 mod wifi;
 
+use alloc::boxed::Box;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
-use embassy_executor::{task, Spawner};
+use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use embassy_time::Timer;
-use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
-use esp_hal::config::{WatchdogConfig, WatchdogStatus};
 use esp_hal::efuse::Efuse;
 use esp_hal::gpio::{DriveMode, Input, InputConfig, Level, Output, OutputConfig, Pull};
 use esp_hal::i2c::master::{BusTimeout, Config as I2cConfig, I2c};
+use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::peripherals::Peripherals;
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::{Rtc, RwdtStage};
 use esp_hal::time::{Duration, Rate};
-use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::timer::timg::TimerGroup;
-use esp_hal_embassy::main;
 use esp_println::println;
 use log::{debug, error, info};
 use rand_core::RngCore;
@@ -99,30 +97,38 @@ const WATCHDOG_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Custom halt function for esp-backtrace. Called after panic was handled and should halt
 /// or restart the system.
-#[export_name = "custom_halt"]
+#[unsafe(export_name = "custom_halt")]
 unsafe fn halt() -> ! {
-    // System may be in any state at this time, thus everything is unsafe here. Stealing the
-    // peripherals handle allows us to try to notify the user about this abnormal state and
-    // restart the system. Any error should be ignored.
-    let peripherals = Peripherals::steal();
+    unsafe {
+        // System may be in any state at this time, thus everything is unsafe here. Stealing the
+        // peripherals handle allows us to try to notify the user about this abnormal state and
+        // restart the system. Any error should be ignored.
+        let peripherals = Peripherals::steal();
 
-    // TODO: Steal display driver and show a panic message to the user
+        // TODO: Steal display driver and show a panic message to the user
 
-    // Restart automatically after a delay
-    println!("Restarting in {} seconds...", PANIC_RESTART_DELAY.as_secs());
-    let mut rtc = Rtc::new(peripherals.LPWR);
-    rtc.rwdt.set_timeout(RwdtStage::Stage0, PANIC_RESTART_DELAY);
-    rtc.rwdt.unlisten();
-    rtc.rwdt.enable();
-    loop {
-        esp_hal::riscv::asm::wfi();
+        // Restart automatically after a delay
+        println!("Restarting in {} seconds...", PANIC_RESTART_DELAY.as_secs());
+        let mut rtc = Rtc::new(peripherals.LPWR);
+        rtc.rwdt.set_timeout(RwdtStage::Stage0, PANIC_RESTART_DELAY);
+        rtc.rwdt.unlisten();
+        rtc.rwdt.enable();
+        loop {
+            esp_hal::riscv::asm::wfi();
+        }
     }
 }
 
-#[task]
-async fn feed_watchdog(mut rtc: Rtc<'static>) -> ! {
-    debug!("Start watchdog feed task");
+#[embassy_executor::task]
+async fn watchdog(mut rtc: Rtc<'static>) -> ! {
+    debug!("Start watchdog task");
 
+    // Enable watchdog
+    rtc.rwdt.set_timeout(RwdtStage::Stage0, WATCHDOG_TIMEOUT);
+    rtc.rwdt.listen();
+    rtc.rwdt.enable();
+
+    // Periodically feed watchdog
     let timeout = embassy_time::Duration::from_micros(WATCHDOG_TIMEOUT.as_micros() / 2);
     loop {
         Timer::after(timeout).await;
@@ -130,23 +136,21 @@ async fn feed_watchdog(mut rtc: Rtc<'static>) -> ! {
     }
 }
 
-#[main]
+#[esp_rtos::main]
 async fn main(spawner: Spawner) {
-    let watchdog_config =
-        WatchdogConfig::default().with_rwdt(WatchdogStatus::Enabled(WATCHDOG_TIMEOUT));
-    let esp_config = esp_hal::Config::default()
-        .with_cpu_clock(CpuClock::max())
-        .with_watchdog(watchdog_config);
+    let esp_config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(esp_config);
-    let mut rng = Rng::new(peripherals.RNG);
+    let mut rng = Rng::new();
     let _led = Output::new(peripherals.GPIO8, Level::High, OutputConfig::default());
 
     // Initialize global allocator
+    esp_alloc::heap_allocator!(#[esp_hal::ram(reclaimed)] size: 64 * 1024);
     esp_alloc::heap_allocator!(size: 150 * 1024);
 
     // Initialize async executor
-    let systimer = SystemTimer::new(peripherals.SYSTIMER);
-    esp_hal_embassy::init(systimer.alarm0);
+    let timg0 = TimerGroup::new(peripherals.TIMG0);
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timg0.timer0, sw_int.software_interrupt0);
 
     // Initialize logging
     esp_println::logger::init_logger_from_env();
@@ -154,14 +158,14 @@ async fn main(spawner: Spawner) {
 
     // Start feeding the watchdog
     let rtc = Rtc::new(peripherals.LPWR);
-    debug!("Spawning watchdog feed task...");
+    debug!("Spawning watchdog task...");
     spawner
-        .spawn(feed_watchdog(rtc))
+        .spawn(watchdog(rtc))
         // Panic on failure since failing to spawn a task indicates a serious error
-        .expect("Failed to spawn watchdog feed task");
+        .expect("Failed to spawn watchdog task");
 
     // Read system configuration
-    let config = config::Config::read().await;
+    let config = config::Config::read(peripherals.FLASH).await;
 
     // Initialize article and user look up tables
     let mut articles = article::Articles::new(config.vf_article_ids);
@@ -217,9 +221,7 @@ async fn main(spawner: Spawner) {
         .expect("NFC reader initialization failed");
 
     // Initialize Wifi
-    let timg0 = TimerGroup::new(peripherals.TIMG0);
     let wifi = wifi::Wifi::new(
-        timg0.timer0,
         rng,
         peripherals.WIFI,
         spawner,
@@ -287,9 +289,7 @@ async fn main(spawner: Spawner) {
     }
 
     loop {
-        // FIXME: Ui::run is a pretty large future, but pinning it to the heap seems even worse
-        #[allow(clippy::large_futures)]
-        match ui.run().await {
+        match Box::pin(ui.run()).await {
             // Success: start over again
             Ok(()) => (),
             // User cancelled: start over again

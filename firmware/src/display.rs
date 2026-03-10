@@ -4,11 +4,11 @@ use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_hal_async::i2c::I2c;
 use log::{debug, info};
+use ssd1306::Ssd1306Async;
 use ssd1306::mode::{BufferedGraphicsModeAsync, DisplayConfigAsync};
 use ssd1306::prelude::I2CInterface;
 use ssd1306::rotation::DisplayRotation;
 use ssd1306::size::DisplaySize128x64;
-use ssd1306::Ssd1306Async;
 
 /// Display error
 #[derive(Debug)]

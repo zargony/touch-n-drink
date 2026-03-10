@@ -13,8 +13,8 @@ use crate::vereinsflieger::Vereinsflieger;
 use crate::wifi::Wifi;
 use alloc::string::{String, ToString};
 use core::convert::Infallible;
-use embassy_futures::select::{select, Either};
-use embassy_time::{with_timeout, Duration, TimeoutError, Timer};
+use embassy_futures::select::{Either, select};
+use embassy_time::{Duration, TimeoutError, Timer, with_timeout};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
 use log::info;
@@ -369,7 +369,7 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
                 // Any digit 1..=num_articles selects article
                 Ok(Key::Digit(n)) if n >= 1 && n as usize <= num_articles => {
-                    break Ok(n as usize - 1)
+                    break Ok(n as usize - 1);
                 }
                 // Ignore any other digit
                 Ok(Key::Digit(_)) => (),

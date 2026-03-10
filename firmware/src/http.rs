@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 use chrono::DateTime;
 use core::convert::Infallible;
 use core::{fmt, str};
-use embedded_io_async::{BufRead, Read};
+use embedded_io_async::BufRead;
 use log::debug;
 use reqwless::client::{HttpClient, HttpResource, HttpResourceRequestBuilder};
 use reqwless::client::{TlsConfig, TlsVerify};
@@ -143,7 +143,7 @@ impl<'a> Connection<'a> {
         &'req mut self,
         path: &'req str,
         rx_buf: &'req mut [u8],
-    ) -> Result<json::Reader<BodyReader<impl Read + BufRead + use<'a, 'req>>>, Error> {
+    ) -> Result<json::Reader<BodyReader<impl BufRead + use<'a, 'req>>>, Error> {
         // FIXME: Return type of this function shouldn't be generic, but reqwless hides the
         // inner type `BufferingReader` so we can't use the full type signature for now
 
@@ -170,7 +170,7 @@ impl<'a> Connection<'a> {
         path: &'req str,
         data: &'req [u8],
         rx_buf: &'req mut [u8],
-    ) -> Result<json::Reader<BodyReader<impl Read + BufRead + use<'a, 'req>>>, Error> {
+    ) -> Result<json::Reader<BodyReader<impl BufRead + use<'a, 'req>>>, Error> {
         // FIXME: Return type of this function shouldn't be generic, but reqwless hides the
         // inner type `BufferingReader` so we can't use the full type signature for now
 
@@ -205,7 +205,7 @@ impl Connection<'_> {
     async fn send_request<'req, 'conn, B: RequestBody>(
         request: HttpResourceRequestBuilder<'req, 'conn, TcpConnection<'conn>, B>,
         rx_buf: &'req mut [u8],
-    ) -> Result<json::Reader<BodyReader<impl Read + BufRead + use<'req, 'conn, B>>>, Error> {
+    ) -> Result<json::Reader<BodyReader<impl BufRead + use<'req, 'conn, B>>>, Error> {
         // FIXME: Return type of this function shouldn't be generic, but reqwless hides the
         // inner type `BufferingReader` so we can't use the full type signature for now
 

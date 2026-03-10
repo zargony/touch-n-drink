@@ -9,7 +9,7 @@
 
 use core::convert::Infallible;
 use core::fmt::Debug;
-use embassy_time::{with_timeout, Duration};
+use embassy_time::{Duration, with_timeout};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::{I2c, Operation};
 use log::warn;

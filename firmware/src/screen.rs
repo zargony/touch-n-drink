@@ -7,7 +7,7 @@ use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use rand_core::RngCore;
 use u8g2_fonts::types::{FontColor, HorizontalAlignment, VerticalPosition};
-use u8g2_fonts::{fonts, Content, FontRenderer};
+use u8g2_fonts::{Content, FontRenderer, fonts};
 
 /// Touch 'n Drink bi-color logo
 #[rustfmt::skip]
@@ -153,11 +153,7 @@ fn trim_prefixes<'a>(text: &'a str, prefixes: &[&str]) -> &'a str {
         }
     }
     result = result.trim_start();
-    if result.is_empty() {
-        text
-    } else {
-        result
-    }
+    if result.is_empty() { text } else { result }
 }
 
 /// Draw user greeting (top 10 lines, 0..10)
