@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Updated code to Rust Edition 2024
+- Make sure turning off the buzzer completely stops LEDC timers and output driving
+- Updated to latest esp-rs and embassy versions
+
 ## 1.0.1 - 2025-09-27
 
 - Enabled system hardware watchdog (RWDT) to recover from unresponsive states
