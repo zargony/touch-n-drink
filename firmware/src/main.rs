@@ -225,6 +225,7 @@ async fn main(spawner: Spawner) {
         rng,
         peripherals.WIFI,
         spawner,
+        config.wifi_country,
         &config.wifi_ssid,
         &config.wifi_password,
     )
