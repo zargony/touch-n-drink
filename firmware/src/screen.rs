@@ -134,10 +134,9 @@ fn footer<D: DrawTarget<Color = BinaryColor>>(
 
 /// Trim text if it's too long
 fn trim(text: &str, max_len: usize) -> &str {
-    if text.len() > max_len {
-        &text[..max_len]
-    } else {
-        text
+    match text.char_indices().nth(max_len) {
+        Some((idx, _char)) => &text[..idx],
+        None => text,
     }
 }
 
@@ -149,7 +148,7 @@ fn greeting<D: DrawTarget<Color = BinaryColor>>(
 ) -> Result<(), D::Error> {
     let greeting = GREETINGS[random as usize % GREETINGS.len()];
     // Trim name if it's too long to display
-    let name = trim(name, MEDIUM_CHARS_PER_LINE - greeting.len() - 1);
+    let name = trim(name, MEDIUM_CHARS_PER_LINE - greeting.chars().count() - 1);
     text_centered(&format!("{greeting} {name}"), 7, MEDIUM_STYLE).draw(target)?;
     Ok(())
 }
