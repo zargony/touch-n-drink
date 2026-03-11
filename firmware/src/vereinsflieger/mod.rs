@@ -176,7 +176,7 @@ impl Connection<'_> {
                     if let ArticleOrStatus::Article(article) = article_or_status {
                         total_articles += 1;
                         if let Some(price) = article.price() {
-                            articles.update(&article.articleid, article.designation, price);
+                            articles.update(&article.articleid, &article.designation, price);
                         } else {
                             warn!(
                                 "Ignoring article with no valid price ({}): {}",

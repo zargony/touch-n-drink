@@ -1,5 +1,5 @@
 use alloc::collections::BTreeMap;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 
@@ -43,7 +43,13 @@ impl Articles {
     }
 
     /// Update article with given article id. Ignores article ids not in list.
-    pub fn update(&mut self, id: &ArticleId, name: String, price: f32) {
+    pub fn update(&mut self, id: &ArticleId, name: &str, price: f32) {
+        // Trim generic prefix from article name
+        let name = name
+            .trim_start_matches("Getränke ")
+            .trim_start_matches("Getränk ")
+            .trim_start()
+            .to_string();
         if self.ids.contains(id) {
             self.articles.insert(id.clone(), Article { name, price });
         }
