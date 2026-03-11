@@ -1,13 +1,15 @@
 use crate::article::{Article, Articles};
 use crate::{GIT_SHA_STR, VERSION_STR};
+use alloc::format;
 use core::fmt;
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::image::{Image, ImageRaw};
+use embedded_graphics::mono_font::MonoTextStyle;
+use embedded_graphics::mono_font::iso_8859_15::{FONT_5X7, FONT_6X10, FONT_6X12, FONT_7X13_BOLD};
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
+use embedded_graphics::text::{Alignment, Text};
 use rand_core::RngCore;
-use u8g2_fonts::types::{FontColor, HorizontalAlignment, VerticalPosition};
-use u8g2_fonts::{Content, FontRenderer, fonts};
 
 /// Touch 'n Drink bi-color logo
 #[rustfmt::skip]
@@ -41,11 +43,13 @@ static GREETINGS: [&str; 20] = [
     "Salut", "Cheers", "Salve", "Hoi", "Hiya", "Sup", "Hiho", "Oi",
 ];
 
-const SPLASH_VERSION_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_profont10_tr>();
-const TITLE_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_7x13B_tf>();
-const MEDIUM_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_6x10_tf>();
-const SMALL_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_5x7_tf>();
-const FOOTER_FONT: FontRenderer = FontRenderer::new::<fonts::u8g2_font_5x7_tf>();
+const SPLASH_VERSION_STYLE: MonoTextStyle<BinaryColor> =
+    MonoTextStyle::new(&FONT_6X12, BinaryColor::On);
+const TITLE_STYLE: MonoTextStyle<BinaryColor> =
+    MonoTextStyle::new(&FONT_7X13_BOLD, BinaryColor::On);
+const MEDIUM_STYLE: MonoTextStyle<BinaryColor> = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
+const SMALL_STYLE: MonoTextStyle<BinaryColor> = MonoTextStyle::new(&FONT_5X7, BinaryColor::On);
+const FOOTER_STYLE: MonoTextStyle<BinaryColor> = MonoTextStyle::new(&FONT_5X7, BinaryColor::On);
 
 /// Screen width
 const WIDTH: i32 = 128;
@@ -59,80 +63,53 @@ const HEIGHT: i32 = 64;
 /// Number of characters that fit in a line
 const MEDIUM_CHARS_PER_LINE: usize = WIDTH as usize / 6;
 
-/// Screen display error
-pub type Error<E> = u8g2_fonts::Error<E>;
-
 /// Generic screen that can be displayed
 pub trait Screen {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(
-        &self,
-        target: &mut D,
-    ) -> Result<(), Error<D::Error>>;
+    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error>;
 }
 
 /// Draw left aligned text on given line
 fn left<D: DrawTarget<Color = BinaryColor>>(
-    font: &FontRenderer,
+    style: MonoTextStyle<BinaryColor>,
     x: i32,
     y: i32,
-    content: impl Content,
+    text: &str,
     target: &mut D,
-) -> Result<(), Error<D::Error>> {
-    font.render_aligned(
-        content,
-        Point::new(x, y),
-        VerticalPosition::Baseline,
-        HorizontalAlignment::Left,
-        FontColor::Transparent(BinaryColor::On),
-        target,
-    )?;
+) -> Result<(), D::Error> {
+    Text::with_alignment(text, Point::new(x, y), style, Alignment::Left).draw(target)?;
     Ok(())
 }
 
 /// Draw centered text on given line
 fn centered<D: DrawTarget<Color = BinaryColor>>(
-    font: &FontRenderer,
+    style: MonoTextStyle<BinaryColor>,
     y: i32,
-    content: impl Content,
+    text: &str,
     target: &mut D,
-) -> Result<(), Error<D::Error>> {
-    font.render_aligned(
-        content,
-        Point::new(HCENTER, y),
-        VerticalPosition::Baseline,
-        HorizontalAlignment::Center,
-        FontColor::Transparent(BinaryColor::On),
-        target,
-    )?;
+) -> Result<(), D::Error> {
+    Text::with_alignment(text, Point::new(HCENTER, y), style, Alignment::Center).draw(target)?;
     Ok(())
 }
 
 /// Draw right aligned text on given line
 fn right<D: DrawTarget<Color = BinaryColor>>(
-    font: &FontRenderer,
+    style: MonoTextStyle<BinaryColor>,
     y: i32,
-    content: impl Content,
+    text: &str,
     target: &mut D,
-) -> Result<(), Error<D::Error>> {
-    font.render_aligned(
-        content,
-        Point::new(WIDTH - 1, y),
-        VerticalPosition::Baseline,
-        HorizontalAlignment::Right,
-        FontColor::Transparent(BinaryColor::On),
-        target,
-    )?;
+) -> Result<(), D::Error> {
+    Text::with_alignment(text, Point::new(WIDTH - 1, y), style, Alignment::Right).draw(target)?;
     Ok(())
 }
 
 /// Draw common footer (bottom 7 lines, 57..64)
 fn footer<D: DrawTarget<Color = BinaryColor>>(
-    content_left: impl Content,
-    content_right: impl Content,
+    text_left: &str,
+    text_right: &str,
     target: &mut D,
-) -> Result<(), Error<D::Error>> {
-    left(&FOOTER_FONT, 0, HEIGHT - 1, content_left, target)?;
-    right(&FOOTER_FONT, HEIGHT - 1, content_right, target)?;
+) -> Result<(), D::Error> {
+    left(FOOTER_STYLE, 0, HEIGHT - 2, text_left, target)?;
+    right(FOOTER_STYLE, HEIGHT - 2, text_right, target)?;
     Ok(())
 }
 
@@ -162,28 +139,23 @@ fn greeting<D: DrawTarget<Color = BinaryColor>>(
     random: u32,
     name: &str,
     target: &mut D,
-) -> Result<(), Error<D::Error>> {
+) -> Result<(), D::Error> {
     let greeting = GREETINGS[random as usize % GREETINGS.len()];
     // Trim name if it's too long to display
     let name = trim(name, MEDIUM_CHARS_PER_LINE - greeting.len() - 1);
-    centered(&MEDIUM_FONT, 8, format_args!("{greeting} {name}"), target)
+    centered(MEDIUM_STYLE, 7, &format!("{greeting} {name}"), target)
 }
 
 /// Splash screen
 pub struct Splash;
 
 impl Screen for Splash {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(
-        &self,
-        target: &mut D,
-    ) -> Result<(), Error<D::Error>> {
-        Image::new(&LOGO, Point::new(0, 13))
-            .draw(target)
-            .map_err(Error::DisplayError)?;
+    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+        Image::new(&LOGO, Point::new(0, 13)).draw(target)?;
         centered(
-            &SPLASH_VERSION_FONT,
-            13 + 29,
-            format_args!("v{VERSION_STR}"),
+            SPLASH_VERSION_STYLE,
+            13 + 30,
+            &format!("v{VERSION_STR}"),
             target,
         )?;
         #[cfg(not(debug_assertions))]
@@ -206,17 +178,9 @@ impl<M: fmt::Display> Failure<M> {
 }
 
 impl<M: fmt::Display> Screen for Failure<M> {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(
-        &self,
-        target: &mut D,
-    ) -> Result<(), Error<D::Error>> {
-        centered(&TITLE_FONT, 26, "FEHLER!", target)?;
-        centered(
-            &SMALL_FONT,
-            26 + 12,
-            format_args!("{}", self.message),
-            target,
-        )?;
+    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+        centered(TITLE_STYLE, 25, "FEHLER!", target)?;
+        centered(SMALL_STYLE, 25 + 12, &format!("{}", self.message), target)?;
         footer("* Abbruch", "", target)?;
         Ok(())
     }
@@ -231,14 +195,11 @@ pub enum PleaseWait {
 }
 
 impl Screen for PleaseWait {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(
-        &self,
-        target: &mut D,
-    ) -> Result<(), Error<D::Error>> {
-        centered(&TITLE_FONT, 26, "Stand By...", target)?;
+    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+        centered(TITLE_STYLE, 25, "Stand By...", target)?;
         centered(
-            &MEDIUM_FONT,
-            26 + 12,
+            MEDIUM_STYLE,
+            25 + 12,
             match self {
                 Self::WifiConnecting => "WLAN Verbindung\nwird aufgebaut",
                 Self::UpdatingData => "Daten-Aktualisierung",
@@ -258,11 +219,8 @@ impl Screen for PleaseWait {
 pub struct ScanId;
 
 impl Screen for ScanId {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(
-        &self,
-        target: &mut D,
-    ) -> Result<(), Error<D::Error>> {
-        centered(&TITLE_FONT, 26, "Mitgliedsausweis\nscannen", target)?;
+    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+        centered(TITLE_STYLE, 25, "Mitgliedsausweis\nscannen", target)?;
         Ok(())
     }
 }
@@ -285,10 +243,7 @@ impl<'a> SelectArticle<'a> {
 }
 
 impl Screen for SelectArticle<'_> {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(
-        &self,
-        target: &mut D,
-    ) -> Result<(), Error<D::Error>> {
+    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
         greeting(self.greeting, self.name, target)?;
 
         // Safe to unwrap since conversion always succeeds for these small numbers
@@ -297,19 +252,14 @@ impl Screen for SelectArticle<'_> {
         for (idx, _article_id, article) in self.articles.iter() {
             // Safe to unwrap since conversion always succeeds for these small numbers
             let y = y0 + i32::try_from(idx).unwrap() * 12;
-            left(&TITLE_FONT, 0, y, format_args!("{}:", idx + 1), target)?;
+            left(TITLE_STYLE, 0, y, &format!("{}:", idx + 1), target)?;
             let article_name = trim_prefixes(&article.name, &["Getränke", "Getränk"]);
-            left(&TITLE_FONT, 16, y, trim(article_name, 13), target)?;
-            right(
-                &SMALL_FONT,
-                y,
-                format_args!("{:.02}", article.price),
-                target,
-            )?;
+            left(TITLE_STYLE, 16, y, trim(article_name, 13), target)?;
+            right(SMALL_STYLE, y, &format!("{:.02}", article.price), target)?;
         }
         footer(
             "* Abbruch",
-            format_args!("1-{} Weiter", self.articles.count_ids()),
+            &format!("1-{} Weiter", self.articles.count_ids()),
             target,
         )?;
         Ok(())
@@ -328,21 +278,18 @@ impl<'a> EnterAmount<'a> {
 }
 
 impl Screen for EnterAmount<'_> {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(
-        &self,
-        target: &mut D,
-    ) -> Result<(), Error<D::Error>> {
+    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
         centered(
-            &MEDIUM_FONT,
-            23,
-            format_args!(
+            MEDIUM_STYLE,
+            22,
+            &format!(
                 "{} {:.02}",
                 trim(&self.article.name, MEDIUM_CHARS_PER_LINE - 3),
                 self.article.price
             ),
             target,
         )?;
-        centered(&TITLE_FONT, 23 + 16, "Anzahl wählen", target)?;
+        centered(TITLE_STYLE, 22 + 16, "Anzahl wählen", target)?;
         footer("* Abbruch", "1-9 Weiter", target)?;
         Ok(())
     }
@@ -366,14 +313,11 @@ impl<'a> Checkout<'a> {
 }
 
 impl Screen for Checkout<'_> {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(
-        &self,
-        target: &mut D,
-    ) -> Result<(), Error<D::Error>> {
+    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
         centered(
-            &MEDIUM_FONT,
-            23,
-            format_args!(
+            MEDIUM_STYLE,
+            22,
+            &format!(
                 "{}x {}",
                 self.amount,
                 trim(&self.article.name, MEDIUM_CHARS_PER_LINE - 3)
@@ -381,9 +325,9 @@ impl Screen for Checkout<'_> {
             target,
         )?;
         centered(
-            &TITLE_FONT,
-            23 + 16,
-            format_args!("{:.02} EUR", self.total_price),
+            TITLE_STYLE,
+            22 + 16,
+            &format!("{:.02} EUR", self.total_price),
             target,
         )?;
         footer("* Abbruch", "# BEZAHLEN", target)?;
@@ -403,15 +347,12 @@ impl Success {
 }
 
 impl Screen for Success {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(
-        &self,
-        target: &mut D,
-    ) -> Result<(), Error<D::Error>> {
-        centered(&TITLE_FONT, 26, "Affirm!", target)?;
+    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+        centered(TITLE_STYLE, 25, "Affirm!", target)?;
         centered(
-            &SMALL_FONT,
-            26 + 12,
-            format_args!("{} Getränke genehmigt", self.amount),
+            SMALL_STYLE,
+            25 + 12,
+            &format!("{} Getränke genehmigt", self.amount),
             target,
         )?;
         footer("", "# Ok", target)?;

@@ -2587,7 +2587,6 @@ dependencies = [
  "serde_json",
  "serde_with",
  "ssd1306",
- "u8g2-fonts",
 ]
 
 [[package]]
@@ -2595,15 +2594,6 @@ name = "typenum"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "562d481066bde0658276a35467c4af00bdc6ee726305698a55b86e61d7ad82bb"
-
-[[package]]
-name = "u8g2-fonts"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "825f57be1429fd60f335a4aade11e128a7ae4f89d75ca3a003cb8410a91093f7"
-dependencies = [
- "embedded-graphics-core",
-]
 
 [[package]]
 name = "ufmt-write"

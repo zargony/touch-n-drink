@@ -61,7 +61,6 @@ serde = { version = "1.0", default-features = false, features = ["alloc", "deriv
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 serde_with = { version = "3.17", default-features = false, features = ["alloc", "chrono", "macros"] }
 ssd1306 = { version = "0.10", features = ["async"] }
-u8g2-fonts = "0.7"
 
 # FIXME: Fix for compile failure of embedded-tls 0.18.0, see https://github.com/drogue-iot/embedded-tls/pull/182
 # Becomes obsolete once reqwless starts to use embedded-tls 0.19
