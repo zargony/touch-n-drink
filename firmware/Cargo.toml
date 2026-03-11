@@ -45,6 +45,7 @@ embedded-graphics = "0.8"
 embedded-hal-async = "1.0"
 embedded-io-async = { version = "0.7", features = ["alloc"] }
 embedded-storage = "0.3"
+embedded-text = "0.7"
 esp-alloc = { version = "0.9", features = ["esp32c3"] }
 esp-backtrace = { version = "0.18", features = ["esp32c3", "custom-halt", "panic-handler", "println"] }
 esp-bootloader-esp-idf = { version = "0.4", features = ["esp32c3"] }
@@ -61,7 +62,6 @@ serde = { version = "1.0", default-features = false, features = ["alloc", "deriv
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 serde_with = { version = "3.17", default-features = false, features = ["alloc", "chrono", "macros"] }
 ssd1306 = { version = "0.10", features = ["async"] }
-u8g2-fonts = "0.7"
 
 # FIXME: Fix for compile failure of embedded-tls 0.18.0, see https://github.com/drogue-iot/embedded-tls/pull/182
 # Becomes obsolete once reqwless starts to use embedded-tls 0.19
