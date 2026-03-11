@@ -10,6 +10,7 @@ use esp_hal::peripherals::FLASH as Flash;
 use esp_storage::FlashStorage;
 use log::{debug, info, warn};
 use serde::Deserialize;
+use serde_with::{Bytes, serde_as};
 
 // Config partition type (custom partition type 0x54, subtype 0x44)
 const CONFIG_PARTITION_TYPE: [u8; 2] = [0x54, 0x44];
@@ -57,9 +58,13 @@ impl Deref for SensitiveString {
 ///
 /// If there is no valid JSON or no valid `config` data partition, a default configuration is
 /// provided (which isn't very useful, but at least doesn't prevent the device from starting).
+#[serde_as]
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
+    /// Wifi country
+    #[serde_as(as = "Option<Bytes>")]
+    pub wifi_country: Option<[u8; 2]>,
     /// Wifi SSID to connect to
     pub wifi_ssid: String,
     /// Wifi password

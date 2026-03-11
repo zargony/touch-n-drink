@@ -1,12 +1,17 @@
 // Note that you must remove all comments in your own configuration file since
 // JSON officially doesn't allow comments and parsing will fail with comments.
 {
+  // Wifi country code (optional). Determines allowed channels for regulatory
+  // compliance. Set to an ISO-3166-1 2-letter-code, e.g. "DE". If unset, "01"
+  // is used, which is a safe global default and uses channels 1 to 11 only.
+  "wifi-country": "DE",
+
   // SSID and WPA2 password to use for connecting to Wifi network. Wifi must
   // provide an IPv4 address via DHCP and internet access to required services.
   "wifi-ssid": "My Wifi",
   "wifi-password": "12345",
 
-  // Mixpanel project token for analytics (optional)
+  // Mixpanel project token for analytics (optional).
   "mp-token": "00000000000000000000000000000000",
 
   // Credentials for connecting to the Vereinsflieger API. See Vereinsflieger

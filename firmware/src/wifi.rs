@@ -140,6 +140,7 @@ impl Wifi {
         mut rng: Rng,
         wifi: peripherals::WIFI<'static>,
         spawner: Spawner,
+        country: Option<[u8; 2]>,
         ssid: &str,
         password: &str,
     ) -> Result<Self, InitializationError> {
@@ -151,8 +152,7 @@ impl Wifi {
         // Initialize and start ESP32 Wifi controller
         let esp_wifi_ctrl = Box::new(esp_radio::init()?);
         let esp_wifi_ctrl = Box::leak(esp_wifi_ctrl);
-        // TODO: Make country code configurable
-        let wifi_config = WifiConfig::default().with_country_code(*b"DE");
+        let wifi_config = WifiConfig::default().with_country_code(country.unwrap_or(*b"01"));
         let (mut controller, interfaces) = esp_radio::wifi::new(esp_wifi_ctrl, wifi, wifi_config)?;
         let client_config = ClientConfig::default()
             .with_ssid(ssid.to_string())
