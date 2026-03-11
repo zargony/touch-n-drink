@@ -24,9 +24,9 @@ jobs:
           targets: riscv32imc-unknown-none-elf
           components: clippy, rustfmt
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Cache cargo data
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/git
@@ -55,9 +55,9 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Cache cargo data
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/git
@@ -71,7 +71,7 @@ jobs:
         run: cp target/${{ matrix.target }}/release/touch-n-drink target/release/touch-n-drink-${{ matrix.target }}.elf
         working-directory: firmware
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: touch-n-drink-${{ matrix.target }}
           path: |
@@ -90,7 +90,7 @@ jobs:
     steps:
       - name: Cache espflash
         id: cache-espflash
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cargo/bin/espflash
           key: ${{ runner.os }}-espflash
@@ -103,13 +103,13 @@ jobs:
         if: steps.cache-espflash.outputs.cache-hit != 'true'
         run: cargo install --locked espflash
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           sparse-checkout: |
             firmware/espflash.toml
             firmware/partitions.csv
       - name: Download build artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: touch-n-drink-${{ matrix.target }}
           path: firmware/images
@@ -124,7 +124,7 @@ jobs:
           cd images && shasum -a 256 touch-n-drink-${{ matrix.chip }}.factory.bin >touch-n-drink-${{ matrix.chip }}.factory.sha256
         working-directory: firmware
       - name: Upload image artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: touch-n-drink-${{ matrix.chip }}
           path: |
@@ -141,12 +141,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           sparse-checkout: |
             firmware/CHANGELOG.md
       - name: Download all build artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           path: firmware/images
           merge-multiple: true
