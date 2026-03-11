@@ -52,16 +52,16 @@ const SMALL_STYLE: MonoTextStyle<BinaryColor> = MonoTextStyle::new(&FONT_5X7, Bi
 const FOOTER_STYLE: MonoTextStyle<BinaryColor> = MonoTextStyle::new(&FONT_5X7, BinaryColor::On);
 
 /// Screen width
-const WIDTH: i32 = 128;
+const WIDTH: u32 = 128;
 
 /// Horizontal position for centering
-const HCENTER: i32 = WIDTH / 2;
+const HCENTER: i32 = WIDTH.cast_signed() / 2;
 
 /// Screen height
-const HEIGHT: i32 = 64;
+const HEIGHT: u32 = 64;
 
 /// Number of characters that fit in a line
-const MEDIUM_CHARS_PER_LINE: usize = WIDTH as usize / 6;
+const MEDIUM_CHARS_PER_LINE: usize = (WIDTH / MEDIUM_STYLE.font.character_size.width) as usize;
 
 /// Generic screen that can be displayed
 pub trait Screen {
@@ -98,7 +98,13 @@ fn right<D: DrawTarget<Color = BinaryColor>>(
     text: &str,
     target: &mut D,
 ) -> Result<(), D::Error> {
-    Text::with_alignment(text, Point::new(WIDTH - 1, y), style, Alignment::Right).draw(target)?;
+    Text::with_alignment(
+        text,
+        Point::new(WIDTH.cast_signed() - 1, y),
+        style,
+        Alignment::Right,
+    )
+    .draw(target)?;
     Ok(())
 }
 
@@ -108,8 +114,8 @@ fn footer<D: DrawTarget<Color = BinaryColor>>(
     text_right: &str,
     target: &mut D,
 ) -> Result<(), D::Error> {
-    left(FOOTER_STYLE, 0, HEIGHT - 2, text_left, target)?;
-    right(FOOTER_STYLE, HEIGHT - 2, text_right, target)?;
+    left(FOOTER_STYLE, 0, HEIGHT.cast_signed() - 2, text_left, target)?;
+    right(FOOTER_STYLE, HEIGHT.cast_signed() - 2, text_right, target)?;
     Ok(())
 }
 
