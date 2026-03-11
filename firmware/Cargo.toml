@@ -45,6 +45,7 @@ embedded-graphics = "0.8"
 embedded-hal-async = "1.0"
 embedded-io-async = { version = "0.7", features = ["alloc"] }
 embedded-storage = "0.3"
+embedded-text = "0.7"
 esp-alloc = { version = "0.9", features = ["esp32c3"] }
 esp-backtrace = { version = "0.18", features = ["esp32c3", "custom-halt", "panic-handler", "println"] }
 esp-bootloader-esp-idf = { version = "0.4", features = ["esp32c3"] }

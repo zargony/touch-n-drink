@@ -11,6 +11,8 @@ use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::text::{Alignment, Baseline, Text, TextStyleBuilder};
+use embedded_text::TextBox;
+use embedded_text::alignment::HorizontalAlignment;
 use rand_core::RngCore;
 
 /// Touch 'n Drink bi-color logo
@@ -103,6 +105,21 @@ fn text_right<'a>(
     Text::with_alignment(text, right(y), style, Alignment::Right)
 }
 
+/// Word-wrapped multi-line text
+fn text_block<'a>(
+    text: &'a str,
+    top: i32,
+    height: u32,
+    style: MonoTextStyle<'a, BinaryColor>,
+) -> TextBox<'a, MonoTextStyle<'a, BinaryColor>> {
+    TextBox::with_alignment(
+        text,
+        Rectangle::new(left(top), Size::new(SCREEN.size.width, height)),
+        style,
+        HorizontalAlignment::Center,
+    )
+}
+
 /// Draw common footer (bottom 7 lines, 57..64)
 fn footer<D: DrawTarget<Color = BinaryColor>>(
     text_left: &str,
@@ -173,8 +190,8 @@ impl<M: fmt::Display> Failure<M> {
 
 impl<M: fmt::Display> Screen for Failure<M> {
     fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
-        text_centered("FEHLER!", 25, TITLE_STYLE).draw(target)?;
-        text_centered(&format!("{}", self.message), 25 + 12, SMALL_STYLE).draw(target)?;
+        text_centered("FEHLER!", 15, TITLE_STYLE).draw(target)?;
+        text_block(&format!("{}", self.message), 15 + 5, 36, SMALL_STYLE).draw(target)?;
         footer("* Abbruch", "", target)?;
         Ok(())
     }
