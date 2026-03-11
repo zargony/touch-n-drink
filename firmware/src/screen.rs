@@ -140,19 +140,6 @@ fn trim(text: &str, max_len: usize) -> &str {
     }
 }
 
-/// Draw user greeting (top 10 lines, 0..10)
-fn greeting<D: DrawTarget<Color = BinaryColor>>(
-    random: u32,
-    name: &str,
-    target: &mut D,
-) -> Result<(), D::Error> {
-    let greeting = GREETINGS[random as usize % GREETINGS.len()];
-    // Trim name if it's too long to display
-    let name = trim(name, MEDIUM_CHARS_PER_LINE - greeting.chars().count() - 1);
-    text_centered(&format!("{greeting} {name}"), 7, MEDIUM_STYLE).draw(target)?;
-    Ok(())
-}
-
 /// Generic screen that can be displayed
 pub trait Screen {
     fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error>;
@@ -251,7 +238,12 @@ impl<'a> SelectArticle<'a> {
 
 impl Screen for SelectArticle<'_> {
     fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
-        greeting(self.greeting, self.name, target)?;
+        let greeting = GREETINGS[self.greeting as usize % GREETINGS.len()];
+        let name = trim(
+            self.name,
+            MEDIUM_CHARS_PER_LINE - greeting.chars().count() - 1,
+        );
+        text_centered(&format!("{greeting} {name}"), 7, MEDIUM_STYLE).draw(target)?;
 
         // Safe to unwrap since conversion always succeeds for these small numbers
         let num_articles = i32::try_from(self.articles.count_ids()).unwrap();
