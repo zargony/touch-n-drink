@@ -103,22 +103,21 @@ impl Config {
             }
         };
 
-        // Look up config data partition
-        let mut partition = if let Some(entry) = table
+        // Look up config data partition and flash region
+        let mut region = if let Some(part) = table
             .iter()
-            .find(|entry| [entry.raw_type(), entry.raw_subtype()] == CONFIG_PARTITION_TYPE)
+            .find(|part| [part.raw_type(), part.raw_subtype()] == CONFIG_PARTITION_TYPE)
         {
-            let offset = entry.offset();
-            debug!("Config: Found config partition at offset 0x{offset:x}");
-            entry.as_embedded_storage(&mut storage)
+            debug!("Config: Found config partition at 0x{:x}", part.offset());
+            part.as_embedded_storage(&mut storage)
         } else {
             warn!("Config: No config partition found, using default configuration");
             return Self::default();
         };
 
-        // Read config data partition
-        let mut bytes = vec![0; partition.capacity()];
-        if let Err(_err) = partition.read(0, &mut bytes) {
+        // Read config data flash region
+        let mut bytes = vec![0; region.capacity()];
+        if let Err(_err) = region.read(0, &mut bytes) {
             warn!("Config: Unable to read config partition");
             return Self::default();
         }
