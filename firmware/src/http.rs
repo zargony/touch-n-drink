@@ -90,8 +90,8 @@ impl Resources {
 }
 
 /// HTTP client
-pub struct Http<'client> {
-    client: HttpClient<'client, TcpClient<'client>, DnsSocket<'client>>,
+pub struct Http<'a> {
+    client: HttpClient<'a, TcpClient<'a>, DnsSocket<'a>>,
 }
 
 impl fmt::Debug for Http<'_> {
@@ -100,9 +100,9 @@ impl fmt::Debug for Http<'_> {
     }
 }
 
-impl<'client> Http<'client> {
+impl<'a> Http<'a> {
     /// Create new HTTP client using the given resources
-    pub fn new(wifi: &'client Wifi, seed: u64, resources: &'client mut Resources) -> Self {
+    pub fn new(wifi: &'a Wifi, seed: u64, resources: &'a mut Resources) -> Self {
         // FIXME: reqwless with embedded-tls can't verify TLS certificates (though pinning is
         // supported). This is bad since it makes communication vulnerable to MITM attacks.
         // esp-mbedtls would work, but is only supported with git reqwless and nightly Rust atm.

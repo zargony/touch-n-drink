@@ -69,10 +69,10 @@ impl<'a> Mixpanel<'a> {
 
 /// Mixpanel API client connection
 #[derive(Debug)]
-pub struct Connection<'a> {
-    http: http::Connection<'a>,
-    token: &'a str,
-    device_id: &'a str,
+pub struct Connection<'conn> {
+    http: http::Connection<'conn>,
+    token: &'conn str,
+    device_id: &'conn str,
 }
 
 impl Connection<'_> {
@@ -106,9 +106,9 @@ impl Connection<'_> {
     }
 }
 
-impl<'a> Connection<'a> {
+impl<'conn> Connection<'conn> {
     /// Connect to API server
-    async fn new(mp: &'a Mixpanel<'_>, http: &'a mut Http<'_>) -> Result<Self, Error> {
+    async fn new(mp: &'conn Mixpanel<'_>, http: &'conn mut Http<'_>) -> Result<Self, Error> {
         // Connect to API server
         let connection = with_timeout(TIMEOUT, http.connect(BASE_URL))
             .await?
@@ -122,15 +122,24 @@ impl<'a> Connection<'a> {
     }
 
     /// Helper function to create a list of tracking events from telemetry events
-    fn events(&self, events: &'a [(Instant, Event)]) -> Result<Vec<proto_event::Event<'a>>, Error> {
+    fn events<'a>(
+        &self,
+        events: &'a [(Instant, Event)],
+    ) -> Result<Vec<proto_event::Event<'a>>, Error>
+    where
+        'conn: 'a,
+    {
         events
             .iter()
-            .map(|(time, event)| self.event(time, event))
+            .map(|(time, event)| self.event(*time, event))
             .collect()
     }
 
     /// Helper function to create a tracking event from a telemetry event
-    fn event(&self, time: &'a Instant, event: &'a Event) -> Result<proto_event::Event<'a>, Error> {
+    fn event<'a>(&self, time: Instant, event: &'a Event) -> Result<proto_event::Event<'a>, Error>
+    where
+        'conn: 'a,
+    {
         use proto_event::{
             DistinctId, EventProperties, EventPropertiesExtra, EventPropertiesExtraAuthentication,
             EventPropertiesExtraDataRefresh, EventPropertiesExtraError,
