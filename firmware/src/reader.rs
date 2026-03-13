@@ -130,7 +130,6 @@ pub struct LineReader<R, const BUFSIZE: usize = 256> {
 
 impl<R: Read, const BUFSIZE: usize> LineReader<R, BUFSIZE> {
     /// Create line reader object using the given reader
-    #[cfg_attr(not(test), expect(dead_code))]
     pub fn new(reader: R) -> Self {
         Self {
             buffer: BufferedReader::new(reader),
@@ -139,7 +138,6 @@ impl<R: Read, const BUFSIZE: usize> LineReader<R, BUFSIZE> {
     }
 
     /// Return next line
-    #[cfg_attr(not(test), expect(dead_code))]
     pub async fn next(&mut self) -> Result<Option<&[u8]>, Error<R::Error>> {
         self.buffer.consume(self.last_line_len);
         self.buffer.read().await?;

@@ -48,6 +48,7 @@ mod http;
 mod keypad;
 mod mixpanel;
 mod nfc;
+mod ota;
 mod pn532;
 mod reader;
 mod schedule;
@@ -253,6 +254,10 @@ async fn main(spawner: Spawner) {
         const_hex::Buffer::new().const_format(&Efuse::read_base_mac_address());
     let mut telemetry = telemetry::Telemetry::new(config.mp_token.as_deref(), device_id.as_str());
     telemetry.track(telemetry::Event::SystemStart);
+
+    // Initialize OTA updater
+    let mut ota_resources = Box::new(ota::Resources::new());
+    let _ota = ota::Ota::new(wifi.tcp(), wifi.dns(), rng.next_u64(), &mut ota_resources);
 
     // Initialize buzzer
     let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
