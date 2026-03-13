@@ -76,6 +76,7 @@ use esp_hal::rtc_cntl::{Rtc, RwdtStage};
 use esp_hal::time::{Duration, Rate};
 use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
+use esp_storage::FlashStorage;
 use log::{debug, error, info};
 use rand_core::RngCore;
 
@@ -165,7 +166,8 @@ async fn main(spawner: Spawner) {
         .expect("Failed to spawn watchdog task");
 
     // Read system configuration
-    let config = config::Config::read(peripherals.FLASH);
+    let mut flash = FlashStorage::new(peripherals.FLASH);
+    let config = config::Config::read(&mut flash);
 
     // Initialize article and user look up tables
     let mut articles = article::Articles::new(config.vf_article_ids);

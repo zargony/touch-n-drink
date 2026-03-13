@@ -4,10 +4,8 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 use core::ops::Deref;
-use embedded_storage::ReadStorage;
+use embedded_storage::{ReadStorage, Storage};
 use esp_bootloader_esp_idf::partitions;
-use esp_hal::peripherals::FLASH as Flash;
-use esp_storage::FlashStorage;
 use log::{debug, info, warn};
 use serde::Deserialize;
 use serde_with::{Bytes, serde_as};
@@ -87,12 +85,10 @@ pub struct Config {
 
 impl Config {
     /// Read configuration from `config` flash data partition
-    pub fn read(flash: Flash<'_>) -> Self {
-        let mut storage = FlashStorage::new(flash);
-
+    pub fn read<S: Storage>(storage: &mut S) -> Self {
         // Read partition table
         let mut buf = [0; partitions::PARTITION_TABLE_MAX_LEN];
-        let table = match partitions::read_partition_table(&mut storage, &mut buf) {
+        let table = match partitions::read_partition_table(storage, &mut buf) {
             Ok(table) => {
                 debug!("Config: Read partition table with {} entries", table.len());
                 table
@@ -109,7 +105,7 @@ impl Config {
             .find(|part| [part.raw_type(), part.raw_subtype()] == CONFIG_PARTITION_TYPE)
         {
             debug!("Config: Found config partition at 0x{:x}", part.offset());
-            part.as_embedded_storage(&mut storage)
+            part.as_embedded_storage(storage)
         } else {
             warn!("Config: No config partition found, using default configuration");
             return Self::default();
