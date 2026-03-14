@@ -5,7 +5,7 @@ use core::ops::Range;
 use embedded_io_async::Read;
 use serde::de::DeserializeOwned;
 
-/// Streaming JSON error
+/// Reader error
 #[derive(Debug)]
 pub enum Error<E> {
     /// Read error
@@ -20,7 +20,7 @@ pub enum Error<E> {
     ExpectedColon,
     /// Expected this character to be either a `','` or a `'}'`
     ExpectedObjectCommaOrEnd,
-    /// JSON has non-whitespace trailing characters after the value
+    /// Input has non-whitespace trailing characters
     TrailingCharacters,
     /// JSON parse error
     Json(serde_json::Error),
@@ -41,78 +41,28 @@ impl<E: fmt::Display> fmt::Display for Error<E> {
     }
 }
 
-/// Streaming JSON object reader.
-/// Uses an IO reader to read and parse a JSON object element by element. Requires only one
-/// element to fit into memory rather than the whole JSON data and object.
-pub struct StreamingJsonObjectReader<R, T, const BUFSIZE: usize = 2048> {
+/// Buffered reader
+/// Uses an async IO reader to fill a buffer and provide its content.
+pub struct BufferedReader<R, const BUFSIZE: usize = 1024> {
     buffer: [u8; BUFSIZE],
     range: Range<usize>,
     reader: R,
     eof: bool,
-    initialized: bool,
-    done: bool,
-    element_type: PhantomData<T>,
 }
 
-impl<R: Read, T: DeserializeOwned, const BUFSIZE: usize> StreamingJsonObjectReader<R, T, BUFSIZE> {
-    /// Create streaming JSON object reader using the given reader
+impl<R: Read, const BUFSIZE: usize> BufferedReader<R, BUFSIZE> {
+    /// Create buffered reader using the given reader
     pub fn new(reader: R) -> Self {
         Self {
             buffer: [0; BUFSIZE],
             range: 0..0,
             reader,
             eof: false,
-            initialized: false,
-            done: false,
-            element_type: PhantomData,
         }
     }
 
-    /// Return next key and element
-    pub async fn next(&mut self) -> Result<Option<(String, T)>, Error<R::Error>> {
-        self.fill_buf().await?;
-
-        if self.done {
-            match self.peek() {
-                Ok(_) => return Err(Error::TrailingCharacters),
-                Err(Error::EofWhileParsing) => return Ok(None),
-                Err(err) => return Err(err),
-            }
-        }
-
-        if !self.initialized {
-            match self.peek()? {
-                b'{' => self.consume(1),
-                _ => return Err(Error::ExpectedObjectBegin),
-            }
-            self.initialized = true;
-        }
-
-        let key: String = self.deserialize()?;
-
-        match self.peek()? {
-            b':' => self.consume(1),
-            _ => return Err(Error::ExpectedColon),
-        }
-
-        let value: T = self.deserialize()?;
-
-        match self.peek()? {
-            b',' => self.consume(1),
-            b'}' => {
-                self.consume(1);
-                self.done = true;
-            }
-            _ => return Err(Error::ExpectedObjectCommaOrEnd),
-        }
-
-        Ok(Some((key, value)))
-    }
-}
-
-impl<R: Read, T: DeserializeOwned, const BUFSIZE: usize> StreamingJsonObjectReader<R, T, BUFSIZE> {
     /// Move remaining buffer data to front and try to fill up the buffer by reading data
-    async fn fill_buf(&mut self) -> Result<(), Error<R::Error>> {
+    pub async fn read(&mut self) -> Result<(), Error<R::Error>> {
         if self.range.start > 0 && self.range.end > 0 {
             self.buffer.copy_within(self.range.clone(), 0);
             self.range.end -= self.range.start;
@@ -134,17 +84,17 @@ impl<R: Read, T: DeserializeOwned, const BUFSIZE: usize> StreamingJsonObjectRead
     }
 
     /// Consume data
-    fn consume(&mut self, amt: usize) {
+    pub fn consume(&mut self, amt: usize) {
         self.range.start = (self.range.start + amt).min(self.range.end);
     }
 
     /// Currently buffered data to parse
-    fn buffer(&self) -> &[u8] {
+    pub fn buffer(&self) -> &[u8] {
         &self.buffer[self.range.clone()]
     }
 
     /// Trim leading whitespace from buffer
-    fn trim_whitespace(&mut self) {
+    pub fn trim_whitespace(&mut self) {
         while self.range.start < self.range.end
             && self.buffer[self.range.start].is_ascii_whitespace()
         {
@@ -152,26 +102,94 @@ impl<R: Read, T: DeserializeOwned, const BUFSIZE: usize> StreamingJsonObjectRead
         }
     }
 
-    /// Skip leading whitespace and peek next byte in buffer
-    fn peek(&mut self) -> Result<u8, Error<R::Error>> {
-        self.trim_whitespace();
+    /// Peek next byte in buffer
+    pub fn peek(&mut self) -> Result<u8, Error<R::Error>> {
         match self.buffer().first() {
             Some(b) => Ok(*b),
             None if self.range.end == BUFSIZE => Err(Error::BufferTooSmall),
             None => Err(Error::EofWhileParsing),
         }
     }
+}
 
+/// Streaming JSON object reader.
+/// Uses an async IO reader to read and parse a JSON object element by element. Requires only one
+/// element to fit into memory rather than the whole JSON data and object.
+pub struct StreamingJsonObjectReader<R, T, const BUFSIZE: usize = 2048> {
+    buffer: BufferedReader<R, BUFSIZE>,
+    initialized: bool,
+    done: bool,
+    element_type: PhantomData<T>,
+}
+
+impl<R: Read, T: DeserializeOwned, const BUFSIZE: usize> StreamingJsonObjectReader<R, T, BUFSIZE> {
+    /// Create streaming JSON object reader using the given reader
+    pub fn new(reader: R) -> Self {
+        Self {
+            buffer: BufferedReader::new(reader),
+            initialized: false,
+            done: false,
+            element_type: PhantomData,
+        }
+    }
+
+    /// Return next key and element
+    pub async fn next(&mut self) -> Result<Option<(String, T)>, Error<R::Error>> {
+        self.buffer.read().await?;
+
+        if self.done {
+            self.buffer.trim_whitespace();
+            match self.buffer.peek() {
+                Ok(_) => return Err(Error::TrailingCharacters),
+                Err(Error::EofWhileParsing) => return Ok(None),
+                Err(err) => return Err(err),
+            }
+        }
+
+        if !self.initialized {
+            self.buffer.trim_whitespace();
+            match self.buffer.peek()? {
+                b'{' => self.buffer.consume(1),
+                _ => return Err(Error::ExpectedObjectBegin),
+            }
+            self.initialized = true;
+        }
+
+        let key: String = self.deserialize()?;
+
+        self.buffer.trim_whitespace();
+        match self.buffer.peek()? {
+            b':' => self.buffer.consume(1),
+            _ => return Err(Error::ExpectedColon),
+        }
+
+        let value: T = self.deserialize()?;
+
+        self.buffer.trim_whitespace();
+        match self.buffer.peek()? {
+            b',' => self.buffer.consume(1),
+            b'}' => {
+                self.buffer.consume(1);
+                self.done = true;
+            }
+            _ => return Err(Error::ExpectedObjectCommaOrEnd),
+        }
+
+        Ok(Some((key, value)))
+    }
+}
+
+impl<R: Read, T: DeserializeOwned, const BUFSIZE: usize> StreamingJsonObjectReader<R, T, BUFSIZE> {
     /// Deserialize given type
     fn deserialize<U: DeserializeOwned>(&mut self) -> Result<U, Error<R::Error>> {
-        let mut de = serde_json::Deserializer::from_slice(self.buffer()).into_iter();
+        let mut de = serde_json::Deserializer::from_slice(self.buffer.buffer()).into_iter();
         let value = match de.next() {
             Some(Ok(value)) => value,
             Some(Err(err)) => return Err(Error::Json(err)),
             None => return Err(Error::EofWhileParsing),
         };
         let len = de.byte_offset();
-        self.consume(len);
+        self.buffer.consume(len);
         Ok(value)
     }
 }
@@ -182,23 +200,22 @@ mod tests {
     use serde::Deserialize;
 
     #[async_std::test]
-    async fn fill_and_consume() {
-        let json = b"0123456789abcdef";
-        let mut reader: StreamingJsonObjectReader<_, (), 10> =
-            StreamingJsonObjectReader::new(&json[..]);
-        reader.fill_buf().await.unwrap();
+    async fn buffered_reader() {
+        let input = b"0123456789abcdef";
+        let mut reader: BufferedReader<_, 10> = BufferedReader::new(&input[..]);
+        reader.read().await.unwrap();
         assert_eq!(reader.buffer(), b"0123456789");
-        reader.fill_buf().await.unwrap();
+        reader.read().await.unwrap();
         assert_eq!(reader.buffer(), b"0123456789");
         reader.consume(8);
         assert_eq!(reader.buffer(), b"89");
-        reader.fill_buf().await.unwrap();
+        reader.read().await.unwrap();
         assert_eq!(reader.buffer(), b"89abcdef");
-        reader.fill_buf().await.unwrap();
+        reader.read().await.unwrap();
         assert_eq!(reader.buffer(), b"89abcdef");
         reader.consume(8);
         assert_eq!(reader.buffer(), b"");
-        reader.fill_buf().await.unwrap();
+        reader.read().await.unwrap();
         assert_eq!(reader.buffer(), b"");
     }
 
@@ -209,10 +226,10 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn smoke() {
-        let json = br#"{"foo": {"name": "Alice", "age": 42}, "bar": {"name": "Bob", "age": 23}}"#;
+    async fn streaming_json_object_reader() {
+        let input = br#"{"foo": {"name": "Alice", "age": 42}, "bar": {"name": "Bob", "age": 23}}"#;
         let mut reader: StreamingJsonObjectReader<_, Person> =
-            StreamingJsonObjectReader::new(&json[..]);
+            StreamingJsonObjectReader::new(&input[..]);
         let (key, person) = reader.next().await.unwrap().unwrap();
         assert_eq!(key, "foo");
         assert_eq!(person.name, "Alice");
