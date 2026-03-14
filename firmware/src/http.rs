@@ -1,4 +1,4 @@
-use crate::json::{self, StreamingJsonObjectReader};
+use crate::reader::{self, StreamingJsonObjectReader};
 use crate::time;
 use crate::wifi::{DnsSocket, TcpClient, TcpConnection, Wifi};
 use alloc::string::String;
@@ -40,7 +40,7 @@ pub enum Error {
     /// Response could not be parsed
     MalformedResponse(serde_json::Error),
     /// Response stream could not be parsed
-    MalformedResponseStream(json::Error<reqwless::Error>),
+    MalformedResponseStream(reader::Error<reqwless::Error>),
 }
 
 impl From<reqwless::Error> for Error {
@@ -49,11 +49,11 @@ impl From<reqwless::Error> for Error {
     }
 }
 
-impl From<json::Error<reqwless::Error>> for Error {
-    fn from(err: json::Error<reqwless::Error>) -> Self {
+impl From<reader::Error<reqwless::Error>> for Error {
+    fn from(err: reader::Error<reqwless::Error>) -> Self {
         match err {
-            json::Error::Read(err) => Self::Network(err),
-            json::Error::Json(err) => Self::MalformedResponse(err),
+            reader::Error::Read(err) => Self::Network(err),
+            reader::Error::Json(err) => Self::MalformedResponse(err),
             err => Self::MalformedResponseStream(err),
         }
     }
