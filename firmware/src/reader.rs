@@ -110,6 +110,46 @@ impl<R: Read, const BUFSIZE: usize> BufferedReader<R, BUFSIZE> {
             None => Err(Error::EofWhileParsing),
         }
     }
+
+    /// Peek next line in buffer
+    pub fn peek_line(&mut self) -> Result<&[u8], Error<R::Error>> {
+        match self.buffer().iter().position(|b| b"\r\n".contains(b)) {
+            Some(pos) => Ok(&self.buffer()[..pos]),
+            None if self.range.end == BUFSIZE => Err(Error::BufferTooSmall),
+            None => Ok(self.buffer()),
+        }
+    }
+}
+
+/// Line reader
+/// Uses an async IO reader to read the input stream line by line.
+pub struct LineReader<R, const BUFSIZE: usize = 256> {
+    buffer: BufferedReader<R, BUFSIZE>,
+    last_line_len: usize,
+}
+
+impl<R: Read, const BUFSIZE: usize> LineReader<R, BUFSIZE> {
+    /// Create line reader object using the given reader
+    #[allow(dead_code)]
+    pub fn new(reader: R) -> Self {
+        Self {
+            buffer: BufferedReader::new(reader),
+            last_line_len: 0,
+        }
+    }
+
+    /// Return next line
+    #[allow(dead_code)]
+    pub async fn next(&mut self) -> Result<Option<&[u8]>, Error<R::Error>> {
+        self.buffer.consume(self.last_line_len);
+        self.buffer.read().await?;
+        if self.buffer.buffer().is_empty() {
+            return Ok(None);
+        }
+        let line = self.buffer.peek_line()?;
+        self.last_line_len = line.len() + 1;
+        Ok(Some(line))
+    }
 }
 
 /// Streaming JSON object reader.
@@ -238,6 +278,47 @@ mod tests {
         assert_eq!(key, "bar");
         assert_eq!(person.name, "Bob");
         assert_eq!(person.age, 23);
+        assert_eq!(reader.next().await.unwrap(), None);
+    }
+
+    #[async_std::test]
+    async fn line_reader() {
+        let input = b"one\ntwo\nthree\n";
+        let mut reader: LineReader<_> = LineReader::new(&input[..]);
+        let line = reader.next().await.unwrap().unwrap();
+        assert_eq!(line, b"one");
+        let line = reader.next().await.unwrap().unwrap();
+        assert_eq!(line, b"two");
+        let line = reader.next().await.unwrap().unwrap();
+        assert_eq!(line, b"three");
+        assert_eq!(reader.next().await.unwrap(), None);
+    }
+
+    #[async_std::test]
+    async fn line_reader_multi_newlines() {
+        let input = b"one\n\ntwo\nthree";
+        let mut reader: LineReader<_> = LineReader::new(&input[..]);
+        let line = reader.next().await.unwrap().unwrap();
+        assert_eq!(line, b"one");
+        let line = reader.next().await.unwrap().unwrap();
+        assert_eq!(line, b"");
+        let line = reader.next().await.unwrap().unwrap();
+        assert_eq!(line, b"two");
+        let line = reader.next().await.unwrap().unwrap();
+        assert_eq!(line, b"three");
+        assert_eq!(reader.next().await.unwrap(), None);
+    }
+
+    #[async_std::test]
+    async fn line_reader_no_trailing_newline() {
+        let input = b"one\ntwo\nthree";
+        let mut reader: LineReader<_> = LineReader::new(&input[..]);
+        let line = reader.next().await.unwrap().unwrap();
+        assert_eq!(line, b"one");
+        let line = reader.next().await.unwrap().unwrap();
+        assert_eq!(line, b"two");
+        let line = reader.next().await.unwrap().unwrap();
+        assert_eq!(line, b"three");
         assert_eq!(reader.next().await.unwrap(), None);
     }
 }
