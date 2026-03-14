@@ -76,7 +76,7 @@ impl<I2C: I2c> Display<I2C> {
     }
 
     /// Clear display
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub async fn clear(&mut self) -> Result<(), Error> {
         self.driver.clear(BinaryColor::Off)?;
         self.driver.flush().await?;

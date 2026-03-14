@@ -1,5 +1,5 @@
 // Mute pedantic clippy warnings caused by original code copied from pn532 crate
-#![allow(
+#![expect(
     clippy::cast_possible_truncation,
     clippy::if_not_else,
     clippy::items_after_statements,

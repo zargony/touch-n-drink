@@ -130,7 +130,7 @@ impl fmt::Debug for Connection<'_> {
 
 impl Connection<'_> {
     /// Fetch information about authenticated user
-    #[allow(dead_code)]
+    #[cfg_attr(not(debug_assertions), expect(dead_code))]
     pub async fn get_user_information(&mut self) -> Result<(), Error> {
         use proto_auth::{UserInformationRequest, UserInformationResponse};
 
@@ -157,7 +157,7 @@ impl Connection<'_> {
         #[serde(untagged)]
         enum ArticleOrStatus {
             Article(Article),
-            #[allow(dead_code)]
+            #[expect(dead_code)]
             Status(u16),
         }
 
@@ -206,7 +206,7 @@ impl Connection<'_> {
         #[serde(untagged)]
         enum UserOrStatus {
             User(User),
-            #[allow(dead_code)]
+            #[expect(dead_code)]
             Status(u16),
         }
 

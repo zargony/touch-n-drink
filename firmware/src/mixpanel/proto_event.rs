@@ -68,7 +68,7 @@ pub enum EventPropertiesExtra<'a> {
 
 /// Event-specific custom properties (data refresh)
 #[derive(Debug, Serialize)]
-#[allow(clippy::struct_field_names)]
+#[expect(clippy::struct_field_names)]
 pub struct EventPropertiesExtraDataRefresh {
     pub article_count: usize,
     pub uid_count: usize,

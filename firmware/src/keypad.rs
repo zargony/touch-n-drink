@@ -20,7 +20,7 @@ pub enum Key {
 
 impl Key {
     /// Returns digit as number if key is a digit
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub fn digit(self) -> Option<usize> {
         match self {
             Self::Digit(n) => Some(n as usize),
@@ -29,19 +29,19 @@ impl Key {
     }
 
     /// Returns true if key is enter key
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub fn enter(self) -> bool {
         self == Self::Enter
     }
 
     /// Returns true if key is cancel key
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub fn cancel(self) -> bool {
         self == Self::Cancel
     }
 
     /// Returns key as character
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub fn as_char(self) -> char {
         match self {
             Self::Digit(n) => char::from_digit(u32::from(n), 16).unwrap_or('?'),
@@ -148,7 +148,7 @@ impl Keypad<'_, 3, 4> {
     }
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 impl Keypad<'_, 4, 4> {
     // 1 2 3 A
     // 4 5 6 B

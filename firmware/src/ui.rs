@@ -56,7 +56,7 @@ pub struct Ui<'a, RNG, I2C, IRQ> {
 
 impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C, IRQ> {
     /// Create user interface with given human interface devices
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         rng: RNG,
         display: &'a mut Display<I2C>,
@@ -268,14 +268,14 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
             let amount = self.select_amount(&article).await?;
 
             // Calculate total price. It's ok to cast amount to f32 as it's always a small number.
-            #[allow(clippy::cast_precision_loss)]
+            #[expect(clippy::cast_precision_loss)]
             let total_price = article.price * amount as f32;
 
             // Show total price and ask for confirmation
             self.confirm_purchase(&article, amount, total_price).await?;
 
             // Store purchase
-            #[allow(clippy::cast_precision_loss)]
+            #[expect(clippy::cast_precision_loss)]
             self.purchase(&article_id, amount as f32, user_id, total_price)
                 .await?;
 
@@ -313,7 +313,7 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
             self.display.screen(&screen::ScanId).await?;
 
             // Wait for id card read or timeout
-            #[allow(clippy::single_match_else)]
+            #[expect(clippy::single_match_else)]
             let uid = match with_timeout(IDLE_TIMEOUT, self.nfc.read()).await {
                 // Id card detected
                 Ok(res) => res?,
@@ -359,7 +359,7 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
             .await?;
         let num_articles = self.articles.count_ids();
         loop {
-            #[allow(clippy::match_same_arms)]
+            #[expect(clippy::match_same_arms)]
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
                 // Any digit 1..=num_articles selects article
                 Ok(Key::Digit(n)) if n >= 1 && n as usize <= num_articles => {
@@ -388,7 +388,7 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
             .screen(&screen::EnterAmount::new(article))
             .await?;
         loop {
-            #[allow(clippy::match_same_arms)]
+            #[expect(clippy::match_same_arms)]
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
                 // Any digit 1..=9 selects amount
                 Ok(Key::Digit(n)) if (1..=9).contains(&n) => break Ok(n as usize),

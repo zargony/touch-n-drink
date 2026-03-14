@@ -240,7 +240,7 @@ impl Wifi {
     }
 
     /// Query DNS for IP address of given name
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub async fn dns_query(&self, name: &str) -> Result<IpAddress, dns::Error> {
         match self.stack.dns_query(name, DnsQueryType::A).await {
             Ok(addrs) if addrs.is_empty() => {

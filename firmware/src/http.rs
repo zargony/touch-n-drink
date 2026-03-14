@@ -35,7 +35,7 @@ pub enum Error {
     /// Server returned an error (HTTP status 4xx)
     BadRequest(StatusCode),
     /// Server returned an error (HTTP status 5xx)
-    #[allow(clippy::enum_variant_names)]
+    #[expect(clippy::enum_variant_names)]
     ServerError(StatusCode),
     /// Response could not be parsed
     MalformedResponse(serde_json::Error),

@@ -29,7 +29,7 @@ impl fmt::Display for Error {
 
 impl Error {
     /// Error kind
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub fn kind(&self) -> &ErrorKind {
         &self.kind
     }
@@ -51,7 +51,7 @@ impl Error {
 
     /// Try running the provided closure and associate the given user id with any error that might
     /// be returned by it
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub fn try_with<T, F>(user_id: UserId, f: F) -> Result<T, Self>
     where
         F: FnOnce() -> Result<T, Self>,
