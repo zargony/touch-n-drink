@@ -112,7 +112,7 @@ impl Config {
         };
 
         // Read config data flash region
-        let mut bytes = vec![0; region.capacity()];
+        let mut bytes = vec![0; region.capacity()].into_boxed_slice();
         if let Err(_err) = region.read(0, &mut bytes) {
             warn!("Config: Unable to read config partition");
             return Self::default();

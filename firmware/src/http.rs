@@ -1,9 +1,9 @@
 use crate::reader::{self, StreamingJsonObjectReader};
 use crate::time;
 use crate::wifi::{DnsSocket, TcpClient, TcpConnection, Wifi};
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec;
-use alloc::vec::Vec;
 use chrono::DateTime;
 use core::{fmt, str};
 use log::debug;
@@ -17,10 +17,11 @@ use serde::{Serialize, de::DeserializeOwned};
 /// Maximum size of response headers from server
 const MAX_RESPONSE_HEADER_SIZE: usize = 2048;
 
-/// TLS read buffer size
+/// HTTP (TLS) read buffer size. Needs to fit an encrypted TLS record. Actual size depends on
+/// server configuration. Maximum allowed value for a TLS record is 16640.
 const READ_BUFFER_SIZE: usize = 16640;
 
-/// TLS write buffer size
+/// HTTP (TLS) write buffer size
 const WRITE_BUFFER_SIZE: usize = 2048;
 
 /// HTTP client error
@@ -75,16 +76,16 @@ impl fmt::Display for Error {
 
 /// HTTP client resources
 pub struct Resources {
-    read_buffer: Vec<u8>,
-    write_buffer: Vec<u8>,
+    read_buffer: Box<[u8]>,
+    write_buffer: Box<[u8]>,
 }
 
 impl Resources {
     /// Create new HTTP client resources
     pub fn new() -> Self {
         Self {
-            read_buffer: vec![0; READ_BUFFER_SIZE],
-            write_buffer: vec![0; WRITE_BUFFER_SIZE],
+            read_buffer: vec![0; READ_BUFFER_SIZE].into_boxed_slice(),
+            write_buffer: vec![0; WRITE_BUFFER_SIZE].into_boxed_slice(),
         }
     }
 }
@@ -202,7 +203,7 @@ impl Connection<'_> {
             .headers(&[("Accept", "application/json")])
             .body(body.as_ref());
 
-        let mut rx_buf = vec![0; MAX_RESPONSE_HEADER_SIZE];
+        let mut rx_buf = vec![0; MAX_RESPONSE_HEADER_SIZE].into_boxed_slice();
         let response = Self::send_request(request, &mut rx_buf).await?;
         let reader = response.body().reader();
         let mut stream = StreamingJsonObjectReader::<_, U, 2048>::new(reader);
@@ -217,8 +218,10 @@ impl Connection<'_> {
 
 impl Connection<'_> {
     /// Serialize data to JSON for request body
-    pub fn prepare_body<T: Serialize>(data: &T) -> Result<Vec<u8>, Error> {
-        let body = serde_json::to_vec(data).map_err(Error::MalformedRequest)?;
+    pub fn prepare_body<T: Serialize>(data: &T) -> Result<Box<[u8]>, Error> {
+        let body = serde_json::to_vec(data)
+            .map_err(Error::MalformedRequest)?
+            .into_boxed_slice();
         Ok(body)
     }
 
@@ -230,7 +233,7 @@ impl Connection<'_> {
         // rx_buf is used to buffer response headers. The response body reader uses this only for
         // non-TLS connections. Body reader of TLS connections will use the TLS read_buffer for
         // buffering parts of the body. However, read_to_end will again always use this buffer.
-        let mut rx_buf = vec![0; MAX_RESPONSE_HEADER_SIZE];
+        let mut rx_buf = vec![0; MAX_RESPONSE_HEADER_SIZE].into_boxed_slice();
         let response = Self::send_request(request, &mut rx_buf).await?;
         let body = response.body().read_to_end().await?;
         serde_json::from_slice(body).map_err(Error::MalformedResponse)
