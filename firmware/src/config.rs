@@ -5,13 +5,14 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::ops::Deref;
 use embedded_storage::{ReadStorage, Storage};
-use esp_bootloader_esp_idf::partitions;
+use esp_bootloader_esp_idf::partitions::{self, DataPartitionSubType, PartitionType};
 use log::{debug, info, warn};
 use serde::Deserialize;
 use serde_with::{Bytes, serde_as};
 
-// Config partition type (custom partition type 0x54, subtype 0x44)
-const CONFIG_PARTITION_TYPE: [u8; 2] = [0x54, 0x44];
+// Config partition type and name
+const PARTITION_TYPE: PartitionType = PartitionType::Data(DataPartitionSubType::Undefined);
+const PARTITION_NAME: &str = "config";
 
 /// String with sensitive content (debug and display output redacted)
 #[derive(Default, Deserialize)]
@@ -100,10 +101,9 @@ impl Config {
         };
 
         // Look up config data partition and flash region
-        let mut region = if let Some(part) = table
-            .iter()
-            .find(|part| [part.raw_type(), part.raw_subtype()] == CONFIG_PARTITION_TYPE)
-        {
+        let mut region = if let Some(part) = table.iter().find(|part| {
+            part.partition_type() == PARTITION_TYPE && part.label_as_str() == PARTITION_NAME
+        }) {
             debug!("Config: Found config partition at 0x{:x}", part.offset());
             part.as_embedded_storage(storage)
         } else {

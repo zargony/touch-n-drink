@@ -28,7 +28,7 @@ cargo espflash flash --release
 
 Configuration is stored in a separate flash partition and is therefore unaffected by firmware updates. As there is currently no way to change the configuration at runtime, it needs to be flashed to the device manually (once).
 
-Create a custom configuration, e.g. `config.json`. See `config-example.json` for available settings. Keep it as small as possible, either by removing all comments and whitespace manually or by using the `jq` tool:
+Create a custom configuration, e.g. `config.json`. See `config-example.json` for available settings. Before flashing, keep it small and remove all comments, either manually or by using the `jq` tool:
 
 ```sh
 jq -c < config.json > config.min.json
@@ -37,7 +37,7 @@ jq -c < config.json > config.min.json
 Store the minimized configuration to the device's `config` partition using `espflash`:
 
 ```sh
-espflash write-bin config config.min.json
+espflash write-bin 0xd000 config.min.json
 ```
 
 ## Contributions

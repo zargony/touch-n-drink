@@ -1,10 +1,11 @@
 # ESP-IDF Partition Table
-# See also https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/partition-tables.html
-# Name,   Type, SubType,   Offset,     Size,   Flags
-nvs,      data, nvs,       0x9000,   0x3000,
-config,   0x54, 0x44,      0xc000,   0x1000,   readonly
-otadata,  data, ota,       0xd000,   0x2000,
-phy_init, data, phy,       0xf000,   0x1000,
-app0,     app,  ota_0,    0x10000, 0x170000,
-app1,     app,  ota_1,   0x180000, 0x170000,
-data,     data, 0x06,    0x2f0000, 0x110000,
+# See also https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/api-guides/partition-tables.html
+# Name,            Type,            SubType,     Offset,     Size, Flags
+# bootloader,      bootloader,      primary,     0x0000,   0x8000,
+# partition_table, partition_table, primary,     0x8000,   0x1000,
+nvs,               data,            nvs,         0x9000,   0x4000,
+config,            data,            undefined,   0xd000,   0x1000, readonly
+otadata,           data,            ota,         0xe000,   0x2000,
+app0,              app,             ota_0,      0x10000, 0x170000,
+app1,              app,             ota_1,     0x180000, 0x170000,
+data,              data,            nvs,       0x2f0000, 0x110000,
