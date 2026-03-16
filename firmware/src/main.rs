@@ -257,7 +257,7 @@ async fn main(spawner: Spawner) {
 
     // Initialize OTA updater
     let mut ota_resources = Box::new(ota::Resources::new());
-    let _ota = ota::Ota::new(wifi.tcp(), wifi.dns(), rng.next_u64(), &mut ota_resources);
+    let mut ota = ota::Ota::new(wifi.tcp(), wifi.dns(), rng.next_u64(), &mut ota_resources);
 
     // Initialize buzzer
     let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
@@ -269,6 +269,7 @@ async fn main(spawner: Spawner) {
     // Create UI
     let mut ui = ui::Ui::new(
         rng,
+        flash,
         &mut display,
         &mut keypad,
         &mut nfc,
@@ -279,11 +280,12 @@ async fn main(spawner: Spawner) {
         &mut articles,
         &mut users,
         &mut telemetry,
+        &mut ota,
         &mut schedule,
     );
 
     loop {
-        match ui.init().await {
+        match Box::pin(ui.init()).await {
             // Success: continue
             Ok(()) => break,
             // User cancelled: continue

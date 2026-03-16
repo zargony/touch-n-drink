@@ -200,6 +200,8 @@ impl<M: fmt::Display> Screen for Failure<M> {
 /// Wait while a lengthy action is in progress
 pub enum PleaseWait {
     WifiConnecting,
+    UpdateCheck,
+    UpdatingFirmware,
     UpdatingData,
     Purchasing,
     SubmittingTelemetry,
@@ -211,6 +213,8 @@ impl Screen for PleaseWait {
         text_centered(
             match self {
                 Self::WifiConnecting => "WLAN Verbindung\nwird aufgebaut",
+                Self::UpdateCheck => "Suche Updates",
+                Self::UpdatingFirmware => "Lade\nFirmware-Update",
                 Self::UpdatingData => "Daten-Aktualisierung",
                 Self::Purchasing => "Zahlung wird\nbearbeitet",
                 Self::SubmittingTelemetry => "Daten-Übertragung",

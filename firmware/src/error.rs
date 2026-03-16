@@ -1,5 +1,5 @@
 use crate::user::UserId;
-use crate::{display, nfc, vereinsflieger};
+use crate::{display, nfc, ota, vereinsflieger};
 use core::fmt;
 use core::future::Future;
 
@@ -84,6 +84,8 @@ pub enum ErrorKind {
     NFCError(nfc::Error),
     /// Vereinsflieger API error
     VereinsfliegerError(vereinsflieger::Error),
+    /// OTA error
+    Ota(ota::Error),
     /// User cancel request
     Cancel,
     /// User interaction timeout
@@ -112,12 +114,19 @@ impl From<vereinsflieger::Error> for ErrorKind {
     }
 }
 
+impl From<ota::Error> for ErrorKind {
+    fn from(err: ota::Error) -> Self {
+        Self::Ota(err)
+    }
+}
+
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::DisplayError(err) => write!(f, "Display: {err}"),
             Self::NFCError(err) => write!(f, "NFC: {err}"),
             Self::VereinsfliegerError(err) => write!(f, "Vereinsflieger: {err}"),
+            Self::Ota(err) => write!(f, "OTA: {err}"),
             Self::Cancel => write!(f, "User cancelled"),
             Self::UserTimeout => write!(f, "Timeout waiting for input"),
             Self::NoNetwork => write!(f, "No network connection"),
