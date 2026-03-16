@@ -3,6 +3,7 @@ use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::{format, vec};
 use core::fmt;
+use embassy_time::{Duration, Instant, with_deadline, with_timeout};
 use embedded_io_async::BufRead;
 use embedded_nal_async::{Dns, TcpConnect};
 use embedded_storage::Storage;
@@ -26,6 +27,12 @@ const IMAGE_FILENAME: &str = concat!(env!("CARGO_PKG_NAME"), "-esp32c3.bin");
 
 /// OTA update name of checksum file to download
 const CHECKSUMS_FILENAME: &str = "SHA256SUMS";
+
+/// How long to wait for a server response
+const TIMEOUT: Duration = Duration::from_secs(10);
+
+/// How long to wait to finish streaming a server's response
+const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Maximum number of redirects to follow
 const MAX_REDIRECTS: usize = 5;
@@ -62,11 +69,19 @@ pub enum Error {
     FlashingFailed(partitions::Error),
     /// Checksum mismatch
     ChecksumMismatch,
+    /// Timeout waiting for response
+    Timeout,
 }
 
 impl From<reqwless::Error> for Error {
     fn from(err: reqwless::Error) -> Self {
         Self::Network(err)
+    }
+}
+
+impl From<embassy_time::TimeoutError> for Error {
+    fn from(_err: embassy_time::TimeoutError) -> Self {
+        Self::Timeout
     }
 }
 
@@ -84,6 +99,7 @@ impl fmt::Display for Error {
             Self::UnableToFetchChecksum => write!(f, "Unable to fetch checksum"),
             Self::FlashingFailed(err) => write!(f, "Flashing failed: {err}"),
             Self::ChecksumMismatch => write!(f, "Checksum mismatch"),
+            Self::Timeout => write!(f, "Timeout"),
         }
     }
 }
@@ -223,20 +239,23 @@ impl<T: TcpConnect, D: Dns> Ota<'_, T, D> {
             "{REPOSITORY_URL}/releases/download/{RELEASE_TAG_VERSION_PREFIX}{version}/{IMAGE_FILENAME}"
         );
         self.send_request(url, true, async |response| {
-            let mut reader = response.body().reader();
-            let mut offset = 0;
-            let mut hasher = Sha256::new();
-            while let data = reader.fill_buf().await?
-                && !data.is_empty()
-            {
-                flash.write(offset, data).map_err(Error::FlashingFailed)?;
-                hasher.update(data);
-                let len = data.len();
-                reader.consume(len);
-                offset += u32::try_from(len).unwrap(); // safe to unwrap because READ_BUFFER_SIZE < u32::MAX
-                debug!("Ota: Flashed {offset} bytes");
-            }
-            Ok(hasher.finalize().into())
+            with_timeout(FETCH_TIMEOUT, async {
+                let mut reader = response.body().reader();
+                let mut offset = 0;
+                let mut hasher = Sha256::new();
+                while let data = reader.fill_buf().await?
+                    && !data.is_empty()
+                {
+                    flash.write(offset, data).map_err(Error::FlashingFailed)?;
+                    hasher.update(data);
+                    let len = data.len();
+                    reader.consume(len);
+                    offset += u32::try_from(len).unwrap(); // safe to unwrap because READ_BUFFER_SIZE < u32::MAX
+                    debug!("Ota: Flashed {offset} bytes");
+                }
+                Ok(hasher.finalize().into())
+            })
+            .await?
         })
         .await
     }
@@ -247,44 +266,47 @@ impl<T: TcpConnect, D: Dns> Ota<'_, T, D> {
             "{REPOSITORY_URL}/releases/download/{RELEASE_TAG_VERSION_PREFIX}{version}/{CHECKSUMS_FILENAME}"
         );
         self.send_request(url, true, async |response| {
-            let mut reader: LineReader<_> = LineReader::new(response.body().reader());
-            while let Some(line) = reader
-                .next()
-                .await
-                .map_err(|_| Error::UnableToFetchChecksum)?
-            {
-                // Read through sha256sums file. Each line has 64 characters hex digest, 2 spaces, filename, newline.
-                let mut elements = line.split(|b| *b == b' ');
-                // 64 characters hex digest
-                let digest: [u8; 32] = match elements.next() {
-                    Some(hex) => match const_hex::decode_to_array(hex) {
-                        Ok(digest) => digest,
-                        Err(_err) => continue,
-                    },
-                    None => continue,
-                };
-                // 2 spaces (empty element)
-                match elements.next() {
-                    Some(&[]) => (),
-                    Some(_) | None => continue,
-                }
-                // Filename
-                match elements.next() {
-                    Some(filename) if filename == IMAGE_FILENAME.as_bytes() => {
-                        debug!(
-                            "Ota: Release v{version} checksum {}: {}",
-                            String::from_utf8_lossy(filename),
-                            const_hex::const_encode::<32, false>(&digest).as_str()
-                        );
-                        return Ok(digest);
+            with_timeout(TIMEOUT, async {
+                let mut reader: LineReader<_> = LineReader::new(response.body().reader());
+                while let Some(line) = reader
+                    .next()
+                    .await
+                    .map_err(|_| Error::UnableToFetchChecksum)?
+                {
+                    // Read through sha256sums file. Each line has 64 characters hex digest, 2 spaces, filename, newline.
+                    let mut elements = line.split(|b| *b == b' ');
+                    // 64 characters hex digest
+                    let digest: [u8; 32] = match elements.next() {
+                        Some(hex) => match const_hex::decode_to_array(hex) {
+                            Ok(digest) => digest,
+                            Err(_err) => continue,
+                        },
+                        None => continue,
+                    };
+                    // 2 spaces (empty element)
+                    match elements.next() {
+                        Some(&[]) => (),
+                        Some(_) | None => continue,
                     }
-                    // Some(_filename) => continue,
-                    // None => continue,
-                    _ => (),
+                    // Filename
+                    match elements.next() {
+                        Some(filename) if filename == IMAGE_FILENAME.as_bytes() => {
+                            debug!(
+                                "Ota: Release v{version} checksum {}: {}",
+                                String::from_utf8_lossy(filename),
+                                const_hex::const_encode::<32, false>(&digest).as_str()
+                            );
+                            return Ok(digest);
+                        }
+                        // Some(_filename) => continue,
+                        // None => continue,
+                        _ => (),
+                    }
                 }
-            }
-            // EOF
-            Err(Error::UnableToFetchChecksum)
+                // EOF
+                Err(Error::UnableToFetchChecksum)
+            })
+            .await?
         })
         .await
     }
@@ -331,11 +353,13 @@ impl<T: TcpConnect, D: Dns> Ota<'_, T, D> {
         F: AsyncFnOnce(Response<'_, '_, HttpConnection<'_, T::Connection<'_>>>) -> Result<R, Error>,
     {
         let mut rx_buf = vec![0; MAX_RESPONSE_HEADER_SIZE].into_boxed_slice();
+        let deadline = Instant::now() + TIMEOUT;
 
         for _ in 0..MAX_REDIRECTS {
             debug!("Ota: GET {url}");
-            let mut request = self.http.request(Method::GET, &url).await?;
-            let response = request.send(&mut rx_buf).await?;
+            let mut request =
+                with_deadline(deadline, self.http.request(Method::GET, &url)).await??;
+            let response = with_deadline(deadline, request.send(&mut rx_buf)).await??;
             debug!("Ota: HTTP status {}", response.status.0);
 
             // If response is redirect and should follow redirects, parse location header and continue
