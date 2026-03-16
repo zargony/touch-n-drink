@@ -1,9 +1,8 @@
 use crate::article::ArticleId;
+use crate::util::SensitiveString;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-use core::fmt;
-use core::ops::Deref;
 use embedded_storage::{ReadStorage, Storage};
 use esp_bootloader_esp_idf::partitions::{self, DataPartitionSubType, PartitionType};
 use log::{debug, info, warn};
@@ -13,39 +12,6 @@ use serde_with::{Bytes, serde_as};
 // Config partition type and name
 const PARTITION_TYPE: PartitionType = PartitionType::Data(DataPartitionSubType::Undefined);
 const PARTITION_NAME: &str = "config";
-
-/// String with sensitive content (debug and display output redacted)
-#[derive(Default, Deserialize)]
-#[serde(transparent)]
-pub struct SensitiveString(String);
-
-impl fmt::Debug for SensitiveString {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0.is_empty() {
-            self.0.fmt(f)
-        } else {
-            "<redacted>".fmt(f)
-        }
-    }
-}
-
-impl fmt::Display for SensitiveString {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0.is_empty() {
-            self.0.fmt(f)
-        } else {
-            "<redacted>".fmt(f)
-        }
-    }
-}
-
-impl Deref for SensitiveString {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 /// System configuration
 ///

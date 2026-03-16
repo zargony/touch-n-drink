@@ -1,3 +1,4 @@
+use crate::util::{DisplayOption, DisplaySlice};
 use alloc::boxed::Box;
 use alloc::string::ToString;
 use core::cell::Cell;
@@ -35,37 +36,6 @@ pub type TcpConnection<'d> = tcp::client::TcpConnection<'d, NUM_TCP_SOCKETS, 102
 
 /// Wifi initialization error
 pub use esp_radio::InitializationError;
-
-/// Option display helper
-struct DisplayOption<T: fmt::Display>(Option<T>);
-
-impl<T: fmt::Display> fmt::Display for DisplayOption<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.0 {
-            None => write!(f, "-"),
-            Some(value) => value.fmt(f),
-        }
-    }
-}
-
-/// List display helper
-struct DisplayList<'a, T: fmt::Display>(&'a [T]);
-
-impl<T: fmt::Display> fmt::Display for DisplayList<'_, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0.is_empty() {
-            write!(f, "-")?;
-        } else {
-            for (i, elem) in self.0.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
-                }
-                elem.fmt(f)?;
-            }
-        }
-        Ok(())
-    }
-}
 
 /// Wifi configuration display helper
 struct DisplayModeConfig(ModeConfig);
@@ -113,7 +83,7 @@ impl fmt::Display for DisplayNetworkConfig {
             "ip: {}, gw: {}, dns: {}",
             self.0.address,
             DisplayOption(self.0.gateway),
-            DisplayList(&self.0.dns_servers),
+            DisplaySlice(&self.0.dns_servers),
         )
     }
 }
@@ -248,7 +218,7 @@ impl Wifi {
                 Err(dns::Error::Failed)
             }
             Ok(addrs) => {
-                debug!("Wifi: DNS query {}: {}", name, DisplayList(&addrs));
+                debug!("Wifi: DNS query {}: {}", name, DisplaySlice(&addrs));
                 Ok(addrs[0])
             }
             Err(err) => {

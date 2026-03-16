@@ -1,4 +1,4 @@
-use core::fmt;
+use crate::util::DisplayDuration;
 use embassy_time::Timer;
 use embassy_time::{Duration, Instant};
 use log::info;
@@ -8,18 +8,6 @@ use log::info;
 const DAILY_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 #[cfg(debug_assertions)]
 const DAILY_INTERVAL: Duration = Duration::from_secs(30 * 60);
-
-/// Duration display helper
-struct DisplayDuration(Duration);
-
-impl fmt::Display for DisplayDuration {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let hours = self.0.as_secs() / 3600;
-        let min = self.0.as_secs() % 3600 / 60;
-        let secs = self.0.as_secs() % 60;
-        write!(f, "{hours}h{min}m{secs}s")
-    }
-}
 
 /// Scheduler for daily events
 #[derive(Debug)]
