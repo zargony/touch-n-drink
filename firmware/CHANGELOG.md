@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## 2.0.0 - 2026-03-16
+
 **Breaking Change**: Partition table has been updated to a new layout. Especially the config
 partition type and location is different now. You must flash the factory image and a new configuration
 to update!
