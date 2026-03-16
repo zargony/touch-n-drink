@@ -218,11 +218,8 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         // Show splash screen for a while
         self.show_splash().await?;
 
-        // Wait for network to become available (if not already)
-        self.wait_network_up().await?;
-
-        // Refresh articles and users
-        self.refresh_articles_and_users().await?;
+        // Run daily schedule
+        self.schedule().await?;
 
         Ok(())
     }
@@ -289,15 +286,14 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
 
     /// Run schedule
     pub async fn schedule(&mut self) -> Result<(), Error> {
-        if self.schedule.is_expired() {
-            info!("UI: Running schedule...");
+        info!("UI: Running schedule...");
 
-            // Schedule next event
-            self.schedule.schedule_next();
+        // Schedule next event
+        self.schedule.schedule_next();
 
-            // Refresh article and user information
-            self.refresh_articles_and_users().await?;
-        }
+        // Refresh article and user information
+        self.refresh_articles_and_users().await?;
+
         Ok(())
     }
 }
