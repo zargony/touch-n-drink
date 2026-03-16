@@ -29,14 +29,14 @@ pub enum Error<E> {
 impl<E: fmt::Display> fmt::Display for Error<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Read(err) => write!(f, "Read error: {err}"),
+            Self::Read(err) => write!(f, "Read: {err}"),
             Self::BufferTooSmall => write!(f, "Buffer too small"),
             Self::EofWhileParsing => write!(f, "EOF while parsing"),
             Self::ExpectedObjectBegin => write!(f, "Expected `{{`"),
             Self::ExpectedColon => write!(f, "Expected `:`"),
             Self::ExpectedObjectCommaOrEnd => write!(f, "Expected `,` or `}}`"),
             Self::TrailingCharacters => write!(f, "Trailing characters"),
-            Self::Json(err) => write!(f, "JSON error: {err}"),
+            Self::Json(err) => write!(f, "JSON: {err}"),
         }
     }
 }

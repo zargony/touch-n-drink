@@ -63,7 +63,7 @@ impl From<reader::Error<reqwless::Error>> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Network(_err) => write!(f, "Network error"),
+            Self::Network(err) => write!(f, "Network: {err}"),
             Self::MalformedRequest(_err) => write!(f, "Malformed request"),
             Self::Unauthorized => write!(f, "Unauthorized"),
             Self::BadRequest(status) => write!(f, "Bad request ({})", status.0),
