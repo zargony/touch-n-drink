@@ -88,7 +88,7 @@ impl<'a> Buzzer<'a> {
     }
 
     /// Stop driving the buzzer
-    #[allow(clippy::unused_self, clippy::unnecessary_wraps)]
+    #[expect(clippy::unused_self, clippy::unnecessary_wraps)]
     pub fn off(&mut self) -> Result<(), Error> {
         // debug!("Buzzer: turning off");
         // Turn off buzzer by disabling LEDC signal output, keep the output high

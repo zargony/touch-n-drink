@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+**Breaking Change**: Partition table has been updated to a new layout. Especially the config
+partition type and location is different now. You must flash the factory image and a new configuration
+to update!
+
+- Automatically check for OTA update once a day and install if available
 - Long error messages are now word-wrapped over multiple lines
 - Article name prefix "Getränk(e)" is now trimmed everywhere instead just in article selection
 - Added more user greetings

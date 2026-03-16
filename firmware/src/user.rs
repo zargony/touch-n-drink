@@ -12,7 +12,6 @@ static EXTRA_UIDS: [(Uid, UserId); 2] = [
 
 /// User id
 /// Equivalent to the Vereinsflieger `memberid` attribute
-#[allow(clippy::module_name_repetitions)]
 pub type UserId = u32;
 
 /// User information

@@ -17,7 +17,7 @@ use rand_core::RngCore;
 
 /// Touch 'n Drink bi-color logo
 #[rustfmt::skip]
-#[allow(clippy::unreadable_literal)]
+#[expect(clippy::unreadable_literal)]
 static LOGO: ImageRaw<BinaryColor> = ImageRaw::new(&[
     0b11111111, 0b11000111, 0b11100011, 0b11001111, 0b00011111, 0b10001111, 0b00011110, 0b00111101, 0b11110011, 0b11000011, 0b11111100, 0b01111111, 0b10001111, 0b01111100, 0b11110111, 0b10001111,
     0b10000000, 0b01001100, 0b00110010, 0b01001001, 0b00110000, 0b11001001, 0b00010010, 0b00100101, 0b00010010, 0b01000011, 0b11111110, 0b01111111, 0b11001111, 0b01111100, 0b11110111, 0b10001111,
@@ -200,6 +200,8 @@ impl<M: fmt::Display> Screen for Failure<M> {
 /// Wait while a lengthy action is in progress
 pub enum PleaseWait {
     WifiConnecting,
+    UpdateCheck,
+    UpdatingFirmware,
     UpdatingData,
     Purchasing,
     SubmittingTelemetry,
@@ -211,6 +213,8 @@ impl Screen for PleaseWait {
         text_centered(
             match self {
                 Self::WifiConnecting => "WLAN Verbindung\nwird aufgebaut",
+                Self::UpdateCheck => "Suche Updates",
+                Self::UpdatingFirmware => "Lade\nFirmware-Update",
                 Self::UpdatingData => "Daten-Aktualisierung",
                 Self::Purchasing => "Zahlung wird\nbearbeitet",
                 Self::SubmittingTelemetry => "Daten-Übertragung",

@@ -2586,6 +2586,7 @@ dependencies = [
  "embedded-graphics",
  "embedded-hal-async",
  "embedded-io-async 0.7.0",
+ "embedded-nal-async",
  "embedded-storage",
  "embedded-text",
  "esp-alloc",
@@ -2604,6 +2605,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "sha2",
  "ssd1306",
 ]
 

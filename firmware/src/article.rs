@@ -5,7 +5,6 @@ use core::borrow::Borrow;
 
 /// Article id
 /// Equivalent to the Vereinsflieger `articleid` attribute
-#[allow(clippy::module_name_repetitions)]
 pub type ArticleId = String;
 
 /// Article information

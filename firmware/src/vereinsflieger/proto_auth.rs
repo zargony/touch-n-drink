@@ -40,7 +40,7 @@ pub struct UserInformationRequest<'a> {
 /// `auth/getuser` response
 #[serde_as]
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+#[expect(dead_code)]
 pub struct UserInformationResponse {
     #[serde_as(as = "DisplayFromStr")]
     pub uid: u32,

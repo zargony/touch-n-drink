@@ -24,22 +24,14 @@ const CONNECT_RETRY_DELAY: Duration = Duration::from_millis(5000);
 /// Number of TCP sockets
 const NUM_TCP_SOCKETS: usize = 4;
 
-/// Size of transmit buffer (per TCP socket)
-const TX_BUFFER_SIZE: usize = 2048;
-
-/// Size of receive buffer (per TCP socket)
-const RX_BUFFER_SIZE: usize = 4096;
-
 /// Type of DNS socket
 pub type DnsSocket<'d> = dns::DnsSocket<'d>;
 
 /// Type of TCP client
-pub type TcpClient<'d> =
-    tcp::client::TcpClient<'d, NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>;
+pub type TcpClient<'d> = tcp::client::TcpClient<'d, NUM_TCP_SOCKETS>;
 
 /// Type of TCP connection returned by TCP client
-pub type TcpConnection<'d> =
-    tcp::client::TcpConnection<'d, NUM_TCP_SOCKETS, TX_BUFFER_SIZE, RX_BUFFER_SIZE>;
+pub type TcpConnection<'d> = tcp::client::TcpConnection<'d, NUM_TCP_SOCKETS, 1024, 1024>;
 
 /// Wifi initialization error
 pub use esp_radio::InitializationError;
@@ -248,7 +240,7 @@ impl Wifi {
     }
 
     /// Query DNS for IP address of given name
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub async fn dns_query(&self, name: &str) -> Result<IpAddress, dns::Error> {
         match self.stack.dns_query(name, DnsQueryType::A).await {
             Ok(addrs) if addrs.is_empty() => {

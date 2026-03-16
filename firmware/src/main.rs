@@ -45,11 +45,12 @@ mod config;
 mod display;
 mod error;
 mod http;
-mod json;
 mod keypad;
 mod mixpanel;
 mod nfc;
+mod ota;
 mod pn532;
+mod reader;
 mod schedule;
 mod screen;
 mod telemetry;
@@ -76,6 +77,7 @@ use esp_hal::rtc_cntl::{Rtc, RwdtStage};
 use esp_hal::time::{Duration, Rate};
 use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
+use esp_storage::FlashStorage;
 use log::{debug, error, info};
 use rand_core::RngCore;
 
@@ -165,7 +167,8 @@ async fn main(spawner: Spawner) {
         .expect("Failed to spawn watchdog task");
 
     // Read system configuration
-    let config = config::Config::read(peripherals.FLASH);
+    let mut flash = FlashStorage::new(peripherals.FLASH);
+    let config = config::Config::read(&mut flash);
 
     // Initialize article and user look up tables
     let mut articles = article::Articles::new(config.vf_article_ids);
@@ -252,6 +255,10 @@ async fn main(spawner: Spawner) {
     let mut telemetry = telemetry::Telemetry::new(config.mp_token.as_deref(), device_id.as_str());
     telemetry.track(telemetry::Event::SystemStart);
 
+    // Initialize OTA updater
+    let mut ota_resources = Box::new(ota::Resources::new());
+    let mut ota = ota::Ota::new(wifi.tcp(), wifi.dns(), rng.next_u64(), &mut ota_resources);
+
     // Initialize buzzer
     let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
     let _ = buzzer.startup().await;
@@ -262,6 +269,7 @@ async fn main(spawner: Spawner) {
     // Create UI
     let mut ui = ui::Ui::new(
         rng,
+        flash,
         &mut display,
         &mut keypad,
         &mut nfc,
@@ -272,11 +280,12 @@ async fn main(spawner: Spawner) {
         &mut articles,
         &mut users,
         &mut telemetry,
+        &mut ota,
         &mut schedule,
     );
 
     loop {
-        match ui.init().await {
+        match Box::pin(ui.init()).await {
             // Success: continue
             Ok(()) => break,
             // User cancelled: continue

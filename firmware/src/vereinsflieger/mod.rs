@@ -53,12 +53,12 @@ impl From<embassy_time::TimeoutError> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::FetchUserInformation(err) => write!(f, "Fetch user info failed ({err})"),
-            Self::FetchArticles(err) => write!(f, "Fetch articles failed ({err})"),
-            Self::FetchUsers(err) => write!(f, "Fetch users failed ({err})"),
-            Self::Purchase(err) => write!(f, "Purchase failed ({err})"),
-            Self::Connect(err) => write!(f, "Connect failed ({err})"),
-            Self::SignIn(err) => write!(f, "Sign in failed ({err})"),
+            Self::FetchUserInformation(err) => write!(f, "Fetch user info failed: {err}"),
+            Self::FetchArticles(err) => write!(f, "Fetch articles failed: {err}"),
+            Self::FetchUsers(err) => write!(f, "Fetch users failed: {err}"),
+            Self::Purchase(err) => write!(f, "Purchase failed: {err}"),
+            Self::Connect(err) => write!(f, "Connect failed: {err}"),
+            Self::SignIn(err) => write!(f, "Sign in failed: {err}"),
             Self::Timeout => write!(f, "Timeout"),
         }
     }
@@ -114,9 +114,9 @@ impl<'a> Vereinsflieger<'a> {
 }
 
 /// Vereinsflieger API client connection
-pub struct Connection<'a> {
-    http: http::Connection<'a>,
-    accesstoken: &'a AccessToken,
+pub struct Connection<'conn> {
+    http: http::Connection<'conn>,
+    accesstoken: &'conn AccessToken,
 }
 
 impl fmt::Debug for Connection<'_> {
@@ -130,7 +130,7 @@ impl fmt::Debug for Connection<'_> {
 
 impl Connection<'_> {
     /// Fetch information about authenticated user
-    #[allow(dead_code)]
+    #[cfg_attr(not(debug_assertions), expect(dead_code))]
     pub async fn get_user_information(&mut self) -> Result<(), Error> {
         use proto_auth::{UserInformationRequest, UserInformationResponse};
 
@@ -157,7 +157,7 @@ impl Connection<'_> {
         #[serde(untagged)]
         enum ArticleOrStatus {
             Article(Article),
-            #[allow(dead_code)]
+            #[expect(dead_code)]
             Status(u16),
         }
 
@@ -206,7 +206,7 @@ impl Connection<'_> {
         #[serde(untagged)]
         enum UserOrStatus {
             User(User),
-            #[allow(dead_code)]
+            #[expect(dead_code)]
             Status(u16),
         }
 
@@ -291,10 +291,13 @@ impl Connection<'_> {
     }
 }
 
-impl<'a> Connection<'a> {
+impl<'conn> Connection<'conn> {
     /// Connect to API server, check existing access token (if any) or fetch a new one and sign
     /// in. Return connection for authenticated API requests.
-    async fn new(vf: &'a mut Vereinsflieger<'_>, http: &'a mut Http<'_>) -> Result<Self, Error> {
+    async fn new(
+        vf: &'conn mut Vereinsflieger<'_>,
+        http: &'conn mut Http<'_>,
+    ) -> Result<Self, Error> {
         // Connect to API server
         let mut connection = with_timeout(TIMEOUT, http.connect(BASE_URL))
             .await?

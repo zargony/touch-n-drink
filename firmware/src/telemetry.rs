@@ -47,7 +47,7 @@ impl Event {
 
     /// User id associated with this event, if any
     pub fn user_id(&self) -> Option<user::UserId> {
-        #[allow(clippy::match_same_arms)]
+        #[expect(clippy::match_same_arms)]
         match self {
             Event::SystemStart => None,
             Event::DataRefreshed(..) => None,

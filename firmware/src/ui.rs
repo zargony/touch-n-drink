@@ -5,6 +5,7 @@ use crate::error::{Error, ErrorKind};
 use crate::http::Http;
 use crate::keypad::{Key, Keypad};
 use crate::nfc::Nfc;
+use crate::ota::Ota;
 use crate::schedule::Daily;
 use crate::screen;
 use crate::telemetry::{Event, Telemetry};
@@ -17,6 +18,8 @@ use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, TimeoutError, Timer, with_timeout};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
+use embedded_nal_async::{Dns, TcpConnect};
+use embedded_storage::Storage;
 use log::info;
 use rand_core::RngCore;
 
@@ -39,8 +42,9 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(300);
 const IDLE_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// User interface
-pub struct Ui<'a, RNG, I2C, IRQ> {
+pub struct Ui<'a, RNG, FLASH, I2C, IRQ, DNS: Dns, TCP: TcpConnect> {
     rng: RNG,
+    flash: FLASH,
     display: &'a mut Display<I2C>,
     keypad: &'a mut Keypad<'a, 3, 4>,
     nfc: &'a mut Nfc<I2C, IRQ>,
@@ -51,14 +55,25 @@ pub struct Ui<'a, RNG, I2C, IRQ> {
     articles: &'a mut Articles,
     users: &'a mut Users,
     telemetry: &'a mut Telemetry<'a>,
+    ota: &'a mut Ota<'a, TCP, DNS>,
     schedule: &'a mut Daily,
 }
 
-impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C, IRQ> {
+impl<
+    'a,
+    RNG: RngCore,
+    FLASH: Storage,
+    I2C: I2c,
+    IRQ: Wait<Error = Infallible>,
+    DNS: Dns,
+    TCP: TcpConnect,
+> Ui<'a, RNG, FLASH, I2C, IRQ, DNS, TCP>
+{
     /// Create user interface with given human interface devices
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new(
         rng: RNG,
+        flash: FLASH,
         display: &'a mut Display<I2C>,
         keypad: &'a mut Keypad<'a, 3, 4>,
         nfc: &'a mut Nfc<I2C, IRQ>,
@@ -69,10 +84,12 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         articles: &'a mut Articles,
         users: &'a mut Users,
         telemetry: &'a mut Telemetry<'a>,
+        ota: &'a mut Ota<'a, TCP, DNS>,
         schedule: &'a mut Daily,
     ) -> Self {
         Self {
             rng,
+            flash,
             display,
             keypad,
             nfc,
@@ -83,6 +100,7 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
             articles,
             users,
             telemetry,
+            ota,
             schedule,
         }
     }
@@ -156,6 +174,32 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         }
     }
 
+    /// Check for OTA update
+    pub async fn check_for_ota_update(&mut self) -> Result<(), Error> {
+        // Wait for network to become available (if not already)
+        self.wait_network_up().await?;
+
+        info!("UI: Checking for OTA update...");
+
+        self.display
+            .screen(&screen::PleaseWait::UpdateCheck)
+            .await?;
+
+        // Check for OTA update
+        if let Some(new_version) = self.ota.check().await? {
+            self.display
+                .screen(&screen::PleaseWait::UpdatingFirmware)
+                .await?;
+
+            // Download and apply OTA update
+            self.ota.update(&new_version, &mut self.flash).await?;
+
+            // Done, restart
+        }
+
+        Ok(())
+    }
+
     /// Refresh article and user information
     pub async fn refresh_articles_and_users(&mut self) -> Result<(), Error> {
         // Wait for network to become available (if not already)
@@ -218,11 +262,8 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
         // Show splash screen for a while
         self.show_splash().await?;
 
-        // Wait for network to become available (if not already)
-        self.wait_network_up().await?;
-
-        // Refresh articles and users
-        self.refresh_articles_and_users().await?;
+        // Run daily schedule
+        self.schedule().await?;
 
         Ok(())
     }
@@ -268,14 +309,14 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
             let amount = self.select_amount(&article).await?;
 
             // Calculate total price. It's ok to cast amount to f32 as it's always a small number.
-            #[allow(clippy::cast_precision_loss)]
+            #[expect(clippy::cast_precision_loss)]
             let total_price = article.price * amount as f32;
 
             // Show total price and ask for confirmation
             self.confirm_purchase(&article, amount, total_price).await?;
 
             // Store purchase
-            #[allow(clippy::cast_precision_loss)]
+            #[expect(clippy::cast_precision_loss)]
             self.purchase(&article_id, amount as f32, user_id, total_price)
                 .await?;
 
@@ -289,20 +330,30 @@ impl<'a, RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'a, RNG, I2C,
 
     /// Run schedule
     pub async fn schedule(&mut self) -> Result<(), Error> {
-        if self.schedule.is_expired() {
-            info!("UI: Running schedule...");
+        info!("UI: Running schedule...");
 
-            // Schedule next event
-            self.schedule.schedule_next();
+        // Schedule next event
+        self.schedule.schedule_next();
 
-            // Refresh article and user information
-            self.refresh_articles_and_users().await?;
-        }
+        // Check for OTA update
+        self.check_for_ota_update().await?;
+
+        // Refresh article and user information
+        self.refresh_articles_and_users().await?;
+
         Ok(())
     }
 }
 
-impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ> {
+impl<
+    RNG: RngCore,
+    FLASH: Storage,
+    I2C: I2c,
+    IRQ: Wait<Error = Infallible>,
+    DNS: Dns,
+    TCP: TcpConnect,
+> Ui<'_, RNG, FLASH, I2C, IRQ, DNS, TCP>
+{
     /// Authentication: wait for id card, read it and look up the associated user. On idle timeout,
     /// enter power saving (turn off display). Any key pressed leaves power saving (turn on
     /// display).
@@ -313,7 +364,7 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
             self.display.screen(&screen::ScanId).await?;
 
             // Wait for id card read or timeout
-            #[allow(clippy::single_match_else)]
+            #[expect(clippy::single_match_else)]
             let uid = match with_timeout(IDLE_TIMEOUT, self.nfc.read()).await {
                 // Id card detected
                 Ok(res) => res?,
@@ -359,7 +410,7 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
             .await?;
         let num_articles = self.articles.count_ids();
         loop {
-            #[allow(clippy::match_same_arms)]
+            #[expect(clippy::match_same_arms)]
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
                 // Any digit 1..=num_articles selects article
                 Ok(Key::Digit(n)) if n >= 1 && n as usize <= num_articles => {
@@ -388,7 +439,7 @@ impl<RNG: RngCore, I2C: I2c, IRQ: Wait<Error = Infallible>> Ui<'_, RNG, I2C, IRQ
             .screen(&screen::EnterAmount::new(article))
             .await?;
         loop {
-            #[allow(clippy::match_same_arms)]
+            #[expect(clippy::match_same_arms)]
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
                 // Any digit 1..=9 selects amount
                 Ok(Key::Digit(n)) if (1..=9).contains(&n) => break Ok(n as usize),

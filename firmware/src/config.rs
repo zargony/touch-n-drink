@@ -4,16 +4,15 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 use core::ops::Deref;
-use embedded_storage::ReadStorage;
-use esp_bootloader_esp_idf::partitions;
-use esp_hal::peripherals::FLASH as Flash;
-use esp_storage::FlashStorage;
+use embedded_storage::{ReadStorage, Storage};
+use esp_bootloader_esp_idf::partitions::{self, DataPartitionSubType, PartitionType};
 use log::{debug, info, warn};
 use serde::Deserialize;
 use serde_with::{Bytes, serde_as};
 
-// Config partition type (custom partition type 0x54, subtype 0x44)
-const CONFIG_PARTITION_TYPE: [u8; 2] = [0x54, 0x44];
+// Config partition type and name
+const PARTITION_TYPE: PartitionType = PartitionType::Data(DataPartitionSubType::Undefined);
+const PARTITION_NAME: &str = "config";
 
 /// String with sensitive content (debug and display output redacted)
 #[derive(Default, Deserialize)]
@@ -87,12 +86,10 @@ pub struct Config {
 
 impl Config {
     /// Read configuration from `config` flash data partition
-    pub fn read(flash: Flash<'_>) -> Self {
-        let mut storage = FlashStorage::new(flash);
-
+    pub fn read<S: Storage>(storage: &mut S) -> Self {
         // Read partition table
         let mut buf = [0; partitions::PARTITION_TABLE_MAX_LEN];
-        let table = match partitions::read_partition_table(&mut storage, &mut buf) {
+        let table = match partitions::read_partition_table(storage, &mut buf) {
             Ok(table) => {
                 debug!("Config: Read partition table with {} entries", table.len());
                 table
@@ -103,22 +100,20 @@ impl Config {
             }
         };
 
-        // Look up config data partition
-        let mut partition = if let Some(entry) = table
-            .iter()
-            .find(|entry| [entry.raw_type(), entry.raw_subtype()] == CONFIG_PARTITION_TYPE)
-        {
-            let offset = entry.offset();
-            debug!("Config: Found config partition at offset 0x{offset:x}");
-            entry.as_embedded_storage(&mut storage)
+        // Look up config data partition and flash region
+        let mut region = if let Some(part) = table.iter().find(|part| {
+            part.partition_type() == PARTITION_TYPE && part.label_as_str() == PARTITION_NAME
+        }) {
+            debug!("Config: Found config partition at 0x{:x}", part.offset());
+            part.as_embedded_storage(storage)
         } else {
             warn!("Config: No config partition found, using default configuration");
             return Self::default();
         };
 
-        // Read config data partition
-        let mut bytes = vec![0; partition.capacity()];
-        if let Err(_err) = partition.read(0, &mut bytes) {
+        // Read config data flash region
+        let mut bytes = vec![0; region.capacity()].into_boxed_slice();
+        if let Err(_err) = region.read(0, &mut bytes) {
             warn!("Config: Unable to read config partition");
             return Self::default();
         }
