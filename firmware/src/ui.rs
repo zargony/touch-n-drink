@@ -176,6 +176,7 @@ impl<
     }
 
     /// Check for OTA update
+    #[cfg_attr(debug_assertions, expect(dead_code))]
     pub async fn check_for_ota_update(&mut self) -> Result<(), Error> {
         // Wait for network to become available (if not already)
         self.wait_network_up().await?;
@@ -339,6 +340,7 @@ impl<
 
         // Check for OTA update
         if !util::recently_restarted() {
+            #[cfg(not(debug_assertions))]
             self.check_for_ota_update().await?;
         }
 
