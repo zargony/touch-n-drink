@@ -10,6 +10,7 @@ use crate::schedule::Daily;
 use crate::screen;
 use crate::telemetry::{Event, Telemetry};
 use crate::user::{UserId, Users};
+use crate::util;
 use crate::vereinsflieger::Vereinsflieger;
 use crate::wifi::Wifi;
 use alloc::string::{String, ToString};
@@ -194,7 +195,8 @@ impl<
             // Download and apply OTA update
             self.ota.update(&new_version, &mut self.flash).await?;
 
-            // Done, restart
+            // Done, restart system
+            util::restart();
         }
 
         Ok(())
@@ -336,7 +338,9 @@ impl<
         self.schedule.schedule_next();
 
         // Check for OTA update
-        self.check_for_ota_update().await?;
+        if !util::recently_restarted() {
+            self.check_for_ota_update().await?;
+        }
 
         // Refresh article and user information
         self.refresh_articles_and_users().await?;

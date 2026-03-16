@@ -57,6 +57,7 @@ mod telemetry;
 mod time;
 mod ui;
 mod user;
+mod util;
 mod vereinsflieger;
 mod wifi;
 
