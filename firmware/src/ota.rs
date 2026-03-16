@@ -8,7 +8,7 @@ use embedded_nal_async::{Dns, TcpConnect};
 use embedded_storage::Storage;
 use esp_bootloader_esp_idf::ota::OtaImageState;
 use esp_bootloader_esp_idf::ota_updater::OtaUpdater;
-use esp_bootloader_esp_idf::partitions;
+use esp_bootloader_esp_idf::partitions::{self, FlashRegion};
 use log::{debug, info, warn};
 use reqwless::client::{HttpClient, HttpConnection, TlsConfig, TlsVerify};
 use reqwless::request::Method;
@@ -132,7 +132,7 @@ impl<'a, T: TcpConnect, D: Dns> Ota<'a, T, D> {
         flash: &mut F,
     ) -> Result<Option<String>, Error> {
         if let Some(new_version) = self.check().await? {
-            self.update(flash, &new_version).await?;
+            self.update(&new_version, flash).await?;
             Ok(Some(new_version))
         } else {
             Ok(None)
@@ -140,7 +140,7 @@ impl<'a, T: TcpConnect, D: Dns> Ota<'a, T, D> {
     }
 
     /// Update to given release version
-    pub async fn update<F: Storage>(&mut self, flash: &mut F, version: &str) -> Result<(), Error> {
+    pub async fn update<F: Storage>(&mut self, version: &str, flash: &mut F) -> Result<(), Error> {
         info!("Ota: Updating to release v{version}...");
 
         let expected_checksum = self.get_release_checksum(version).await?;
@@ -157,28 +157,9 @@ impl<'a, T: TcpConnect, D: Dns> Ota<'a, T, D> {
 
         // TODO: Erase partition first to get rid of any remains?
 
-        let url = format!(
-            "{REPOSITORY_URL}/releases/download/{RELEASE_TAG_VERSION_PREFIX}{version}/{IMAGE_FILENAME}"
-        );
-        let checksum: [u8; _] = self
-            .send_request(url, true, async |response| {
-                let mut reader = response.body().reader();
-                let mut offset = 0;
-                let mut hasher = Sha256::new();
-                while let data = reader.fill_buf().await?
-                    && !data.is_empty()
-                {
-                    region.write(offset, data).map_err(Error::FlashingFailed)?;
-                    hasher.update(data);
-                    let len = data.len();
-                    reader.consume(len);
-                    offset += u32::try_from(len).unwrap(); // safe to unwrap because READ_BUFFER_SIZE < u32::MAX
-                    debug!("Ota: Flashed {offset} bytes");
-                }
-                Ok(hasher.finalize().into())
-            })
+        let checksum = self
+            .download_and_flash_release(version, &mut region)
             .await?;
-
         if checksum != expected_checksum {
             warn!(
                 "Ota: Checksum mismatch! Expected {}, got {}",
@@ -232,6 +213,34 @@ impl<'a, T: TcpConnect, D: Dns> Ota<'a, T, D> {
 }
 
 impl<T: TcpConnect, D: Dns> Ota<'_, T, D> {
+    /// Download release, store it in given flash region and return its calculated checksum
+    async fn download_and_flash_release<F: Storage>(
+        &mut self,
+        version: &str,
+        flash: &mut FlashRegion<'_, F>,
+    ) -> Result<[u8; 32], Error> {
+        let url = format!(
+            "{REPOSITORY_URL}/releases/download/{RELEASE_TAG_VERSION_PREFIX}{version}/{IMAGE_FILENAME}"
+        );
+        self.send_request(url, true, async |response| {
+            let mut reader = response.body().reader();
+            let mut offset = 0;
+            let mut hasher = Sha256::new();
+            while let data = reader.fill_buf().await?
+                && !data.is_empty()
+            {
+                flash.write(offset, data).map_err(Error::FlashingFailed)?;
+                hasher.update(data);
+                let len = data.len();
+                reader.consume(len);
+                offset += u32::try_from(len).unwrap(); // safe to unwrap because READ_BUFFER_SIZE < u32::MAX
+                debug!("Ota: Flashed {offset} bytes");
+            }
+            Ok(hasher.finalize().into())
+        })
+        .await
+    }
+
     /// Get checksum of given release version
     async fn get_release_checksum(&mut self, version: &str) -> Result<[u8; 32], Error> {
         let url = format!(
