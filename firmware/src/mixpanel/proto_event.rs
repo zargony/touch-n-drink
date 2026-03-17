@@ -1,16 +1,14 @@
-use crate::nfc::Uid;
-use crate::user::UserId;
+use alloc::borrow::Cow;
 use alloc::string::String;
-use alloc::vec::Vec;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_with::{DisplayFromStr, TimestampMilliSeconds, serde_as};
+use serde_with::{TimestampMilliSeconds, serde_as};
 
 /// `track` request
 #[derive(Debug, Serialize)]
 #[serde(transparent)]
-pub struct TrackRequest<'a> {
-    pub events: Vec<Event<'a>>,
+pub struct TrackRequest<'a, T: Serialize> {
+    pub events: &'a [Event<'a, T>],
 }
 
 /// `track` response
@@ -22,77 +20,44 @@ pub struct TrackResponse {
 
 /// Event
 #[derive(Debug, Serialize)]
-pub struct Event<'a> {
+pub struct Event<'a, P: Serialize> {
     pub event: &'a str,
-    pub properties: EventProperties<'a>,
+    pub properties: EventProperties<'a, P>,
 }
 
 /// Event properties
 #[serde_as]
 #[derive(Debug, Serialize)]
-pub struct EventProperties<'a> {
+pub struct EventProperties<'a, P: Serialize> {
     // Reserved properties, see https://docs.mixpanel.com/docs/data-structure/property-reference/reserved-properties
     pub token: &'a str,
     #[serde_as(as = "TimestampMilliSeconds<i64>")]
     pub time: DateTime<Utc>,
-    pub distinct_id: DistinctId<'a>,
+    // FIXME: distinct_id should be &str, but that's a lot harder, e.g. with number types
+    pub distinct_id: Cow<'a, str>,
 
-    // Global custom properties
-    pub firmware_version: &'a str,
-    pub firmware_git_sha: &'a str,
-    pub device_id: &'a str,
-
-    // Event-specific custom properties
+    // User-defined properties (flattened)
     #[serde(flatten)]
-    pub extra: EventPropertiesExtra<'a>,
+    pub extra: P,
 }
 
-/// Distinct id is either a user id (if present) or the device id
-#[derive(Debug, Serialize)]
-#[serde(untagged)]
-pub enum DistinctId<'a> {
-    User(UserId),
-    Device(&'a str),
-}
-
-/// Event-specific custom properties
-#[derive(Debug, Serialize)]
-#[serde(untagged)]
-pub enum EventPropertiesExtra<'a> {
-    None,
-    DataRefresh(EventPropertiesExtraDataRefresh),
-    Authentication(EventPropertiesExtraAuthentication<'a>),
-    Purchase(EventPropertiesExtraPurchase<'a>),
-    Error(EventPropertiesExtraError<'a>),
-}
-
-/// Event-specific custom properties (data refresh)
-#[derive(Debug, Serialize)]
-#[expect(clippy::struct_field_names)]
-pub struct EventPropertiesExtraDataRefresh {
-    pub article_count: usize,
-    pub uid_count: usize,
-    pub user_count: usize,
-}
-
-// Event-specific custom properties (authentication)
-#[serde_as]
-#[derive(Debug, Serialize)]
-pub struct EventPropertiesExtraAuthentication<'a> {
-    #[serde_as(as = "DisplayFromStr")]
-    pub uid: &'a Uid,
-}
-
-/// Event-specific custom properties (purchase)
-#[derive(Debug, Serialize)]
-pub struct EventPropertiesExtraPurchase<'a> {
-    pub article_id: &'a str,
-    pub amount: f32,
-    pub total_price: f32,
-}
-
-/// Event-specific custom properties (error)
-#[derive(Debug, Serialize)]
-pub struct EventPropertiesExtraError<'a> {
-    pub error_message: &'a str,
+impl<'a, P: Serialize> Event<'a, P> {
+    /// Create event with given properties
+    pub fn new(
+        name: &'a str,
+        token: &'a str,
+        time: DateTime<Utc>,
+        distinct_id: impl Into<Cow<'a, str>>,
+        extra: P,
+    ) -> Self {
+        Self {
+            event: name,
+            properties: EventProperties {
+                token,
+                time,
+                distinct_id: distinct_id.into(),
+                extra,
+            },
+        }
+    }
 }

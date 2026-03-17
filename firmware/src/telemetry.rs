@@ -1,10 +1,16 @@
-use crate::http::Http;
-use crate::mixpanel::{self, Mixpanel};
-use crate::{article, nfc, user};
+use crate::mixpanel::{self, Event as MixpanelEvent, Mixpanel};
+use crate::time::DateTimeExt;
+use crate::{GIT_SHA_STR, VERSION_STR, article, nfc, user};
 use alloc::collections::VecDeque;
-use alloc::string::String;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::fmt;
 use embassy_time::{Duration, Instant};
+use embedded_nal_async::{Dns, TcpConnect};
 use log::{debug, info, warn};
+use reqwless::client::HttpClient;
+use serde::Serialize;
+use serde_with::{DisplayFromStr, serde_as};
 
 /// Time after which events are flushed even when queue isn't filled yet
 const MAX_BUFFER_DURATION: Duration = Duration::from_secs(30);
@@ -13,7 +19,68 @@ const MAX_BUFFER_DURATION: Duration = Duration::from_secs(30);
 const MAX_BUFFER_EVENTS: usize = 10;
 
 /// Telemetry error
-pub type Error = mixpanel::Error;
+#[derive(Debug)]
+pub enum Error {
+    /// Mixpanel error
+    Mixpanel(mixpanel::Error),
+    /// Current time is required but not set
+    CurrentTimeNotSet,
+}
+
+impl From<mixpanel::Error> for Error {
+    fn from(err: mixpanel::Error) -> Self {
+        Self::Mixpanel(err)
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Mixpanel(err) => write!(f, "Mixpanel: {err}"),
+            Self::CurrentTimeNotSet => write!(f, "Unknown current time"),
+        }
+    }
+}
+
+/// Custom event properties for Mixpanel submission
+#[derive(Debug, Serialize)]
+struct MixpanelEventProperties<'a> {
+    // Global custom properties
+    firmware_version: &'static str,
+    firmware_git_sha: &'static str,
+    device_id: &'a str,
+    // Event-specific custom properties
+    #[serde(flatten)]
+    extra: MixpanelEventPropertiesExtra<'a>,
+}
+
+/// Event-specific custom properties for Mixpanel submission
+#[serde_as]
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+enum MixpanelEventPropertiesExtra<'a> {
+    /// No event-specific properties
+    None,
+    /// Event-specific custom properties (data refresh)
+    DataRefresh {
+        article_count: usize,
+        uid_count: usize,
+        user_count: usize,
+    },
+    /// Event-specific custom properties (authentication)
+    Authentication {
+        #[serde_as(as = "DisplayFromStr")]
+        uid: &'a nfc::Uid,
+    },
+    /// Event-specific custom properties (purchase)
+    Purchase {
+        article_id: &'a str,
+        amount: f32,
+        total_price: f32,
+    },
+    /// Event-specific custom properties (error)
+    Error { error_message: &'a str },
+}
 
 /// Telemetry event
 #[derive(Debug)]
@@ -34,7 +101,7 @@ pub enum Event {
 
 impl Event {
     /// Event name as reported to server
-    pub fn event_name(&self) -> &'static str {
+    fn event_name(&self) -> &'static str {
         match self {
             Event::SystemStart => "system_start",
             Event::DataRefreshed(..) => "data_refreshed",
@@ -46,7 +113,7 @@ impl Event {
     }
 
     /// User id associated with this event, if any
-    pub fn user_id(&self) -> Option<user::UserId> {
+    fn user_id(&self) -> Option<user::UserId> {
         #[expect(clippy::match_same_arms)]
         match self {
             Event::SystemStart => None,
@@ -57,12 +124,44 @@ impl Event {
             Event::Error(user_id, ..) => *user_id,
         }
     }
+
+    /// Custom event properties for Mixpanel submission
+    fn mixpanel_properties<'a>(&'a self, device_id: &'a str) -> MixpanelEventProperties<'a> {
+        MixpanelEventProperties {
+            firmware_version: VERSION_STR,
+            firmware_git_sha: GIT_SHA_STR,
+            device_id,
+            extra: match self {
+                Self::SystemStart => MixpanelEventPropertiesExtra::None,
+                Self::DataRefreshed(article_count, uid_count, user_count) => {
+                    MixpanelEventPropertiesExtra::DataRefresh {
+                        article_count: *article_count,
+                        uid_count: *uid_count,
+                        user_count: *user_count,
+                    }
+                }
+                Self::AuthenticationFailed(uid) | Self::UserAuthenticated(_, uid) => {
+                    MixpanelEventPropertiesExtra::Authentication { uid }
+                }
+                Self::ArticlePurchased(_, article_id, amount, total_price) => {
+                    MixpanelEventPropertiesExtra::Purchase {
+                        article_id,
+                        amount: *amount,
+                        total_price: *total_price,
+                    }
+                }
+                Self::Error(_, error_message) => {
+                    MixpanelEventPropertiesExtra::Error { error_message }
+                }
+            },
+        }
+    }
 }
 
 /// Telemetry for tracking events
-#[derive(Debug)]
 pub struct Telemetry<'a> {
     mixpanel: Option<Mixpanel<'a>>,
+    device_id: &'a str,
     events: VecDeque<(Instant, Event)>,
     last_flush: Instant,
 }
@@ -72,13 +171,14 @@ impl<'a> Telemetry<'a> {
     pub fn new(mp_token: Option<&'a str>, device_id: &'a str) -> Self {
         let mixpanel = if let Some(token) = mp_token {
             info!("Telemetry: Initialized with Mixpanel token {token}");
-            Some(Mixpanel::new(token, device_id))
+            Some(Mixpanel::new(token))
         } else {
             warn!("Telemetry: Disabled! No Mixpanel token.");
             None
         };
         Self {
             mixpanel,
+            device_id,
             events: VecDeque::new(),
             last_flush: Instant::now(),
         }
@@ -99,7 +199,10 @@ impl<'a> Telemetry<'a> {
     }
 
     /// Submit tracked events to server
-    pub async fn flush(&mut self, http: &mut Http<'_>) -> Result<(), Error> {
+    pub async fn flush<T: TcpConnect, D: Dns>(
+        &mut self,
+        http: &mut HttpClient<'_, T, D>,
+    ) -> Result<(), Error> {
         if self.events.is_empty() {
             return Ok(());
         }
@@ -107,9 +210,35 @@ impl<'a> Telemetry<'a> {
         if let Some(ref mut mixpanel) = self.mixpanel {
             debug!("Telemetry: Flushing {} events...", self.events.len());
 
+            let token = mixpanel.token().to_string();
             let mut mp = mixpanel.connect(http).await?;
-            let events = self.events.make_contiguous();
-            mp.submit(events).await?;
+
+            let events = self
+                .events
+                .iter()
+                .map(|(time, event)| -> Result<_, Error> {
+                    let time = time.to_datetime().ok_or(Error::CurrentTimeNotSet)?;
+                    if let Some(user_id) = event.user_id() {
+                        Ok(MixpanelEvent::new(
+                            event.event_name(),
+                            &token,
+                            time,
+                            user_id.to_string(),
+                            event.mixpanel_properties(self.device_id),
+                        ))
+                    } else {
+                        Ok(MixpanelEvent::new(
+                            event.event_name(),
+                            &token,
+                            time,
+                            self.device_id,
+                            event.mixpanel_properties(self.device_id),
+                        ))
+                    }
+                })
+                .collect::<Result<Vec<_>, Error>>()?;
+            // TODO: Pass events iterator without allocating a temporary collection vector?
+            mp.submit(&events).await?;
 
             debug!("Telemetry: Flush successful");
             self.events.clear();

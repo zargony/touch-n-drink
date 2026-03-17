@@ -23,6 +23,7 @@ use embedded_nal_async::{Dns, TcpConnect};
 use embedded_storage::Storage;
 use log::info;
 use rand_core::RngCore;
+use reqwless::client::HttpClient;
 
 /// How long to show the splash screen if no key is pressed
 const SPLASH_TIMEOUT: Duration = Duration::from_secs(5);
@@ -52,6 +53,7 @@ pub struct Ui<'a, RNG, FLASH, I2C, IRQ, DNS: Dns, TCP: TcpConnect> {
     buzzer: &'a mut Buzzer<'a>,
     wifi: &'a Wifi,
     http: &'a mut Http<'a>,
+    http_new: &'a mut HttpClient<'a, TCP, DNS>,
     vereinsflieger: &'a mut Vereinsflieger<'a>,
     articles: &'a mut Articles,
     users: &'a mut Users,
@@ -81,6 +83,7 @@ impl<
         buzzer: &'a mut Buzzer<'a>,
         wifi: &'a Wifi,
         http: &'a mut Http<'a>,
+        http_new: &'a mut HttpClient<'a, TCP, DNS>,
         vereinsflieger: &'a mut Vereinsflieger<'a>,
         articles: &'a mut Articles,
         users: &'a mut Users,
@@ -97,6 +100,7 @@ impl<
             buzzer,
             wifi,
             http,
+            http_new,
             vereinsflieger,
             articles,
             users,
@@ -255,7 +259,7 @@ impl<
             .await?;
 
         // Submit telemetry data, ignore any error
-        let _ = self.telemetry.flush(self.http).await;
+        let _ = self.telemetry.flush(self.http_new).await;
 
         Ok(())
     }
