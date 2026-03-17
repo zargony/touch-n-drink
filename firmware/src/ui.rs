@@ -2,26 +2,25 @@ use crate::article::{Article, ArticleId, Articles};
 use crate::buzzer::Buzzer;
 use crate::display::Display;
 use crate::error::{Error, ErrorKind};
-use crate::http::Http;
 use crate::keypad::{Key, Keypad};
-use crate::nfc::Nfc;
+use crate::nfc::{Nfc, Uid};
 use crate::ota::Ota;
 use crate::schedule::Daily;
-use crate::screen;
 use crate::telemetry::{Event, Telemetry};
 use crate::user::{UserId, Users};
-use crate::util;
 use crate::vereinsflieger::Vereinsflieger;
 use crate::wifi::Wifi;
+use crate::{screen, time, util};
 use alloc::string::{String, ToString};
 use core::convert::Infallible;
+use core::str::FromStr;
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, TimeoutError, Timer, with_timeout};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
 use embedded_nal_async::{Dns, TcpConnect};
 use embedded_storage::Storage;
-use log::info;
+use log::{debug, info, warn};
 use rand_core::RngCore;
 use reqwless::client::HttpClient;
 
@@ -52,8 +51,7 @@ pub struct Ui<'a, RNG, FLASH, I2C, IRQ, DNS: Dns, TCP: TcpConnect> {
     nfc: &'a mut Nfc<I2C, IRQ>,
     buzzer: &'a mut Buzzer<'a>,
     wifi: &'a Wifi,
-    http: &'a mut Http<'a>,
-    http_new: &'a mut HttpClient<'a, TCP, DNS>,
+    http: &'a mut HttpClient<'a, TCP, DNS>,
     vereinsflieger: &'a mut Vereinsflieger<'a>,
     articles: &'a mut Articles,
     users: &'a mut Users,
@@ -82,7 +80,6 @@ impl<
         nfc: &'a mut Nfc<I2C, IRQ>,
         buzzer: &'a mut Buzzer<'a>,
         wifi: &'a Wifi,
-        http: &'a mut Http<'a>,
         http_new: &'a mut HttpClient<'a, TCP, DNS>,
         vereinsflieger: &'a mut Vereinsflieger<'a>,
         articles: &'a mut Articles,
@@ -99,8 +96,7 @@ impl<
             nfc,
             buzzer,
             wifi,
-            http,
-            http_new,
+            http: http_new,
             vereinsflieger,
             articles,
             users,
@@ -226,10 +222,56 @@ impl<
         vf.get_user_information().await?;
 
         // Refresh article information
-        vf.refresh_articles(self.articles).await?;
+        debug!("Vereinsflieger: Refreshing articles...");
+        self.articles.clear();
+        let total_articles = vf
+            .get_articles(async |article| {
+                if let Some(price) = article.price() {
+                    self.articles
+                        .update(&article.articleid, &article.designation, price);
+                } else {
+                    warn!(
+                        "Ignoring article with no valid price ({}): {}",
+                        article.articleid, article.designation
+                    );
+                }
+            })
+            .await?;
+        info!(
+            "Vereinsflieger: Refreshed {} of {} articles",
+            self.articles.count(),
+            total_articles
+        );
 
         // Refresh user information
-        vf.refresh_users(self.users).await?;
+        debug!("Vereinsflieger: Refreshing users...");
+        self.users.clear();
+        let total_users = vf
+            .get_users(async |user| {
+                if !user.is_retired() {
+                    let keys = user.keys_named_with_prefix("NFC Transponder");
+                    if !keys.is_empty() {
+                        for key in keys {
+                            if let Ok(uid) = Uid::from_str(key) {
+                                self.users.update_uid(uid, user.memberid);
+                            } else {
+                                warn!(
+                                    "Ignoring user key with invalid NFC uid ({}): {}",
+                                    user.memberid, key
+                                );
+                            }
+                        }
+                        self.users
+                            .update_user(user.memberid, user.firstname.clone());
+                    }
+                }
+            })
+            .await?;
+        info!(
+            "Vereinsflieger: Refreshed {} of {} users",
+            self.users.count(),
+            total_users
+        );
 
         // Close connection to Vereinsflieger API
         drop(vf);
@@ -259,7 +301,7 @@ impl<
             .await?;
 
         // Submit telemetry data, ignore any error
-        let _ = self.telemetry.flush(self.http_new).await;
+        let _ = self.telemetry.flush(self.http).await;
 
         Ok(())
     }
@@ -513,7 +555,8 @@ impl<
         let mut vf = self.vereinsflieger.connect(self.http).await?;
 
         // Store purchase
-        vf.purchase(article_id, amount, user_id, total_price)
+        let date = time::today().ok_or(ErrorKind::CurrentTimeNotSet)?;
+        vf.purchase(date, article_id, amount, user_id, total_price)
             .await?;
         self.telemetry.track(Event::ArticlePurchased(
             user_id,

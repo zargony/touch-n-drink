@@ -3,18 +3,23 @@ mod proto_auth;
 mod proto_sale;
 mod proto_user;
 
-use crate::article::{ArticleId, Articles};
-use crate::http::{self, Http};
-use crate::nfc::Uid;
+pub use proto_articles::Article;
+pub use proto_user::User;
+
+use crate::reader::{self, StreamingJsonObjectReader};
 use crate::time;
-use crate::user::{UserId, Users};
-use alloc::format;
 use alloc::string::String;
+use alloc::vec;
+use chrono::{DateTime, NaiveDate};
 use core::fmt;
-use core::str::FromStr;
-use embassy_time::{Duration, with_timeout};
+use embassy_time::{Duration, Instant, with_deadline, with_timeout};
+use embedded_nal_async::{Dns, TcpConnect};
 use log::{debug, info, warn};
-use serde::Deserialize;
+use reqwless::client::{HttpClient, HttpConnection, HttpResource};
+use reqwless::headers::ContentType;
+use reqwless::request::RequestBuilder;
+use reqwless::response::{Response, StatusCode};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 /// Vereinsflieger API base URL
 const BASE_URL: &str = "https://www.vereinsflieger.de/interface/rest";
@@ -25,23 +30,41 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 /// How long to wait to finish streaming a server's response
 const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// Maximum size of response headers from server
+const MAX_RESPONSE_HEADER_SIZE: usize = 2048;
+
 /// Vereinsflieger API error
 #[derive(Debug)]
 pub enum Error {
-    /// Failed to fetch user information
-    FetchUserInformation(http::Error),
-    /// Failed to fetch articles
-    FetchArticles(http::Error),
-    /// Failed to fetch users
-    FetchUsers(http::Error),
-    /// Failed to purchase
-    Purchase(http::Error),
-    /// Failed to connect to API server
-    Connect(http::Error),
-    /// Failed to sign in to API server
-    SignIn(http::Error),
-    /// Timeout waiting for response from API server
+    /// Network error
+    Network(reqwless::Error),
+    /// Request could not be built
+    MalformedRequest(serde_json::Error),
+    /// Request failed
+    RequestFailed(StatusCode),
+    /// Response could not be parsed
+    MalformedResponse(serde_json::Error),
+    /// Streaming response could not be parsed
+    MalformedResponseStream(reader::Error<reqwless::Error>),
+    /// Timeout waiting for response
     Timeout,
+    /// Not logged in
+    NotLoggedIn,
+}
+
+impl From<reqwless::Error> for Error {
+    fn from(err: reqwless::Error) -> Self {
+        Self::Network(err)
+    }
+}
+
+impl From<reader::Error<reqwless::Error>> for Error {
+    fn from(err: reader::Error<reqwless::Error>) -> Self {
+        match err {
+            reader::Error::Read(err) => Self::Network(err),
+            err => Self::MalformedResponseStream(err),
+        }
+    }
 }
 
 impl From<embassy_time::TimeoutError> for Error {
@@ -53,13 +76,13 @@ impl From<embassy_time::TimeoutError> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::FetchUserInformation(err) => write!(f, "Fetch user info failed: {err}"),
-            Self::FetchArticles(err) => write!(f, "Fetch articles failed: {err}"),
-            Self::FetchUsers(err) => write!(f, "Fetch users failed: {err}"),
-            Self::Purchase(err) => write!(f, "Purchase failed: {err}"),
-            Self::Connect(err) => write!(f, "Connect failed: {err}"),
-            Self::SignIn(err) => write!(f, "Sign in failed: {err}"),
+            Self::Network(err) => write!(f, "Network: {err}"),
+            Self::MalformedRequest(_err) => write!(f, "Malformed request"),
+            Self::RequestFailed(status) => write!(f, "Request failed ({})", status.0),
+            Self::MalformedResponse(_err) => write!(f, "Malformed response"),
+            Self::MalformedResponseStream(_err) => write!(f, "Malformed response stream"),
             Self::Timeout => write!(f, "Timeout"),
+            Self::NotLoggedIn => write!(f, "Not logged in"),
         }
     }
 }
@@ -74,17 +97,6 @@ pub struct Vereinsflieger<'a> {
     appkey: &'a str,
     cid: Option<u32>,
     accesstoken: Option<AccessToken>,
-}
-
-impl fmt::Debug for Vereinsflieger<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Vereinsflieger")
-            .field("username", &self.username)
-            .field("password_md5", &"<redacted>")
-            .field("appkey", &"<redacted>")
-            .field("cid", &self.cid)
-            .finish()
-    }
 }
 
 impl<'a> Vereinsflieger<'a> {
@@ -104,163 +116,161 @@ impl<'a> Vereinsflieger<'a> {
         }
     }
 
-    /// Connect to API server
-    pub async fn connect<'conn>(
-        &'conn mut self,
-        http: &'conn mut Http<'_>,
-    ) -> Result<Connection<'conn>, Error> {
-        Connection::new(self, http).await
+    /// Connect to API server, check existing access token (if any) or fetch a new one and sign
+    /// in. Returns connection for authenticated API requests.
+    pub async fn connect<'vf, 'conn, T: TcpConnect, D: Dns>(
+        &'vf mut self,
+        http: &'conn mut HttpClient<'_, T, D>,
+    ) -> Result<Connection<'vf, 'conn, T>, Error> {
+        // Connect to API server
+        let resource = with_timeout(TIMEOUT, http.resource(BASE_URL)).await??;
+        debug!("Vereinsflieger: Connected {BASE_URL}");
+
+        // Check whether the current access token (if any) is signed in. If not, forget it.
+        // Note: juggling with a temporary connection, as self can't be modified while borrowed
+        let mut connection: Connection<T> = Connection::new(self, resource);
+        let is_signed_in = connection.is_signed_in().await?;
+        let resource = connection.into_resource();
+        if !is_signed_in {
+            self.accesstoken = None;
+        }
+
+        // Without an access token, fetch a new access token and sign in
+        // Note: juggling with a temporary connection, as self can't be modified while borrowed
+        let connection = if self.accesstoken.is_none() {
+            // Fetch a new access token
+            let mut connection: Connection<T> = Connection::new(self, resource);
+            let accesstoken = connection.get_new_accesstoken().await?;
+            let resource = connection.into_resource();
+            self.accesstoken = Some(accesstoken);
+
+            // Use credentials to sign in
+            let mut connection: Connection<T> = Connection::new(self, resource);
+            connection
+                .sign_in(self.username, self.password_md5, self.appkey, self.cid)
+                .await?;
+            connection
+        } else {
+            Connection::new(self, resource)
+        };
+
+        Ok(connection)
+    }
+}
+
+impl Vereinsflieger<'_> {
+    /// Vereinsflieger API accesstoken
+    fn accesstoken(&self) -> Result<&AccessToken, Error> {
+        self.accesstoken.as_ref().ok_or(Error::NotLoggedIn)
     }
 }
 
 /// Vereinsflieger API client connection
-pub struct Connection<'conn> {
-    http: http::Connection<'conn>,
-    accesstoken: &'conn AccessToken,
+pub struct Connection<'vf, 'conn, T: TcpConnect + 'conn> {
+    vereinsflieger: &'vf Vereinsflieger<'vf>,
+    resource: HttpResource<'conn, T::Connection<'conn>>,
 }
 
-impl fmt::Debug for Connection<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Connection")
-            .field("http", &self.http)
-            .field("accesstoken", &"<redacted>")
-            .finish()
-    }
-}
-
-impl Connection<'_> {
+impl<T: TcpConnect> Connection<'_, '_, T> {
     /// Fetch information about authenticated user
-    #[cfg_attr(not(debug_assertions), expect(dead_code))]
     pub async fn get_user_information(&mut self) -> Result<(), Error> {
         use proto_auth::{UserInformationRequest, UserInformationResponse};
 
-        let response: UserInformationResponse = with_timeout(
-            TIMEOUT,
-            self.http.post(
+        let response: UserInformationResponse = self
+            .http_json_post(
                 "auth/getuser",
                 &UserInformationRequest {
-                    accesstoken: self.accesstoken,
+                    accesstoken: self.vereinsflieger.accesstoken()?,
                 },
-            ),
-        )
-        .await?
-        .map_err(Error::FetchUserInformation)?;
+            )
+            .await?;
         debug!("Vereinsflieger: Got user information: {response:?}");
         Ok(())
     }
 
-    /// Fetch list of articles and update article lookup table
-    pub async fn refresh_articles(&mut self, articles: &mut Articles) -> Result<(), Error> {
-        use proto_articles::{Article, ArticleListRequest};
+    /// Fetch list of articles and call closure with each
+    pub async fn get_articles<F>(&mut self, mut f: F) -> Result<usize, Error>
+    where
+        F: AsyncFnMut(&Article),
+    {
+        use proto_articles::ArticleListRequest;
 
+        /// Helper to distinguish article and numeric status code in response
         #[derive(Debug, Deserialize)]
         #[serde(untagged)]
-        enum ArticleOrStatus {
+        pub enum ArticleOrNumber {
             Article(Article),
             #[expect(dead_code)]
-            Status(u16),
+            Number(u16),
         }
 
-        debug!("Vereinsflieger: Refreshing articles...");
-        articles.clear();
-
-        let mut total_articles: usize = 0;
-        with_timeout(
-            FETCH_TIMEOUT,
-            self.http.post_fn(
-                "articles/list",
-                &ArticleListRequest {
-                    accesstoken: self.accesstoken,
-                },
-                |_key, article_or_status: ArticleOrStatus| {
-                    if let ArticleOrStatus::Article(article) = article_or_status {
+        let mut total_articles = 0;
+        self.http_json_post_fn::<_, ArticleOrNumber, _>(
+            "articles/list",
+            &ArticleListRequest {
+                accesstoken: self.vereinsflieger.accesstoken()?,
+            },
+            async |_key, element| {
+                match element {
+                    ArticleOrNumber::Article(article) => {
                         total_articles += 1;
-                        if let Some(price) = article.price() {
-                            articles.update(&article.articleid, &article.designation, price);
-                        } else {
-                            warn!(
-                                "Ignoring article with no valid price ({}): {}",
-                                article.articleid, article.designation
-                            );
-                        }
+                        f(article).await;
                     }
-                },
-            ),
+                    ArticleOrNumber::Number(_) => (),
+                }
+                Ok(())
+            },
         )
-        .await?
-        .map_err(Error::FetchArticles)?;
-
-        info!(
-            "Vereinsflieger: Refreshed {} of {} articles",
-            articles.count(),
-            total_articles
-        );
-        Ok(())
+        .await?;
+        debug!("Vereinsflieger: Got {total_articles} articles");
+        Ok(total_articles)
     }
 
-    /// Fetch list of users and update user lookup table
-    pub async fn refresh_users(&mut self, users: &mut Users) -> Result<(), Error> {
-        use proto_user::{User, UserListRequest};
+    /// Fetch list of users and call closure with each
+    pub async fn get_users<F>(&mut self, mut f: F) -> Result<usize, Error>
+    where
+        F: AsyncFnMut(&User),
+    {
+        use proto_user::UserListRequest;
 
+        /// Helper to distinguish user and numeric status code in response
         #[derive(Debug, Deserialize)]
         #[serde(untagged)]
-        enum UserOrStatus {
+        pub enum UserOrNumber {
             User(User),
             #[expect(dead_code)]
-            Status(u16),
+            Number(u16),
         }
 
-        debug!("Vereinsflieger: Refreshing users...");
-        users.clear();
-
-        let mut total_users: usize = 0;
-        with_timeout(
-            FETCH_TIMEOUT,
-            self.http.post_fn(
-                "user/list",
-                &UserListRequest {
-                    accesstoken: self.accesstoken,
-                },
-                |_key, user_or_status: UserOrStatus| {
-                    if let UserOrStatus::User(user) = user_or_status {
+        let mut total_users = 0;
+        self.http_json_post_fn::<_, UserOrNumber, _>(
+            "user/list",
+            &UserListRequest {
+                accesstoken: self.vereinsflieger.accesstoken()?,
+            },
+            async |_key, element| {
+                match element {
+                    UserOrNumber::User(user) => {
                         total_users += 1;
-                        if !user.is_retired() {
-                            let keys = user.keys_named_with_prefix("NFC Transponder");
-                            if !keys.is_empty() {
-                                for key in keys {
-                                    if let Ok(uid) = Uid::from_str(key) {
-                                        users.update_uid(uid, user.memberid);
-                                    } else {
-                                        warn!(
-                                            "Ignoring user key with invalid NFC uid ({}): {}",
-                                            user.memberid, key
-                                        );
-                                    }
-                                }
-                                users.update_user(user.memberid, user.firstname);
-                            }
-                        }
+                        f(user).await;
                     }
-                },
-            ),
+                    UserOrNumber::Number(_) => (),
+                }
+                Ok(())
+            },
         )
-        .await?
-        .map_err(Error::FetchUsers)?;
-
-        info!(
-            "Vereinsflieger: Refreshed {} of {} users",
-            users.count(),
-            total_users
-        );
-        Ok(())
+        .await?;
+        debug!("Vereinsflieger: Got {total_users} users");
+        Ok(total_users)
     }
 
     /// Store a purchase
     pub async fn purchase(
         &mut self,
-        article_id: &ArticleId,
+        date: NaiveDate,
+        article_id: &str,
         amount: f32,
-        user_id: UserId,
+        user_id: u32,
         total_price: f32,
     ) -> Result<(), Error> {
         use proto_sale::{SaleAddRequest, SaleAddResponse};
@@ -269,119 +279,221 @@ impl Connection<'_> {
             "Vereinsflieger: Purchasing {amount}x {article_id}, {total_price:.02} EUR for user {user_id}"
         );
 
-        let _response: SaleAddResponse = with_timeout(
-            TIMEOUT,
-            self.http.post(
+        let _response: SaleAddResponse = self
+            .http_json_post(
                 "sale/add",
                 &SaleAddRequest {
-                    accesstoken: self.accesstoken,
-                    bookingdate: &Self::today(),
+                    accesstoken: self.vereinsflieger.accesstoken()?,
+                    bookingdate: date,
                     articleid: article_id,
                     amount,
                     memberid: Some(user_id),
                     totalprice: Some(total_price),
                     comment: None,
                 },
-            ),
-        )
-        .await?
-        .map_err(Error::Purchase)?;
+            )
+            .await?;
         debug!("Vereinsflieger: Purchase successful");
         Ok(())
     }
 }
 
-impl<'conn> Connection<'conn> {
-    /// Connect to API server, check existing access token (if any) or fetch a new one and sign
-    /// in. Return connection for authenticated API requests.
-    async fn new(
-        vf: &'conn mut Vereinsflieger<'_>,
-        http: &'conn mut Http<'_>,
-    ) -> Result<Self, Error> {
-        // Connect to API server
-        let mut connection = with_timeout(TIMEOUT, http.connect(BASE_URL))
-            .await?
-            .map_err(Error::Connect)?;
-
-        // If exist, check validity of access token
-        if let Some(ref accesstoken) = vf.accesstoken {
-            use proto_auth::{UserInformationRequest, UserInformationResponse};
-
-            let response: Result<UserInformationResponse, _> = with_timeout(
-                TIMEOUT,
-                connection.post("auth/getuser", &UserInformationRequest { accesstoken }),
-            )
-            .await?;
-            match response {
-                Ok(_userinfo) => debug!("Vereinsflieger: Access token valid"),
-                Err(http::Error::Unauthorized) => {
-                    debug!("Vereinsflieger: Access token expired");
-                    vf.accesstoken = None;
-                }
-                Err(err) => return Err(Error::Connect(err)),
-            }
-        }
-
-        // Without an access token, fetch a new access token and sign in
-        if vf.accesstoken.is_none() {
-            use proto_auth::{AccessTokenResponse, SignInRequest, SignInResponse};
-
-            // Fetch a new access token
-            let response: AccessTokenResponse =
-                with_timeout(TIMEOUT, connection.get("auth/accesstoken"))
-                    .await?
-                    .map_err(Error::SignIn)?;
-            let accesstoken = response.accesstoken;
-            // debug!("Vereinsflieger: Got access token {accesstoken}");
-            debug!(
-                "Vereinsflieger: Got access token (length {})",
-                accesstoken.len()
-            );
-
-            // Use credentials to sign in
-            let response: Result<SignInResponse, _> = with_timeout(
-                TIMEOUT,
-                connection.post(
-                    "auth/signin",
-                    &SignInRequest {
-                        accesstoken: &accesstoken,
-                        username: vf.username,
-                        password_md5: vf.password_md5,
-                        appkey: vf.appkey,
-                        cid: vf.cid,
-                        auth_secret: None,
-                    },
-                ),
-            )
-            .await?;
-            match response {
-                Ok(_signin) => {
-                    vf.accesstoken = Some(accesstoken);
-                    info!("Vereinsflieger: Signed in as {}", vf.username);
-                }
-                Err(err) => {
-                    warn!("Vereinsflieger: Sign in failed: {err}");
-                    return Err(Error::SignIn(err));
-                }
-            }
-        }
-
-        match vf.accesstoken {
-            Some(ref accesstoken) => Ok(Self {
-                http: connection,
-                accesstoken,
-            }),
-            // Actually unreachable
-            None => Err(Error::SignIn(http::Error::Unauthorized)),
+impl<'vf, 'conn, T: TcpConnect> Connection<'vf, 'conn, T> {
+    /// Create new connection from given client and http resource handle
+    fn new(
+        vereinsflieger: &'vf Vereinsflieger<'vf>,
+        resource: HttpResource<'conn, T::Connection<'conn>>,
+    ) -> Self {
+        Self {
+            vereinsflieger,
+            resource,
         }
     }
 
-    /// Helper function to get today's date as "yyyy-mm-dd" string
-    fn today() -> String {
-        if let Some(now) = time::now() {
-            format!("{}", now.format("%Y-%m-%d"))
-        } else {
-            String::new()
+    /// Consume connection and return the http resource handle
+    fn into_resource(self) -> HttpResource<'conn, T::Connection<'conn>> {
+        self.resource
+    }
+}
+
+impl<T: TcpConnect> Connection<'_, '_, T> {
+    /// Check whether the current access token is valid and signed in
+    async fn is_signed_in(&mut self) -> Result<bool, Error> {
+        match self.get_user_information().await {
+            Ok(()) => {
+                debug!("Vereinsflieger: Access token valid");
+                Ok(true)
+            }
+            Err(Error::RequestFailed(status)) if status.0 == 401 => {
+                debug!("Vereinsflieger: Access token expired");
+                Ok(false)
+            }
+            Err(Error::NotLoggedIn) => Ok(false),
+            Err(err) => Err(err),
         }
+    }
+
+    /// Sign in using the given credentials
+    async fn sign_in(
+        &mut self,
+        username: &str,
+        password_md5: &str,
+        appkey: &str,
+        cid: Option<u32>,
+    ) -> Result<(), Error> {
+        use proto_auth::{SignInRequest, SignInResponse};
+
+        match self
+            .http_json_post::<_, SignInResponse>(
+                "auth/signin",
+                &SignInRequest {
+                    accesstoken: self.vereinsflieger.accesstoken()?,
+                    username,
+                    password_md5,
+                    appkey,
+                    cid,
+                    auth_secret: None,
+                },
+            )
+            .await
+        {
+            Ok(_response) => info!("Vereinsflieger: Signed in as {username}"),
+            Err(err) => {
+                warn!("Vereinsflieger: Sign in failed: {err}");
+                return Err(err);
+            }
+        }
+        Ok(())
+    }
+
+    // Fetch a new access token
+    async fn get_new_accesstoken(&mut self) -> Result<AccessToken, Error> {
+        use proto_auth::AccessTokenResponse;
+
+        let response: AccessTokenResponse = self.http_json_get("auth/accesstoken").await?;
+        let accesstoken = response.accesstoken;
+        // debug!("Vereinsflieger: Got access token {accesstoken}");
+        debug!(
+            "Vereinsflieger: Got access token (length {})",
+            accesstoken.len()
+        );
+        Ok(accesstoken)
+    }
+
+    /// Send HTTP GET request, deserialize JSON response
+    async fn http_json_get<R: DeserializeOwned>(&mut self, path: &str) -> Result<R, Error> {
+        let deadline = Instant::now() + TIMEOUT;
+        let mut rx_buf = vec![0; MAX_RESPONSE_HEADER_SIZE].into_boxed_slice();
+
+        let request = self
+            .resource
+            .get(path)
+            .headers(&[("Accept", "application/json")]);
+
+        debug!("Vereinsflieger: GET {BASE_URL}/{path}");
+        let response = with_deadline(deadline, request.send(&mut rx_buf)).await??;
+
+        debug!("Vereinsflieger: HTTP status {}", response.status.0);
+        if !response.status.is_successful() {
+            return Err(Error::RequestFailed(response.status));
+        }
+
+        let body = with_deadline(deadline, response.body().read_to_end()).await??;
+
+        serde_json::from_slice(body).map_err(Error::MalformedResponse)
+    }
+
+    /// Serialize data to JSON, send HTTP POST request, deserialize JSON response
+    async fn http_json_post<D: Serialize, R: DeserializeOwned>(
+        &mut self,
+        path: &str,
+        data: &D,
+    ) -> Result<R, Error> {
+        let deadline = Instant::now() + TIMEOUT;
+        let mut rx_buf = vec![0; MAX_RESPONSE_HEADER_SIZE].into_boxed_slice();
+
+        self.http_post_fn(&mut rx_buf, path, data, async |response| {
+            with_deadline(deadline, async {
+                let body = response.body().read_to_end().await?;
+                serde_json::from_slice(body).map_err(Error::MalformedResponse)
+            })
+            .await?
+        })
+        .await
+    }
+
+    /// Serialize data to JSON, send HTTP POST request, deserialize JSON response stream and call
+    /// closure with elements from response stream
+    async fn http_json_post_fn<D: Serialize, R: DeserializeOwned, F>(
+        &mut self,
+        path: &str,
+        data: &D,
+        mut f: F,
+    ) -> Result<(), Error>
+    where
+        F: AsyncFnMut(&str, &R) -> Result<(), Error>,
+    {
+        let deadline = Instant::now() + FETCH_TIMEOUT;
+        let mut rx_buf = vec![0; MAX_RESPONSE_HEADER_SIZE].into_boxed_slice();
+
+        self.http_post_fn(&mut rx_buf, path, data, async |response| {
+            with_deadline(deadline, async {
+                let reader = response.body().reader();
+                let mut json: StreamingJsonObjectReader<_, R> =
+                    StreamingJsonObjectReader::new(reader);
+                while let Some((key, element)) = json.next().await? {
+                    with_deadline(deadline, f(&key, &element)).await??;
+                }
+                Ok(())
+            })
+            .await?
+        })
+        .await
+    }
+
+    /// Serialize data to JSON, send HTTP POST request and call closure with response object
+    async fn http_post_fn<D: Serialize, F, R>(
+        &mut self,
+        rx_buf: &mut [u8],
+        path: &str,
+        data: &D,
+        f: F,
+    ) -> Result<R, Error>
+    where
+        F: AsyncFnOnce(Response<'_, '_, HttpConnection<'_, T::Connection<'_>>>) -> Result<R, Error>,
+    {
+        let body = serde_json::to_vec(data)
+            .map_err(Error::MalformedRequest)?
+            .into_boxed_slice();
+
+        let request = self
+            .resource
+            .post(path)
+            .content_type(ContentType::ApplicationJson)
+            .headers(&[("Accept", "application/json")])
+            .body(body.as_ref());
+
+        debug!(
+            "Vereinsflieger: POST {BASE_URL}/{path} ({} bytes)",
+            body.len()
+        );
+        let response = with_timeout(TIMEOUT, request.send(rx_buf)).await??;
+
+        // Extract current date and time from response
+        let time = response
+            .headers()
+            .find_map(|(k, v)| (k.eq_ignore_ascii_case("date")).then_some(v))
+            .and_then(|v| str::from_utf8(v).ok())
+            .and_then(|s| DateTime::parse_from_rfc2822(s).ok());
+        if let Some(time) = time {
+            time::set(&time);
+        }
+
+        debug!("Vereinsflieger: HTTP status {}", response.status.0);
+        if !response.status.is_successful() {
+            return Err(Error::RequestFailed(response.status));
+        }
+
+        f(response).await
     }
 }

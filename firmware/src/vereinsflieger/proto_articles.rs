@@ -12,8 +12,8 @@ pub struct ArticleListRequest<'a> {
 
 // /// `articles/list` response
 // #[derive(Debug, Deserialize)]
-// #[serde(transparent)]
 // pub struct ArticleListResponse {
+//     #[serde(flatten)]
 //     pub articles: BTreeMap<String, Article>,
 //     // pub httpstatuscode: u16,
 // }

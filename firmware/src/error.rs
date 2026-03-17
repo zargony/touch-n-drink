@@ -92,6 +92,8 @@ pub enum ErrorKind {
     UserTimeout,
     /// No network connection
     NoNetwork,
+    /// Current time is required but not set
+    CurrentTimeNotSet,
     /// The specified article was not found
     ArticleNotFound,
 }
@@ -130,6 +132,7 @@ impl fmt::Display for ErrorKind {
             Self::Cancel => write!(f, "User cancelled"),
             Self::UserTimeout => write!(f, "Timeout waiting for input"),
             Self::NoNetwork => write!(f, "No network connection"),
+            Self::CurrentTimeNotSet => write!(f, "Unknown current time"),
             Self::ArticleNotFound => write!(f, "Article not found"),
         }
     }

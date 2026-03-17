@@ -1,12 +1,15 @@
 use super::AccessToken;
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
+use serde_with::{DisplayFromStr, serde_as};
 
 /// `sale/add` request
+#[serde_as]
 #[derive(Debug, Serialize)]
 pub struct SaleAddRequest<'a> {
     pub accesstoken: &'a AccessToken,
-    pub bookingdate: &'a str, // "yyyy-mm-dd"
+    #[serde_as(as = "DisplayFromStr")]
+    pub bookingdate: NaiveDate, // "yyyy-mm-dd"
     pub articleid: &'a str,
     pub amount: f32,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -12,8 +12,8 @@ pub struct UserListRequest<'a> {
 
 // /// `user/list` response
 // #[derive(Debug, Deserialize)]
-// #[serde(transparent)]
 // pub struct UserListResponse {
+//     #[serde(flatten)]
 //     pub users: BTreeMap<String, User>,
 //     // pub httpstatuscode: u16,
 // }
@@ -92,7 +92,7 @@ pub struct User {
 }
 
 impl User {
-    /// Whether the user has/was retired ("ausgeschieden")
+    /// Whether the user has retired ("ausgeschieden")
     pub fn is_retired(&self) -> bool {
         self.memberstatus.to_lowercase().contains("ausgeschieden")
     }

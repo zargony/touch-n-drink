@@ -44,7 +44,6 @@ mod buzzer;
 mod config;
 mod display;
 mod error;
-mod http;
 mod keypad;
 mod mixpanel;
 mod nfc;
@@ -241,12 +240,6 @@ async fn main(spawner: Spawner) {
     // Initialize HTTP client
     // As this allocates quite a bit of memory (e.g. for TLS buffers), only a single http client
     // is created that can be passed to an API client whenever a connection needs to be established
-    let mut http_resources = http::Resources::new();
-    let mut http = http::Http::new(&wifi, rng.next_u64(), &mut http_resources);
-
-    // Initialize HTTP client
-    // As this allocates quite a bit of memory (e.g. for TLS buffers), only a single http client
-    // is created that can be passed to an API client whenever a connection needs to be established
     // TLS read buffer needs to fit an encrypted TLS record. Actual size depends on server
     // configuration. Maximum allowed value for a TLS record is 16640, so this is a safe amount.
     let mut tls_read_buffer = vec![0; 16640].into_boxed_slice();
@@ -259,7 +252,7 @@ async fn main(spawner: Spawner) {
         &mut tls_write_buffer,
         TlsVerify::None,
     );
-    let mut http_new = HttpClient::new_with_tls(wifi.tcp(), wifi.dns(), tls_config);
+    let mut http = HttpClient::new_with_tls(wifi.tcp(), wifi.dns(), tls_config);
 
     // Initialize Vereinsflieger API client
     let mut vereinsflieger = vereinsflieger::Vereinsflieger::new(
@@ -296,7 +289,6 @@ async fn main(spawner: Spawner) {
         &mut buzzer,
         &wifi,
         &mut http,
-        &mut http_new,
         &mut vereinsflieger,
         &mut articles,
         &mut users,

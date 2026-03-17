@@ -55,12 +55,12 @@ pub fn uptime() -> Option<TimeDelta> {
 }
 
 /// Current date and time. Always given in UTC since the local timezone is unknown.
+#[expect(dead_code)]
 pub fn now() -> Option<DateTime<Utc>> {
     Instant::now().to_datetime()
 }
 
 /// Current date
-#[expect(dead_code)]
 pub fn today() -> Option<NaiveDate> {
     Instant::now().to_date()
 }

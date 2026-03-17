@@ -32,6 +32,7 @@ pub type DnsSocket<'d> = dns::DnsSocket<'d>;
 pub type TcpClient<'d> = tcp::client::TcpClient<'d, NUM_TCP_SOCKETS>;
 
 /// Type of TCP connection returned by TCP client
+#[expect(dead_code)]
 pub type TcpConnection<'d> = tcp::client::TcpConnection<'d, NUM_TCP_SOCKETS, 1024, 1024>;
 
 /// Wifi initialization error
