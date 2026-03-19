@@ -141,7 +141,7 @@ async fn watchdog(mut rtc: Rtc<'static>) -> ! {
 }
 
 #[esp_rtos::main]
-async fn main(spawner: Spawner) {
+async fn main(spawner: Spawner) -> ! {
     let esp_config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(esp_config);
     let mut rng = Rng::new();
