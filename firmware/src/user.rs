@@ -1,6 +1,9 @@
 use crate::nfc::Uid;
+use crate::vereinsflieger;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
+use core::str::FromStr;
+use log::warn;
 
 /// Extra NFC card uids to add
 static EXTRA_UIDS: [(Uid, UserId); 2] = [
@@ -17,8 +20,6 @@ pub type UserId = u32;
 /// User information
 #[derive(Debug, Clone, PartialEq)]
 pub struct User {
-    // pub uids: Vec<Uid>,
-    // pub id: UserId,
     pub name: String,
 }
 
@@ -57,7 +58,7 @@ impl Users {
         }
     }
 
-    /// Add/update NFC uid for given user id
+    /// Add/update NFC uid to point to given user id
     pub fn update_uid(&mut self, uid: Uid, id: UserId) {
         self.uids.insert(uid, id);
     }
@@ -65,6 +66,28 @@ impl Users {
     /// Add/update user with given user id
     pub fn update_user(&mut self, id: UserId, name: String) {
         self.users.insert(id, User { name });
+    }
+
+    /// Add/update NFC uids and user using the given Vereinsflieger user
+    pub fn update_vereinsflieger_user(&mut self, user: &vereinsflieger::User) {
+        if !user.is_retired() {
+            let mut has_valid_keys = false;
+            // TODO: get prefix from system configuration
+            for key in user.keys_named_with_prefix("NFC Transponder") {
+                if let Ok(uid) = Uid::from_str(key) {
+                    self.update_uid(uid, user.memberid);
+                    has_valid_keys = true;
+                } else {
+                    warn!(
+                        "Ignoring user key with invalid NFC uid ({}): {}",
+                        user.memberid, key
+                    );
+                }
+            }
+            if has_valid_keys {
+                self.update_user(user.memberid, user.firstname.clone());
+            }
+        }
     }
 
     /// Number of uids

@@ -1,7 +1,10 @@
+use crate::vereinsflieger;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use chrono::NaiveDate;
 use core::borrow::Borrow;
+use log::warn;
 
 /// Article id
 /// Equivalent to the Vereinsflieger `articleid` attribute
@@ -10,7 +13,6 @@ pub type ArticleId = String;
 /// Article information
 #[derive(Debug, Clone, PartialEq)]
 pub struct Article {
-    // pub id: ArticleId,
     pub name: String,
     pub price: f32,
 }
@@ -42,15 +44,32 @@ impl Articles {
     }
 
     /// Update article with given article id. Ignores article ids not in list.
-    pub fn update(&mut self, id: &ArticleId, name: &str, price: f32) {
+    pub fn update_article(&mut self, id: &ArticleId, name: &str, price: f32) {
         // Trim generic prefix from article name
         let name = name
+            // TODO: get prefixes from system configuration
             .trim_start_matches("Getränke ")
             .trim_start_matches("Getränk ")
             .trim_start()
             .to_string();
         if self.ids.contains(id) {
             self.articles.insert(id.clone(), Article { name, price });
+        }
+    }
+
+    /// Update article using the given Vereinsflieger article with price on given date
+    pub fn update_vereinsflieger_article(
+        &mut self,
+        article: &vereinsflieger::Article,
+        date: NaiveDate,
+    ) {
+        if let Some(price) = article.price_valid_on(date) {
+            self.update_article(&article.articleid, &article.designation, price);
+        } else {
+            warn!(
+                "Ignoring article with no valid price ({}): {}",
+                article.articleid, article.designation
+            );
         }
     }
 

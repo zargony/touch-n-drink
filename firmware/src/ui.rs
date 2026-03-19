@@ -3,7 +3,7 @@ use crate::buzzer::Buzzer;
 use crate::display::Display;
 use crate::error::{Error, ErrorKind};
 use crate::keypad::{Key, Keypad};
-use crate::nfc::{Nfc, Uid};
+use crate::nfc::Nfc;
 use crate::ota::Ota;
 use crate::schedule::Daily;
 use crate::telemetry::{Event, Telemetry};
@@ -13,14 +13,13 @@ use crate::wifi::Wifi;
 use crate::{screen, time, util};
 use alloc::string::{String, ToString};
 use core::convert::Infallible;
-use core::str::FromStr;
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, TimeoutError, Timer, with_timeout};
 use embedded_hal_async::digital::Wait;
 use embedded_hal_async::i2c::I2c;
 use embedded_nal_async::{Dns, TcpConnect};
 use embedded_storage::Storage;
-use log::{debug, info, warn};
+use log::{debug, info};
 use rand_core::RngCore;
 use reqwless::client::HttpClient;
 
@@ -223,19 +222,11 @@ impl<
 
         // Refresh article information
         debug!("Vereinsflieger: Refreshing articles...");
-        self.articles.clear();
         let today = time::today().ok_or(ErrorKind::CurrentTimeNotSet)?;
+        self.articles.clear();
         let total_articles = vf
             .get_articles(async |article| {
-                if let Some(price) = article.price_valid_on(today) {
-                    self.articles
-                        .update(&article.articleid, &article.designation, price);
-                } else {
-                    warn!(
-                        "Ignoring article with no valid price ({}): {}",
-                        article.articleid, article.designation
-                    );
-                }
+                self.articles.update_vereinsflieger_article(article, today);
             })
             .await?;
         info!(
@@ -249,24 +240,7 @@ impl<
         self.users.clear();
         let total_users = vf
             .get_users(async |user| {
-                if !user.is_retired() {
-                    let mut has_valid_keys = false;
-                    for key in user.keys_named_with_prefix("NFC Transponder") {
-                        if let Ok(uid) = Uid::from_str(key) {
-                            self.users.update_uid(uid, user.memberid);
-                            has_valid_keys = true;
-                        } else {
-                            warn!(
-                                "Ignoring user key with invalid NFC uid ({}): {}",
-                                user.memberid, key
-                            );
-                        }
-                    }
-                    if has_valid_keys {
-                        self.users
-                            .update_user(user.memberid, user.firstname.clone());
-                    }
-                }
+                self.users.update_vereinsflieger_user(user);
             })
             .await?;
         info!(
