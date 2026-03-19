@@ -98,12 +98,11 @@ impl User {
     }
 
     /// Get key numbers with the given label prefix
-    pub fn keys_named_with_prefix(&self, prefix: &str) -> Vec<&str> {
+    pub fn keys_named_with_prefix(&self, prefix: &str) -> impl Iterator<Item = &str> {
         self.keymanagement
             .iter()
-            .filter(|key| key.title.starts_with(prefix))
+            .filter(move |key| key.title.starts_with(prefix))
             .map(|key| key.keyname.as_str())
-            .collect()
     }
 }
 

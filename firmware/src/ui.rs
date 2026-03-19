@@ -249,18 +249,19 @@ impl<
         let total_users = vf
             .get_users(async |user| {
                 if !user.is_retired() {
-                    let keys = user.keys_named_with_prefix("NFC Transponder");
-                    if !keys.is_empty() {
-                        for key in keys {
-                            if let Ok(uid) = Uid::from_str(key) {
-                                self.users.update_uid(uid, user.memberid);
-                            } else {
-                                warn!(
-                                    "Ignoring user key with invalid NFC uid ({}): {}",
-                                    user.memberid, key
-                                );
-                            }
+                    let mut has_valid_keys = false;
+                    for key in user.keys_named_with_prefix("NFC Transponder") {
+                        if let Ok(uid) = Uid::from_str(key) {
+                            self.users.update_uid(uid, user.memberid);
+                            has_valid_keys = true;
+                        } else {
+                            warn!(
+                                "Ignoring user key with invalid NFC uid ({}): {}",
+                                user.memberid, key
+                            );
                         }
+                    }
+                    if has_valid_keys {
                         self.users
                             .update_user(user.memberid, user.firstname.clone());
                     }
