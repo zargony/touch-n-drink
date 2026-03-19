@@ -1,4 +1,4 @@
-use chrono::{DateTime, TimeDelta, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, TimeDelta, TimeZone, Utc};
 use core::cell::RefCell;
 use embassy_sync::blocking_mutex::CriticalSectionMutex;
 use embassy_time::Instant;
@@ -36,6 +36,11 @@ pub trait DateTimeExt {
         let duration = self.to_duration()?;
         Some(start_time + duration)
     }
+
+    /// Convert relative time since system start to current date
+    fn to_date(&self) -> Option<NaiveDate> {
+        self.to_datetime().map(|t| t.date_naive())
+    }
 }
 
 impl DateTimeExt for Instant {
@@ -49,9 +54,15 @@ pub fn uptime() -> Option<TimeDelta> {
     Instant::now().to_duration()
 }
 
-/// Current time. Always given in UTC since the local timezone is unknown.
+/// Current date and time. Always given in UTC since the local timezone is unknown.
 pub fn now() -> Option<DateTime<Utc>> {
     Instant::now().to_datetime()
+}
+
+/// Current date
+#[expect(dead_code)]
+pub fn today() -> Option<NaiveDate> {
+    Instant::now().to_date()
 }
 
 /// Set current time by using the given current time to calculate the time of system start
