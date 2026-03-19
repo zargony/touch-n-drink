@@ -37,7 +37,7 @@ const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
 /// Maximum number of redirects to follow
 const MAX_REDIRECTS: usize = 5;
 
-/// Maximum size of response headers from server.
+/// Maximum size of response headers from server
 /// Unfortunately, github.com download responses contain large headers and need >4k :-(
 const MAX_RESPONSE_HEADER_SIZE: usize = 5120;
 
@@ -105,6 +105,7 @@ impl fmt::Display for Error {
 }
 
 /// OTA updater resources
+#[derive(Debug)]
 pub struct Resources {
     read_buffer: Box<[u8]>,
     write_buffer: Box<[u8]>,
@@ -238,7 +239,7 @@ impl<T: TcpConnect, D: Dns> Ota<'_, T, D> {
         let url = format!(
             "{REPOSITORY_URL}/releases/download/{RELEASE_TAG_VERSION_PREFIX}{version}/{IMAGE_FILENAME}"
         );
-        self.send_request(url, true, async |response| {
+        self.http_get_fn(url, true, async |response| {
             with_timeout(FETCH_TIMEOUT, async {
                 let mut reader = response.body().reader();
                 let mut offset = 0;
@@ -265,7 +266,7 @@ impl<T: TcpConnect, D: Dns> Ota<'_, T, D> {
         let url = format!(
             "{REPOSITORY_URL}/releases/download/{RELEASE_TAG_VERSION_PREFIX}{version}/{CHECKSUMS_FILENAME}"
         );
-        self.send_request(url, true, async |response| {
+        self.http_get_fn(url, true, async |response| {
             with_timeout(TIMEOUT, async {
                 let mut reader: LineReader<_> = LineReader::new(response.body().reader());
                 while let Some(line) = reader
@@ -317,7 +318,7 @@ impl<T: TcpConnect, D: Dns> Ota<'_, T, D> {
     // and select the most appropriate release from it.
     async fn get_latest_release_tag(&mut self) -> Result<String, Error> {
         let url = format!("{REPOSITORY_URL}/releases/latest");
-        self.send_request(url, false, async |response| {
+        self.http_get_fn(url, false, async |response| {
             if !response.status.is_redirection() {
                 return Err(Error::UnableToQueryLatestRelease);
             }
@@ -343,7 +344,7 @@ impl<T: TcpConnect, D: Dns> Ota<'_, T, D> {
     }
 
     /// Send HTTP GET request, optionally follow redirects and call closure with response object
-    async fn send_request<F, R>(
+    async fn http_get_fn<F, R>(
         &mut self,
         mut url: String,
         follow_redirects: bool,
@@ -352,8 +353,8 @@ impl<T: TcpConnect, D: Dns> Ota<'_, T, D> {
     where
         F: AsyncFnOnce(Response<'_, '_, HttpConnection<'_, T::Connection<'_>>>) -> Result<R, Error>,
     {
-        let mut rx_buf = vec![0; MAX_RESPONSE_HEADER_SIZE].into_boxed_slice();
         let deadline = Instant::now() + TIMEOUT;
+        let mut rx_buf = vec![0; MAX_RESPONSE_HEADER_SIZE].into_boxed_slice();
 
         for _ in 0..MAX_REDIRECTS {
             debug!("Ota: GET {url}");
