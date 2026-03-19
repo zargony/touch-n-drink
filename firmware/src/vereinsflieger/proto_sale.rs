@@ -36,7 +36,8 @@ pub struct SaleAddRequest<'a> {
 pub struct SaleAddResponse {
     // pub createtime: String, // "yyyy-mm-dd hh:mm:ss"
     // pub modifytime: String, // "yyyy-mm-dd hh:mm:ss"
-    // pub bookingdate: String, // "yyyy-mm-dd"
+    // #[serde_as(as = "DisplayFromStr")]
+    // pub bookingdate: NaiveDate, // "yyyy-mm-dd"
     // pub callsign: String,
     // pub comment: String,
     // pub username: String,

@@ -224,9 +224,10 @@ impl<
         // Refresh article information
         debug!("Vereinsflieger: Refreshing articles...");
         self.articles.clear();
+        let today = time::today().ok_or(ErrorKind::CurrentTimeNotSet)?;
         let total_articles = vf
             .get_articles(async |article| {
-                if let Some(price) = article.price() {
+                if let Some(price) = article.price_valid_on(today) {
                     self.articles
                         .update(&article.articleid, &article.designation, price);
                 } else {
@@ -556,8 +557,8 @@ impl<
         let mut vf = self.vereinsflieger.connect(self.http).await?;
 
         // Store purchase
-        let date = time::today().ok_or(ErrorKind::CurrentTimeNotSet)?;
-        vf.purchase(date, article_id, amount, user_id, total_price)
+        let today = time::today().ok_or(ErrorKind::CurrentTimeNotSet)?;
+        vf.purchase(today, article_id, amount, user_id, total_price)
             .await?;
         self.telemetry.track(Event::ArticlePurchased(
             user_id,

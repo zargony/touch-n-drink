@@ -43,20 +43,23 @@ pub struct User {
     // pub carlicenseplate: String,
     // pub identification: String,
     // pub natoid: String,
-    // pub policecert_validto: String, // "yyyy-mm-dd"
+    // #[serde_as(as = "DisplayFromStr")]
+    // pub policecert_validto: NaiveDate, // "yyyy-mm-dd"
     // pub ice_contact1: String,
     // pub ice_contact2: String,
     #[serde_as(as = "DisplayFromStr")]
     pub memberid: u32,
     // pub msid: String, // undocumented
     // pub memberbegin: String, // "dd.mm.yyyy"
-    // pub memberend: String, // "yyyy-mm-dd"
+    // #[serde_as(as = "DisplayFromStr")]
+    // pub memberend: NaiveDate, // "yyyy-mm-dd"
     // pub lettertitle: String,
     // pub cid: String, // undocumented
     // pub nickname: String, // undocumented
     // pub clid: String, // undocumented
     // pub flightrelease: String, // undocumented
-    // pub flightreleasevalidto: String, // undocumented "yyyy-mm-dd"
+    // #[serde_as(as = "DisplayFromStr")]
+    // pub flightreleasevalidto: NaiveDate, // undocumented "yyyy-mm-dd"
     // pub flightdiscount: String, // undocumented
     // pub flightdiscount2: String, // undocumented
     // pub flightdiscount3: String, // undocumented
@@ -73,7 +76,8 @@ pub struct User {
     // pub bic: String,
     // pub mandate: String,
     // pub roles: Vec<String>,
-    // pub mandatedate: String, // "yyyy-mm-dd"
+    // #[serde_as(as = "DisplayFromStr")]
+    // pub mandatedate: NaiveDate, // "yyyy-mm-dd"
     // #[serde_as(as = "DisplayFromStr")]
     // pub mailrecipient: u32,
     // pub sector: Vec<String>,

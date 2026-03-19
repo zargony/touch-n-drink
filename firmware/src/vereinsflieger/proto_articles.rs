@@ -1,6 +1,7 @@
 use super::AccessToken;
 use alloc::string::String;
 use alloc::vec::Vec;
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
@@ -28,18 +29,13 @@ pub struct Article {
 }
 
 impl Article {
-    /// Get today's price
-    pub fn price(&self) -> Option<f32> {
-        // TODO: Get a current date and do a real price selection based on validity dates.
-        // For now, we make sure to end up with the last entry valid until 9999-12-31, if any, or
-        // any last entry otherwise.
-        let price = self
-            .prices
+    /// Get price valid on given date
+    pub fn price_valid_on(&self, date: NaiveDate) -> Option<f32> {
+        self.prices
             .iter()
             .rev()
-            .find(|p| p.validto == "9999-12-31")
-            .or(self.prices.last());
-        price.map(|p| p.unitprice)
+            .find(|p| date >= p.validfrom && date <= p.validto)
+            .map(|p| p.unitprice)
     }
 }
 
@@ -47,8 +43,10 @@ impl Article {
 #[serde_as]
 #[derive(Debug, Deserialize)]
 pub struct ArticlePrice {
-    // pub validfrom: String, // "yyyy-mm-dd"
-    pub validto: String, // "yyyy-mm-dd"
+    #[serde_as(as = "DisplayFromStr")]
+    pub validfrom: NaiveDate, // "yyyy-mm-dd"
+    #[serde_as(as = "DisplayFromStr")]
+    pub validto: NaiveDate, // "yyyy-mm-dd"
     // #[serde_as(as = "DisplayFromStr")]
     // pub salestax: f32,
     #[serde_as(as = "DisplayFromStr")]
