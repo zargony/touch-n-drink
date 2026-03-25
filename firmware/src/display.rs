@@ -3,6 +3,7 @@ use core::fmt;
 use derive_more::From;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
+use embedded_graphics::primitives::Rectangle;
 use embedded_hal_async::i2c::I2c;
 use log::{debug, info};
 use ssd1306::Ssd1306Async;
@@ -41,6 +42,40 @@ pub struct Display<I2C> {
     >,
 }
 
+impl<I2C: I2c> Dimensions for Display<I2C> {
+    fn bounding_box(&self) -> Rectangle {
+        self.driver.bounding_box()
+    }
+}
+
+impl<I2C: I2c> DrawTarget for Display<I2C> {
+    type Color = BinaryColor;
+    type Error = Error;
+
+    fn draw_iter<I: IntoIterator<Item = Pixel<Self::Color>>>(
+        &mut self,
+        pixels: I,
+    ) -> Result<(), Self::Error> {
+        Ok(self.driver.draw_iter(pixels)?)
+    }
+
+    fn fill_contiguous<I: IntoIterator<Item = Self::Color>>(
+        &mut self,
+        area: &Rectangle,
+        colors: I,
+    ) -> Result<(), Self::Error> {
+        Ok(self.driver.fill_contiguous(area, colors)?)
+    }
+
+    fn fill_solid(&mut self, area: &Rectangle, color: Self::Color) -> Result<(), Self::Error> {
+        Ok(self.driver.fill_solid(area, color)?)
+    }
+
+    fn clear(&mut self, color: Self::Color) -> Result<(), Self::Error> {
+        Ok(self.driver.clear(color)?)
+    }
+}
+
 impl<I2C: I2c> Display<I2C> {
     /// Create display driver and initialize display hardware
     pub async fn new(i2c: I2C) -> Result<Self, Error> {
@@ -70,19 +105,16 @@ impl<I2C: I2c> Display<I2C> {
         Ok(())
     }
 
-    /// Clear display
-    #[expect(dead_code)]
-    pub async fn clear(&mut self) -> Result<(), Error> {
-        self.driver.clear(BinaryColor::Off)?;
-        self.driver.flush().await?;
-        self.driver.set_display_on(true).await?;
-        Ok(())
-    }
-
     /// Show screen
     pub async fn screen<S: Screen>(&mut self, screen: &S) -> Result<(), Error> {
         self.driver.clear(BinaryColor::Off)?;
         screen.draw(&mut self.driver)?;
+        self.flush().await?;
+        Ok(())
+    }
+
+    /// Flush the graphics buffer, making drawn graphics visible on the physical display
+    pub async fn flush(&mut self) -> Result<(), Error> {
         self.driver.flush().await?;
         self.driver.set_display_on(true).await?;
         Ok(())
