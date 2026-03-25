@@ -45,6 +45,7 @@ embassy-time = "0.5"
 embedded-graphics = "0.8"
 embedded-hal-async = "1.0"
 embedded-io-async = { version = "0.7", features = ["alloc"] }
+embedded-layout = "0.4"
 embedded-nal-async = "0.9"
 embedded-storage = "0.3"
 embedded-text = "0.7"

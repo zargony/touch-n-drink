@@ -91,11 +91,6 @@ impl Articles {
             .filter_map(|(idx, id)| self.get(id).map(|article| (idx, id, article)))
     }
 
-    /// Look up id of article at given index
-    pub fn id(&self, index: usize) -> Option<&ArticleId> {
-        self.ids.get(index)
-    }
-
     /// Look up article by article id
     pub fn get<Q>(&self, id: &Q) -> Option<&Article>
     where
@@ -103,5 +98,12 @@ impl Articles {
         Q: Ord + ?Sized,
     {
         self.articles.get(id)
+    }
+
+    /// Look up article at given index
+    pub fn get_by_index(&self, index: usize) -> Option<(&ArticleId, &Article)> {
+        let id = self.ids.get(index)?;
+        let article = self.get(id)?;
+        Some((id, article))
     }
 }

@@ -101,7 +101,6 @@ impl fmt::Display for DisplayDuration {
 }
 
 /// Rectangle helper methods
-#[expect(dead_code)]
 pub trait RectangleExt {
     /// Split rectangle into two: a top part of given height (header) and bottom part
     fn header(&self, height: u32) -> (Self, Self)

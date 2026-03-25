@@ -1,4 +1,3 @@
-use crate::screen::Screen;
 use core::fmt;
 use derive_more::From;
 use embedded_graphics::pixelcolor::BinaryColor;
@@ -102,14 +101,6 @@ impl<I2C: I2c> Display<I2C> {
     pub async fn turn_off(&mut self) -> Result<(), Error> {
         debug!("Display: Power off");
         self.driver.set_display_on(false).await?;
-        Ok(())
-    }
-
-    /// Show screen
-    pub async fn screen<S: Screen>(&mut self, screen: &S) -> Result<(), Error> {
-        self.driver.clear(BinaryColor::Off)?;
-        screen.draw(&mut self.driver)?;
-        self.flush().await?;
         Ok(())
     }
 

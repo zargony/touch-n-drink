@@ -43,7 +43,6 @@ mod article;
 mod buzzer;
 mod config;
 mod display;
-mod error;
 mod keypad;
 mod mixpanel;
 mod nfc;
@@ -51,7 +50,6 @@ mod ota;
 mod pn532;
 mod reader;
 mod schedule;
-mod screen;
 mod telemetry;
 mod time;
 mod ui;
@@ -62,6 +60,7 @@ mod wifi;
 
 use alloc::boxed::Box;
 use alloc::vec;
+use core::convert::Infallible;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
@@ -79,7 +78,7 @@ use esp_hal::time::{Duration as EspDuration, Rate};
 use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
 use esp_storage::FlashStorage;
-use log::{debug, error, info};
+use log::{debug, info};
 use rand_core::RngCore;
 use reqwless::client::{HttpClient, TlsConfig, TlsVerify};
 
@@ -175,10 +174,6 @@ async fn main(spawner: Spawner) -> ! {
     let mut flash = FlashStorage::new(peripherals.FLASH);
     let config = config::Config::read(&mut flash);
 
-    // Initialize article and user look up tables
-    let mut articles = article::Articles::new(config.vf_article_ids);
-    let mut users = user::Users::new();
-
     // Initialize I2C controller
     let i2c_config = I2cConfig::default()
         // Standard-Mode: 100 kHz, Fast-Mode: 400 kHz
@@ -197,16 +192,15 @@ async fn main(spawner: Spawner) -> ! {
     let i2c: Mutex<NoopRawMutex, _> = Mutex::new(i2c);
 
     // Initialize display
-    let mut display = display::Display::new(I2cDevice::new(&i2c))
+    let display = display::Display::new(I2cDevice::new(&i2c))
         .await
         // Panic on failure since without a display there's no reasonable way to tell the user
         .expect("Display initialization failed");
-    let _ = display.screen(&screen::Splash).await;
 
     // Initialize keypad
     let keypad_input_config = InputConfig::default().with_pull(Pull::Up);
     let keypad_output_config = OutputConfig::default().with_drive_mode(DriveMode::OpenDrain);
-    let mut keypad = keypad::Keypad::new(
+    let keypad = keypad::Keypad::new(
         [
             Input::new(peripherals.GPIO5, keypad_input_config),
             Input::new(peripherals.GPIO6, keypad_input_config),
@@ -223,10 +217,20 @@ async fn main(spawner: Spawner) -> ! {
     // Initialize NFC reader
     let nfc_irq_input_config = InputConfig::default().with_pull(Pull::Up);
     let nfc_irq = Input::new(peripherals.GPIO20, nfc_irq_input_config);
-    let mut nfc = nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq)
+    let nfc = nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq)
         .await
         // Panic on failure since an initialization error indicates a serious error
         .expect("NFC reader initialization failed");
+
+    // Initialize buzzer
+    let buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
+
+    // Initialize article and user look up tables
+    let articles = article::Articles::new(config.vf_article_ids);
+    let users = user::Users::new();
+
+    // Initialize scheduler
+    let schedule = schedule::Daily::new();
 
     // Initialize Wifi
     let wifi = wifi::Wifi::new(
@@ -255,10 +259,10 @@ async fn main(spawner: Spawner) -> ! {
         &mut tls_write_buffer,
         TlsVerify::None,
     );
-    let mut http = HttpClient::new_with_tls(wifi.tcp(), wifi.dns(), tls_config);
+    let http = HttpClient::new_with_tls(wifi.tcp(), wifi.dns(), tls_config);
 
     // Initialize Vereinsflieger API client
-    let mut vereinsflieger = vereinsflieger::Vereinsflieger::new(
+    let vereinsflieger = vereinsflieger::Vereinsflieger::new(
         &config.vf_username,
         &config.vf_password_md5,
         &config.vf_appkey,
@@ -273,62 +277,108 @@ async fn main(spawner: Spawner) -> ! {
 
     // Initialize OTA updater
     let mut ota_resources = Box::new(ota::Resources::new());
-    let mut ota = ota::Ota::new(wifi.tcp(), wifi.dns(), rng.next_u64(), &mut ota_resources);
+    let ota = ota::Ota::new(wifi.tcp(), wifi.dns(), rng.next_u64(), &mut ota_resources);
 
-    // Initialize buzzer
-    let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
-    let _ = buzzer.startup().await;
-
-    // Initialize scheduler
-    let mut schedule = schedule::Daily::new();
-
-    // Create UI
-    let mut ui = ui::Ui::new(
+    // Prepare user interface frontend and backend
+    let mut frontend = ui::FrontendResources::<Frontend> {
+        display,
+        keypad,
+        nfc,
+        buzzer,
+    };
+    let mut backend = ui::BackendResources::<Backend> {
         rng,
         flash,
-        &mut display,
-        &mut keypad,
-        &mut nfc,
-        &mut buzzer,
-        &wifi,
-        &mut http,
-        &mut vereinsflieger,
-        &mut articles,
-        &mut users,
-        &mut telemetry,
-        &mut ota,
-        &mut schedule,
-    );
+        network: &wifi,
+        articles,
+        users,
+        schedule,
+        http,
+        vereinsflieger,
+        telemetry,
+        ota,
+    };
 
-    loop {
-        match Box::pin(ui.init()).await {
-            // Success: continue
-            Ok(()) => break,
-            // User cancelled: continue
-            Err(err) if err.is_cancel() => break,
-            // Display error to user and try again
-            Err(err) => {
-                error!("Initialization error: {err:?}");
-                let _ = ui.show_error(&err).await;
-            }
-        }
-    }
+    // Run user interface
+    ui::run(&mut frontend, &mut backend).await
+}
 
-    loop {
-        match Box::pin(ui.run()).await {
-            // Success: start over again
-            Ok(()) => (),
-            // User cancelled: start over again
-            Err(err) if err.is_cancel() => info!("User cancelled, starting over..."),
-            // User interaction timeout: start over again
-            Err(err) if err.is_user_timeout() => {
-                info!("Timeout waiting for user, starting over...");
-            }
-            // Display error to user and start over again
-            Err(err) => {
-                error!("Error: {err:?}");
-                let _ = ui.show_error(&err).await;
-            }
-        }
+/// User interface frontend
+pub struct Frontend;
+
+impl<I2C: embedded_hal_async::i2c::I2c> ui::Display for display::Display<I2C> {
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        self.flush().await
     }
+    async fn power_save(&mut self) {
+        let _ = self.turn_off().await;
+    }
+}
+
+impl ui::Keypad for keypad::Keypad<'_, 3, 4> {
+    type Error = Infallible;
+
+    async fn read(&mut self) -> Result<char, Self::Error> {
+        Ok(self.read().await)
+    }
+}
+
+impl<I2C: embedded_hal_async::i2c::I2c, IRQ: embedded_hal_async::digital::Wait<Error = Infallible>>
+    ui::NfcReader for nfc::Nfc<I2C, IRQ>
+{
+    type Error = nfc::Error;
+
+    async fn read(&mut self) -> Result<nfc::Uid, Self::Error> {
+        self.read().await
+    }
+}
+
+impl ui::Buzzer for buzzer::Buzzer<'_> {
+    type Error = buzzer::Error;
+
+    async fn startup(&mut self) {
+        let _ = self.startup().await;
+    }
+    async fn confirm(&mut self) {
+        let _ = self.confirm().await;
+    }
+    async fn deny(&mut self) {
+        let _ = self.deny().await;
+    }
+    async fn error(&mut self) {
+        let _ = self.error().await;
+    }
+}
+
+impl ui::Frontend for Frontend {
+    type DisplayError = display::Error;
+    type KeypadError = Infallible;
+    type NfcError = nfc::Error;
+    type BuzzerError = buzzer::Error;
+
+    type Display<'a> = display::Display<I2cDevice<'a, NoopRawMutex, I2c<'a, esp_hal::Async>>>;
+    type Keypad<'a> = keypad::Keypad<'a, 3, 4>;
+    type NfcReader<'a> = nfc::Nfc<I2cDevice<'a, NoopRawMutex, I2c<'a, esp_hal::Async>>, Input<'a>>;
+    type Buzzer<'a> = buzzer::Buzzer<'a>;
+}
+
+/// User interface backend
+struct Backend;
+
+impl ui::Network for &'_ wifi::Wifi {
+    type TcpConnect<'a> = wifi::TcpClient<'a>;
+    type Dns<'a> = wifi::DnsSocket<'a>;
+
+    fn is_up(&self) -> bool {
+        (*self).is_up()
+    }
+    async fn wait_up(&self) {
+        (*self).wait_up().await;
+    }
+}
+
+impl ui::Backend for Backend {
+    type Rng<'a> = Rng;
+    type Flash<'a> = FlashStorage<'a>;
+    type Network<'a> = &'a wifi::Wifi;
 }

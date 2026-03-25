@@ -88,6 +88,13 @@ pub enum Event {
 }
 
 impl Event {
+    /// Track event
+    pub fn track(self, telemetry: &mut Telemetry<'_>) {
+        telemetry.track(self);
+    }
+}
+
+impl Event {
     /// Event name as reported to server
     fn event_name(&self) -> &'static str {
         match self {

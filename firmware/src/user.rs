@@ -100,13 +100,15 @@ impl Users {
         self.users.len()
     }
 
-    /// Look up user id by NFC uid
-    pub fn id(&self, uid: &Uid) -> Option<UserId> {
-        self.uids.get(uid).copied()
-    }
-
     /// Look up user by user id
     pub fn get(&self, id: UserId) -> Option<&User> {
         self.users.get(&id)
+    }
+
+    /// Look up user by NFC uid
+    pub fn get_by_uid(&self, uid: &Uid) -> Option<(UserId, &User)> {
+        let id = self.uids.get(uid).copied()?;
+        let user = self.get(id)?;
+        Some((id, user))
     }
 }
