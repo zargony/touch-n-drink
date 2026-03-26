@@ -1,10 +1,11 @@
 use crate::user::UserId;
 use crate::{display, nfc, ota, vereinsflieger};
-use core::fmt;
 use core::future::Future;
+use derive_more::{Display, From};
 
 /// Main error type
-#[derive(Debug)]
+#[derive(Debug, Display)]
+#[display("{kind}")]
 pub struct Error {
     /// Error kind with optional embedded causing error type
     kind: ErrorKind,
@@ -18,12 +19,6 @@ impl<T: Into<ErrorKind>> From<T> for Error {
             kind: err.into(),
             user_id: None,
         }
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.kind)
     }
 }
 
@@ -76,64 +71,37 @@ impl Error {
 }
 
 /// Error kind with optional embedded causing error type
-#[derive(Debug)]
+#[derive(Debug, Display, From)]
 pub enum ErrorKind {
     /// Display output error
+    #[from]
+    #[display("Display: {_0}")]
     DisplayError(display::Error),
     /// NFC reader error
+    #[from]
+    #[display("NFC: {_0}")]
     NFCError(nfc::Error),
     /// Vereinsflieger API error
+    #[from]
+    #[display("Vereinsflieger: {_0}")]
     VereinsfliegerError(vereinsflieger::Error),
     /// OTA error
+    #[from]
+    #[display("OTA: {_0}")]
     Ota(ota::Error),
     /// User cancel request
+    #[display("User cancelled")]
     Cancel,
     /// User interaction timeout
+    #[display("Timeout waiting for input")]
     UserTimeout,
     /// No network connection
+    #[display("No network connection")]
     NoNetwork,
     /// Current time is required but not set
+    #[display("Unknown current time")]
     CurrentTimeNotSet,
     /// The specified article was not found
+    #[display("Article not found")]
     ArticleNotFound,
-}
-
-impl From<display::Error> for ErrorKind {
-    fn from(err: display::Error) -> Self {
-        Self::DisplayError(err)
-    }
-}
-
-impl From<nfc::Error> for ErrorKind {
-    fn from(err: nfc::Error) -> Self {
-        Self::NFCError(err)
-    }
-}
-
-impl From<vereinsflieger::Error> for ErrorKind {
-    fn from(err: vereinsflieger::Error) -> Self {
-        Self::VereinsfliegerError(err)
-    }
-}
-
-impl From<ota::Error> for ErrorKind {
-    fn from(err: ota::Error) -> Self {
-        Self::Ota(err)
-    }
-}
-
-impl fmt::Display for ErrorKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::DisplayError(err) => write!(f, "Display: {err}"),
-            Self::NFCError(err) => write!(f, "NFC: {err}"),
-            Self::VereinsfliegerError(err) => write!(f, "Vereinsflieger: {err}"),
-            Self::Ota(err) => write!(f, "OTA: {err}"),
-            Self::Cancel => write!(f, "User cancelled"),
-            Self::UserTimeout => write!(f, "Timeout waiting for input"),
-            Self::NoNetwork => write!(f, "No network connection"),
-            Self::CurrentTimeNotSet => write!(f, "Unknown current time"),
-            Self::ArticleNotFound => write!(f, "Article not found"),
-        }
-    }
 }

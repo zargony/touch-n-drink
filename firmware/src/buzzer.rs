@@ -1,4 +1,4 @@
-use core::fmt;
+use derive_more::{Display, From};
 use embassy_time::Timer;
 use esp_hal::gpio::{AnyPin, DriveMode, OutputPin};
 use esp_hal::ledc::channel::{self, ChannelIFace};
@@ -17,33 +17,14 @@ const TONE_DUTY_CYCLE: u8 = 75;
 const TONE_DUTY_CYCLE: u8 = 97;
 
 /// Buzzer error
-#[derive(Debug)]
+#[derive(Debug, Display, From)]
 pub enum Error {
     /// PWM timer error
+    #[display("PWM timer error")]
     Timer(timer::Error),
     /// PWM channel error
+    #[display("PWM channel error")]
     Channel(channel::Error),
-}
-
-impl From<timer::Error> for Error {
-    fn from(err: timer::Error) -> Self {
-        Self::Timer(err)
-    }
-}
-
-impl From<channel::Error> for Error {
-    fn from(err: channel::Error) -> Self {
-        Self::Channel(err)
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Timer(_err) => write!(f, "PWM timer error"),
-            Self::Channel(_err) => write!(f, "PWM channel error"),
-        }
-    }
 }
 
 /// Passive buzzer (driven by PWM signal on GPIO)

@@ -11,7 +11,7 @@ use crate::time;
 use alloc::string::String;
 use alloc::vec;
 use chrono::{DateTime, NaiveDate};
-use core::fmt;
+use derive_more::{Display, From};
 use embassy_time::{Duration, Instant, with_deadline, with_timeout};
 use embedded_nal_async::{Dns, TcpConnect};
 use log::{debug, info, warn};
@@ -34,28 +34,31 @@ const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_RESPONSE_HEADER_SIZE: usize = 2048;
 
 /// Vereinsflieger API error
-#[derive(Debug)]
+#[derive(Debug, Display, From)]
 pub enum Error {
     /// Network error
+    #[from]
+    #[display("Network: {_0}")]
     Network(reqwless::Error),
     /// Request could not be built
+    #[display("Malformed request")]
     MalformedRequest(serde_json::Error),
     /// Request failed
+    #[display("Request failed ({})", _0.0)]
     RequestFailed(StatusCode),
     /// Response could not be parsed
+    #[display("Malformed response")]
     MalformedResponse(serde_json::Error),
     /// Streaming response could not be parsed
+    #[display("Malformed response stream")]
     MalformedResponseStream(reader::Error<reqwless::Error>),
     /// Timeout waiting for response
+    #[from(embassy_time::TimeoutError)]
+    #[display("Timeout")]
     Timeout,
     /// Not logged in
+    #[display("Not logged in")]
     NotLoggedIn,
-}
-
-impl From<reqwless::Error> for Error {
-    fn from(err: reqwless::Error) -> Self {
-        Self::Network(err)
-    }
 }
 
 impl From<reader::Error<reqwless::Error>> for Error {
@@ -63,26 +66,6 @@ impl From<reader::Error<reqwless::Error>> for Error {
         match err {
             reader::Error::Read(err) => Self::Network(err),
             err => Self::MalformedResponseStream(err),
-        }
-    }
-}
-
-impl From<embassy_time::TimeoutError> for Error {
-    fn from(_err: embassy_time::TimeoutError) -> Self {
-        Self::Timeout
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Network(err) => write!(f, "Network: {err}"),
-            Self::MalformedRequest(_err) => write!(f, "Malformed request"),
-            Self::RequestFailed(status) => write!(f, "Request failed ({})", status.0),
-            Self::MalformedResponse(_err) => write!(f, "Malformed response"),
-            Self::MalformedResponseStream(_err) => write!(f, "Malformed response stream"),
-            Self::Timeout => write!(f, "Timeout"),
-            Self::NotLoggedIn => write!(f, "Not logged in"),
         }
     }
 }

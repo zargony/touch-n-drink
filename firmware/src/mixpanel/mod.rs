@@ -4,7 +4,7 @@ pub use self::proto_event::Event;
 
 use crate::util::DisplayOption;
 use alloc::vec;
-use core::fmt;
+use derive_more::{Display, From};
 use embassy_time::{Duration, Instant, with_deadline, with_timeout};
 use embedded_nal_async::{Dns, TcpConnect};
 use log::debug;
@@ -24,42 +24,25 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_RESPONSE_HEADER_SIZE: usize = 2048;
 
 /// Mixpanel API error
-#[derive(Debug)]
+#[derive(Debug, Display, From)]
 pub enum Error {
     /// Network error
+    #[from]
+    #[display("Network: {_0}")]
     Network(reqwless::Error),
     /// Request could not be built
+    #[display("Malformed request")]
     MalformedRequest(serde_json::Error),
     /// Request failed
+    #[display("Request failed: ({})", _0.0)]
     RequestFailed(StatusCode),
     /// Response could not be parsed
+    #[display("Malformed response")]
     MalformedResponse(serde_json::Error),
     /// Timeout waiting for response
+    #[from(embassy_time::TimeoutError)]
+    #[display("Timeout")]
     Timeout,
-}
-
-impl From<reqwless::Error> for Error {
-    fn from(err: reqwless::Error) -> Self {
-        Self::Network(err)
-    }
-}
-
-impl From<embassy_time::TimeoutError> for Error {
-    fn from(_err: embassy_time::TimeoutError) -> Self {
-        Self::Timeout
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Network(err) => write!(f, "Network: {err}"),
-            Self::MalformedRequest(_err) => write!(f, "Malformed request"),
-            Self::RequestFailed(status) => write!(f, "Request failed ({})", status.0),
-            Self::MalformedResponse(_err) => write!(f, "Malformed response"),
-            Self::Timeout => write!(f, "Timeout"),
-        }
-    }
 }
 
 /// Mixpanel API client

@@ -1,44 +1,37 @@
 use alloc::string::String;
-use core::fmt;
 use core::marker::PhantomData;
 use core::ops::Range;
+use derive_more::Display;
 use embedded_io_async::Read;
 use serde::de::DeserializeOwned;
 
 /// Reader error
-#[derive(Debug)]
+#[derive(Debug, Display)]
 pub enum Error<E> {
     /// Read error
+    #[display("Read: {_0}")]
     Read(E),
     /// EOF while parsing
+    #[display("EOF while parsing")]
     EofWhileParsing,
     /// The element to deserialize doesn't fit into the buffer
+    #[display("Buffer too small")]
     BufferTooSmall,
     /// Expected this character to be a `'{'`
+    #[display("Expected `{{`")]
     ExpectedObjectBegin,
     /// Expected this character to be a `':'`
+    #[display("Expected `:`")]
     ExpectedColon,
     /// Expected this character to be either a `','` or a `'}'`
+    #[display("Expected `,` or `}}`")]
     ExpectedObjectCommaOrEnd,
     /// Input has non-whitespace trailing characters
+    #[display("Trailing characters")]
     TrailingCharacters,
     /// JSON parse error
+    #[display("JSON: {_0}")]
     Json(serde_json::Error),
-}
-
-impl<E: fmt::Display> fmt::Display for Error<E> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Read(err) => write!(f, "Read: {err}"),
-            Self::BufferTooSmall => write!(f, "Buffer too small"),
-            Self::EofWhileParsing => write!(f, "EOF while parsing"),
-            Self::ExpectedObjectBegin => write!(f, "Expected `{{`"),
-            Self::ExpectedColon => write!(f, "Expected `:`"),
-            Self::ExpectedObjectCommaOrEnd => write!(f, "Expected `,` or `}}`"),
-            Self::TrailingCharacters => write!(f, "Trailing characters"),
-            Self::Json(err) => write!(f, "JSON: {err}"),
-        }
-    }
 }
 
 /// Buffered reader

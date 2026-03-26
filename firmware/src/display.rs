@@ -1,5 +1,6 @@
 use crate::screen::Screen;
 use core::fmt;
+use derive_more::From;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_hal_async::i2c::I2c;
@@ -11,14 +12,8 @@ use ssd1306::rotation::DisplayRotation;
 use ssd1306::size::DisplaySize128x64;
 
 /// Display error
-#[derive(Debug)]
+#[derive(Debug, From)]
 pub struct Error(display_interface::DisplayError);
-
-impl From<display_interface::DisplayError> for Error {
-    fn from(err: display_interface::DisplayError) -> Self {
-        Self(err)
-    }
-}
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

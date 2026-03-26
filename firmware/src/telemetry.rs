@@ -4,7 +4,7 @@ use crate::{GIT_SHA_STR, VERSION_STR, article, nfc, user};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use core::fmt;
+use derive_more::{Display, From};
 use embassy_time::{Duration, Instant};
 use embedded_nal_async::{Dns, TcpConnect};
 use log::{debug, info, warn};
@@ -19,27 +19,15 @@ const MAX_BUFFER_DURATION: Duration = Duration::from_secs(30);
 const MAX_BUFFER_EVENTS: usize = 10;
 
 /// Telemetry error
-#[derive(Debug)]
+#[derive(Debug, Display, From)]
 pub enum Error {
     /// Mixpanel error
+    #[from]
+    #[display("Mixpanel: {_0}")]
     Mixpanel(mixpanel::Error),
     /// Current time is required but not set
+    #[display("Unknown current time")]
     CurrentTimeNotSet,
-}
-
-impl From<mixpanel::Error> for Error {
-    fn from(err: mixpanel::Error) -> Self {
-        Self::Mixpanel(err)
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Mixpanel(err) => write!(f, "Mixpanel: {err}"),
-            Self::CurrentTimeNotSet => write!(f, "Unknown current time"),
-        }
-    }
 }
 
 /// Custom event properties for Mixpanel submission

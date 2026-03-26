@@ -2,7 +2,7 @@ use crate::reader::LineReader;
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::{format, vec};
-use core::fmt;
+use derive_more::{Display, From};
 use embassy_time::{Duration, Instant, with_deadline, with_timeout};
 use embedded_io_async::BufRead;
 use embedded_nal_async::{Dns, TcpConnect};
@@ -49,59 +49,40 @@ const READ_BUFFER_SIZE: usize = 16640;
 const WRITE_BUFFER_SIZE: usize = 2048;
 
 /// OTA update error
-#[derive(Debug)]
+#[derive(Debug, Display, From)]
 pub enum Error {
     /// Invalid partition setup
+    #[display("Invalid partition setup: {_0}")]
     InvalidPartitionSetup(partitions::Error),
     /// Network error
+    #[from]
+    #[display("Network: {_0}")]
     Network(reqwless::Error),
     /// Received malformed redirect
+    #[display("Malformed redirect")]
     MalformedRedirect,
     /// Too many redirects
+    #[display("Too many redirects")]
     TooManyRedirects,
     /// Request failed
+    #[display("Request failed ({})", _0.0)]
     RequestFailed(StatusCode),
     /// Unable to query latest release
+    #[display("Unable to query latest release")]
     UnableToQueryLatestRelease,
     /// Unable to fetch checksum
+    #[display("Unable to fetch checksum")]
     UnableToFetchChecksum,
     /// Flashing failed
+    #[display("Flashing failed: {_0}")]
     FlashingFailed(partitions::Error),
     /// Checksum mismatch
+    #[display("Checksum mismatch")]
     ChecksumMismatch,
     /// Timeout waiting for response
+    #[from(embassy_time::TimeoutError)]
+    #[display("Timeout")]
     Timeout,
-}
-
-impl From<reqwless::Error> for Error {
-    fn from(err: reqwless::Error) -> Self {
-        Self::Network(err)
-    }
-}
-
-impl From<embassy_time::TimeoutError> for Error {
-    fn from(_err: embassy_time::TimeoutError) -> Self {
-        Self::Timeout
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidPartitionSetup(err) => write!(f, "Invalid partition setup: {err}"),
-            Self::Network(err) => write!(f, "Network: {err}"),
-            Self::MalformedRedirect => write!(f, "Malformed redirect"),
-            Self::TooManyRedirects => write!(f, "Too many redirects"),
-            Self::RequestFailed(status) => write!(f, "Request failed ({})", status.0),
-            Self::UnableToQueryLatestRelease => {
-                write!(f, "Unable to query latest release")
-            }
-            Self::UnableToFetchChecksum => write!(f, "Unable to fetch checksum"),
-            Self::FlashingFailed(err) => write!(f, "Flashing failed: {err}"),
-            Self::ChecksumMismatch => write!(f, "Checksum mismatch"),
-            Self::Timeout => write!(f, "Timeout"),
-        }
-    }
 }
 
 /// OTA updater resources
