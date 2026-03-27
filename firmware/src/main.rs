@@ -65,7 +65,7 @@ use alloc::vec;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
-use embassy_time::Timer;
+use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
 use esp_hal::efuse::Efuse;
@@ -75,7 +75,7 @@ use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::peripherals::Peripherals;
 use esp_hal::rng::Rng;
 use esp_hal::rtc_cntl::{Rtc, RwdtStage};
-use esp_hal::time::{Duration, Rate};
+use esp_hal::time::{Duration as EspDuration, Rate};
 use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
 use esp_storage::FlashStorage;
@@ -92,9 +92,9 @@ static GIT_SHA_STR: &str = env!("GIT_SHORT_SHA");
 
 /// Delay in seconds after which to restart on panic
 #[cfg(not(debug_assertions))]
-const PANIC_RESTART_DELAY: Duration = Duration::from_secs(10);
+const PANIC_RESTART_DELAY: EspDuration = EspDuration::from_secs(10);
 #[cfg(debug_assertions)]
-const PANIC_RESTART_DELAY: Duration = Duration::from_secs(600);
+const PANIC_RESTART_DELAY: EspDuration = EspDuration::from_secs(600);
 
 /// Hardware watchdog timeout. RWDT will reset the system if not fed within this time.
 const WATCHDOG_TIMEOUT: Duration = Duration::from_secs(10);
@@ -128,12 +128,15 @@ async fn watchdog(mut rtc: Rtc<'static>) -> ! {
     debug!("Start watchdog task");
 
     // Enable watchdog
-    rtc.rwdt.set_timeout(RwdtStage::Stage0, WATCHDOG_TIMEOUT);
+    rtc.rwdt.set_timeout(
+        RwdtStage::Stage0,
+        EspDuration::from_micros(WATCHDOG_TIMEOUT.as_micros()),
+    );
     rtc.rwdt.listen();
     rtc.rwdt.enable();
 
     // Periodically feed watchdog
-    let timeout = embassy_time::Duration::from_micros(WATCHDOG_TIMEOUT.as_micros() / 2);
+    let timeout = WATCHDOG_TIMEOUT / 2;
     loop {
         Timer::after(timeout).await;
         rtc.rwdt.feed();
