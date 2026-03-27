@@ -1,3 +1,4 @@
+use derive_more::Display;
 use embassy_futures::select::select_array;
 use embassy_time::{Duration, Timer};
 use esp_hal::gpio::{Input, Output};
@@ -10,11 +11,15 @@ const OUTPUT_SETTLE_TIME: Duration = Duration::from_micros(1);
 const INPUT_DEBOUNCE_TIME: Duration = Duration::from_millis(10);
 
 /// Key that can be pressed
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
+    #[display("{_0}")]
     Digit(u8),
+    #[display("Enter")]
     Enter,
+    #[display("Cancel")]
     Cancel,
+    #[display("'{_0}'")]
     Other(char),
 }
 
