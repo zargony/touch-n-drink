@@ -114,7 +114,6 @@ impl<'a> Buzzer<'a> {
     pub async fn deny(&mut self) -> Result<(), Error> {
         debug!("Buzzer: Playing deny tone");
         self.tone(392, 500).await?; // G4
-        Timer::after_millis(1000).await;
         Ok(())
     }
 
@@ -126,7 +125,6 @@ impl<'a> Buzzer<'a> {
         self.tone(587, 200).await?; // D5
         Timer::after_millis(10).await;
         self.tone(392, 500).await?; // G4
-        Timer::after_millis(1000).await;
         Ok(())
     }
 }
