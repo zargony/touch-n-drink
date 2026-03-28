@@ -1,4 +1,3 @@
-use derive_more::Display;
 use embassy_futures::select::select_array;
 use embassy_time::{Duration, Timer};
 use esp_hal::gpio::{Input, Output};
@@ -9,53 +8,6 @@ const OUTPUT_SETTLE_TIME: Duration = Duration::from_micros(1);
 
 /// Time to wait for debounce after detected keypress
 const INPUT_DEBOUNCE_TIME: Duration = Duration::from_millis(10);
-
-/// Key that can be pressed
-#[derive(Debug, Display, Clone, Copy, PartialEq, Eq)]
-pub enum Key {
-    #[display("{_0}")]
-    Digit(u8),
-    #[display("Enter")]
-    Enter,
-    #[display("Cancel")]
-    Cancel,
-    #[display("'{_0}'")]
-    Other(char),
-}
-
-impl Key {
-    /// Returns digit as number if key is a digit
-    #[expect(dead_code)]
-    pub fn digit(self) -> Option<usize> {
-        match self {
-            Self::Digit(n) => Some(n as usize),
-            _ => None,
-        }
-    }
-
-    /// Returns true if key is enter key
-    #[expect(dead_code)]
-    pub fn enter(self) -> bool {
-        self == Self::Enter
-    }
-
-    /// Returns true if key is cancel key
-    #[expect(dead_code)]
-    pub fn cancel(self) -> bool {
-        self == Self::Cancel
-    }
-
-    /// Returns key as character
-    #[expect(dead_code)]
-    pub fn as_char(self) -> char {
-        match self {
-            Self::Digit(n) => char::from_digit(u32::from(n), 16).unwrap_or('?'),
-            Self::Enter => '#',
-            Self::Cancel => '*',
-            Self::Other(ch) => ch,
-        }
-    }
-}
 
 /// Matrix keypad driver
 pub struct Keypad<'a, const COLS: usize, const ROWS: usize> {
@@ -129,23 +81,10 @@ impl Keypad<'_, 3, 4> {
     // 4 5 6
     // 7 8 9
     // * 0 #
-    const KEYS: [Key; 12] = [
-        Key::Digit(1),
-        Key::Digit(2),
-        Key::Digit(3),
-        Key::Digit(4),
-        Key::Digit(5),
-        Key::Digit(6),
-        Key::Digit(7),
-        Key::Digit(8),
-        Key::Digit(9),
-        Key::Cancel,
-        Key::Digit(0),
-        Key::Enter,
-    ];
+    const KEYS: [char; 12] = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
 
     /// Wait for keypress and return pressed key
-    pub async fn read(&mut self) -> Key {
+    pub async fn read(&mut self) -> char {
         let scancode = self.read_scancode().await;
         let key = Self::KEYS[scancode];
         debug!("Keypad: {key:?} pressed");
@@ -159,27 +98,12 @@ impl Keypad<'_, 4, 4> {
     // 4 5 6 B
     // 7 8 9 C
     // * 0 # D
-    const KEYS: [Key; 16] = [
-        Key::Digit(1),
-        Key::Digit(2),
-        Key::Digit(3),
-        Key::Other('A'),
-        Key::Digit(4),
-        Key::Digit(5),
-        Key::Digit(6),
-        Key::Other('B'),
-        Key::Digit(7),
-        Key::Digit(8),
-        Key::Digit(9),
-        Key::Other('C'),
-        Key::Cancel,
-        Key::Digit(0),
-        Key::Enter,
-        Key::Other('D'),
+    const KEYS: [char; 16] = [
+        '1', '2', '3', 'A', '4', '5', '6', 'B', '7', '8', '9', 'C', '*', '0', '#', 'D',
     ];
 
     /// Wait for keypress and return pressed key
-    pub async fn read(&mut self) -> Key {
+    pub async fn read(&mut self) -> char {
         let scancode = self.read_scancode().await;
         let key = Self::KEYS[scancode];
         debug!("Keypad: {key:?} pressed");

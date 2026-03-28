@@ -2,7 +2,7 @@ use crate::article::{Article, ArticleId, Articles};
 use crate::buzzer::Buzzer;
 use crate::display::Display;
 use crate::error::{Error, ErrorKind};
-use crate::keypad::{Key, Keypad};
+use crate::keypad::Keypad;
 use crate::nfc::Nfc;
 use crate::ota::Ota;
 use crate::schedule::Daily;
@@ -141,7 +141,7 @@ impl<
         let min_time = Duration::from_secs(1);
         Timer::after(min_time).await;
 
-        let wait_cancel = async { while self.keypad.read().await != Key::Cancel {} };
+        let wait_cancel = async { while self.keypad.read().await != '*' {} };
         match with_timeout(USER_TIMEOUT - min_time, wait_cancel).await {
             // Cancel key cancels
             Ok(()) => Ok(()),
@@ -163,7 +163,7 @@ impl<
             .screen(&screen::PleaseWait::WifiConnecting)
             .await?;
 
-        let wait_cancel = async { while self.keypad.read().await != Key::Cancel {} };
+        let wait_cancel = async { while self.keypad.read().await != '*' {} };
         match with_timeout(NETWORK_TIMEOUT, select(self.wifi.wait_up(), wait_cancel)).await {
             // Network has become available
             Ok(Either::First(())) => Ok(()),
@@ -438,16 +438,18 @@ impl<
             .await?;
         let num_articles = self.articles.count_ids();
         loop {
-            #[expect(clippy::match_same_arms)]
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
                 // Any digit 1..=num_articles selects article
-                Ok(Key::Digit(n)) if n >= 1 && n as usize <= num_articles => {
-                    break Ok(n as usize - 1);
+                Ok(ch @ '1'..='9') => {
+                    if let Some(n) = ch.to_digit(10)
+                        && n >= 1
+                        && n as usize <= num_articles
+                    {
+                        break Ok(n as usize - 1);
+                    }
                 }
-                // Ignore any other digit
-                Ok(Key::Digit(_)) => (),
                 // Cancel key cancels
-                Ok(Key::Cancel) => Err(ErrorKind::Cancel)?,
+                Ok('*') => Err(ErrorKind::Cancel)?,
                 // Ignore any other key
                 Ok(_) => (),
                 // User interaction timeout
@@ -467,14 +469,15 @@ impl<
             .screen(&screen::EnterAmount::new(article))
             .await?;
         loop {
-            #[expect(clippy::match_same_arms)]
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
                 // Any digit 1..=9 selects amount
-                Ok(Key::Digit(n)) if (1..=9).contains(&n) => break Ok(n as usize),
-                // Ignore any other digit
-                Ok(Key::Digit(_)) => (),
+                Ok(ch @ '1'..='9') => {
+                    if let Some(n) = ch.to_digit(10) {
+                        break Ok(n as usize);
+                    }
+                }
                 // Cancel key cancels
-                Ok(Key::Cancel) => Err(ErrorKind::Cancel)?,
+                Ok('*') => Err(ErrorKind::Cancel)?,
                 // Ignore any other key
                 Ok(_) => (),
                 // User interaction timeout
@@ -501,9 +504,9 @@ impl<
         loop {
             match with_timeout(USER_TIMEOUT, self.keypad.read()).await {
                 // Enter key confirms purchase
-                Ok(Key::Enter) => break Ok(()),
+                Ok('#') => break Ok(()),
                 // Cancel key cancels
-                Ok(Key::Cancel) => Err(ErrorKind::Cancel)?,
+                Ok('*') => Err(ErrorKind::Cancel)?,
                 // Ignore any other key
                 Ok(_) => (),
                 // User interaction timeout
@@ -555,7 +558,7 @@ impl<
         let min_time = Duration::from_secs(1);
         Timer::after(min_time).await;
 
-        let wait_cancel = async { while self.keypad.read().await != Key::Enter {} };
+        let wait_cancel = async { while self.keypad.read().await != '#' {} };
         match with_timeout(USER_TIMEOUT - min_time, wait_cancel).await {
             // Enter key continues
             Ok(()) => Ok(()),
