@@ -2,6 +2,8 @@ use alloc::string::String;
 use core::fmt;
 use core::ops::Deref;
 use embassy_time::Duration;
+use embedded_graphics::geometry::AnchorY;
+use embedded_graphics::primitives::Rectangle;
 use esp_hal::rtc_cntl::SocResetReason;
 use esp_hal::system;
 use serde::Deserialize;
@@ -95,5 +97,35 @@ impl fmt::Display for DisplayDuration {
         let min = self.0.as_secs() % 3600 / 60;
         let secs = self.0.as_secs() % 60;
         write!(f, "{hours}h{min}m{secs}s")
+    }
+}
+
+/// Rectangle helper methods
+#[expect(dead_code)]
+pub trait RectangleExt {
+    /// Split rectangle into two: a top part of given height (header) and bottom part
+    fn header(&self, height: u32) -> (Self, Self)
+    where
+        Self: Sized;
+
+    /// Split rectangle into two: a top part and bottom part of given height (footer)
+    fn footer(&self, height: u32) -> (Self, Self)
+    where
+        Self: Sized;
+}
+
+impl RectangleExt for Rectangle {
+    fn header(&self, height: u32) -> (Self, Self) {
+        (
+            self.resized_height(height, AnchorY::Top),
+            self.resized_height(self.size.height - height, AnchorY::Bottom),
+        )
+    }
+
+    fn footer(&self, height: u32) -> (Self, Self) {
+        (
+            self.resized_height(self.size.height - height, AnchorY::Top),
+            self.resized_height(height, AnchorY::Bottom),
+        )
     }
 }
