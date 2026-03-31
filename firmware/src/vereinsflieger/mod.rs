@@ -16,6 +16,7 @@ use embassy_time::{Duration, Instant, with_deadline, with_timeout};
 use embedded_io_async::Read;
 use embedded_nal_async::{Dns, TcpConnect};
 use log::{debug, info, warn};
+use reqwless::TryBufRead;
 use reqwless::client::{HttpClient, HttpConnection, HttpResource};
 use reqwless::headers::ContentType;
 use reqwless::request::RequestBuilder;
@@ -47,6 +48,9 @@ pub enum Error {
     /// Request failed
     #[display("Request failed ({})", _0.0)]
     RequestFailed(StatusCode),
+    /// Request failed with error message
+    #[display("({}) {_1}", _0.0)]
+    RequestFailedWithMessage(StatusCode, String),
     /// Response could not be parsed
     #[display("Malformed response")]
     MalformedResponse(serde_json::Error),
@@ -382,7 +386,7 @@ impl<T: TcpConnect> Connection<'_, '_, T> {
 
         debug!("Vereinsflieger: HTTP status {}", response.status.0);
         if !response.status.is_successful() {
-            return Err(Error::RequestFailed(response.status));
+            return Err(parse_error_response(deadline, response).await);
         }
 
         let body = with_deadline(deadline, response.body().read_to_end()).await??;
@@ -449,6 +453,7 @@ impl<T: TcpConnect> Connection<'_, '_, T> {
     where
         F: AsyncFnOnce(Response<'_, '_, HttpConnection<'_, T::Connection<'_>>>) -> Result<R, Error>,
     {
+        let deadline = Instant::now() + TIMEOUT;
         let body = serde_json::to_vec(data)
             .map_err(Error::MalformedRequest)?
             .into_boxed_slice();
@@ -464,14 +469,14 @@ impl<T: TcpConnect> Connection<'_, '_, T> {
             "Vereinsflieger: POST {BASE_URL}/{path} ({} bytes)",
             body.len()
         );
-        let response = with_timeout(TIMEOUT, request.send(rx_buf)).await??;
+        let response = with_deadline(deadline, request.send(rx_buf)).await??;
 
         // Extract current date and time from response
         parse_current_time_from_response(&response);
 
         debug!("Vereinsflieger: HTTP status {}", response.status.0);
         if !response.status.is_successful() {
-            return Err(Error::RequestFailed(response.status));
+            return Err(parse_error_response(deadline, response).await);
         }
 
         f(response).await
@@ -487,5 +492,26 @@ fn parse_current_time_from_response<C: Read>(response: &Response<'_, '_, C>) {
         .and_then(|s| DateTime::parse_from_rfc2822(s).ok());
     if let Some(time) = time {
         time::set(&time);
+    }
+}
+
+/// Try to parse Vereinsflieger error response, return HTTP status only otherwise
+async fn parse_error_response<C: TryBufRead>(
+    deadline: Instant,
+    response: Response<'_, '_, C>,
+) -> Error {
+    use proto_auth::ErrorResponse;
+
+    let status = response.status;
+    match with_deadline(deadline, async {
+        let body = response.body().read_to_end().await?;
+        serde_json::from_slice::<ErrorResponse>(body).map_err(Error::MalformedResponse)
+    })
+    .await
+    {
+        // Parsed Vereinsflieger error message
+        Ok(Ok(error)) => Error::RequestFailedWithMessage(status, error.error),
+        // HTTP status only
+        _ => Error::RequestFailed(status),
     }
 }

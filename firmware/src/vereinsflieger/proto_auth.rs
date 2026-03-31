@@ -4,6 +4,13 @@ use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 
+/// Error response
+#[derive(Debug, Deserialize)]
+pub struct ErrorResponse {
+    // pub httpstatuscode: u16,
+    pub error: String,
+}
+
 /// `auth/accesstoken` response
 #[derive(Debug, Deserialize)]
 pub struct AccessTokenResponse {
