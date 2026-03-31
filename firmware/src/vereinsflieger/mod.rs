@@ -13,6 +13,7 @@ use alloc::vec;
 use chrono::{DateTime, NaiveDate};
 use derive_more::{Display, From};
 use embassy_time::{Duration, Instant, with_deadline, with_timeout};
+use embedded_io_async::Read;
 use embedded_nal_async::{Dns, TcpConnect};
 use log::{debug, info, warn};
 use reqwless::client::{HttpClient, HttpConnection, HttpResource};
@@ -376,6 +377,9 @@ impl<T: TcpConnect> Connection<'_, '_, T> {
         debug!("Vereinsflieger: GET {BASE_URL}/{path}");
         let response = with_deadline(deadline, request.send(&mut rx_buf)).await??;
 
+        // Extract current date and time from response
+        parse_current_time_from_response(&response);
+
         debug!("Vereinsflieger: HTTP status {}", response.status.0);
         if !response.status.is_successful() {
             return Err(Error::RequestFailed(response.status));
@@ -463,14 +467,7 @@ impl<T: TcpConnect> Connection<'_, '_, T> {
         let response = with_timeout(TIMEOUT, request.send(rx_buf)).await??;
 
         // Extract current date and time from response
-        let time = response
-            .headers()
-            .find_map(|(k, v)| (k.eq_ignore_ascii_case("date")).then_some(v))
-            .and_then(|v| str::from_utf8(v).ok())
-            .and_then(|s| DateTime::parse_from_rfc2822(s).ok());
-        if let Some(time) = time {
-            time::set(&time);
-        }
+        parse_current_time_from_response(&response);
 
         debug!("Vereinsflieger: HTTP status {}", response.status.0);
         if !response.status.is_successful() {
@@ -478,5 +475,17 @@ impl<T: TcpConnect> Connection<'_, '_, T> {
         }
 
         f(response).await
+    }
+}
+
+/// Extract current date and time from response
+fn parse_current_time_from_response<C: Read>(response: &Response<'_, '_, C>) {
+    let time = response
+        .headers()
+        .find_map(|(k, v)| (k.eq_ignore_ascii_case("date")).then_some(v))
+        .and_then(|v| str::from_utf8(v).ok())
+        .and_then(|s| DateTime::parse_from_rfc2822(s).ok());
+    if let Some(time) = time {
+        time::set(&time);
     }
 }
