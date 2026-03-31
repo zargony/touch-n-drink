@@ -357,6 +357,7 @@ pub async fn run<FE: Frontend, BE: Backend>(
             Err(err) => {
                 error!("Initialization error: {err}");
                 Event::Error(None, err.to_string()).track(&mut backend.telemetry);
+                let _ = submit_telemetry(frontend, backend).await;
                 let _ = UserInterface(error::ErrorMessage::new(err, false))
                     .run_timeout_ok(frontend)
                     .await;

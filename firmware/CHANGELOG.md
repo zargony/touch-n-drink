@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fixed a bug where errors during initial startup weren't tracked via telemetry
 - Show a more detailed error message on Vereinsflieger API errors
 - Massive internal refactorings (API clients, UI management)
 
