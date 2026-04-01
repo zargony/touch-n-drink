@@ -34,22 +34,8 @@ pub struct Buzzer<'a> {
 }
 
 impl common::Buzzer for Buzzer<'_> {
-    type Error = Error;
-
-    async fn startup(&mut self) {
-        let _ = self.startup().await;
-    }
-
-    async fn confirm(&mut self) {
-        let _ = self.confirm().await;
-    }
-
-    async fn deny(&mut self) {
-        let _ = self.deny().await;
-    }
-
-    async fn error(&mut self) {
-        let _ = self.error().await;
+    async fn tone(&mut self, frequency: u32, duration: u64) {
+        let _ = self.tone(frequency, duration).await;
     }
 }
 
@@ -115,36 +101,6 @@ impl<'a> Buzzer<'a> {
         self.drive(frequency, TONE_DUTY_CYCLE)?;
         Timer::after_millis(duration).await;
         self.off()?;
-        Ok(())
-    }
-
-    /// Output startup/testing tone
-    pub async fn startup(&mut self) -> Result<(), Error> {
-        debug!("Buzzer: Playing startup tone");
-        self.tone(3136, 1000).await // G7
-    }
-
-    /// Output a short confirmation tone
-    pub async fn confirm(&mut self) -> Result<(), Error> {
-        debug!("Buzzer: Playing confirm tone");
-        self.tone(3136, 100).await // G7
-    }
-
-    /// Output a long denying tone
-    pub async fn deny(&mut self) -> Result<(), Error> {
-        debug!("Buzzer: Playing deny tone");
-        self.tone(392, 500).await?; // G4
-        Ok(())
-    }
-
-    /// Output an error tone
-    pub async fn error(&mut self) -> Result<(), Error> {
-        debug!("Buzzer: Playing error tone");
-        self.tone(784, 200).await?; // G5
-        Timer::after_millis(10).await;
-        self.tone(587, 200).await?; // D5
-        Timer::after_millis(10).await;
-        self.tone(392, 500).await?; // G4
         Ok(())
     }
 }

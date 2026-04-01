@@ -16,10 +16,12 @@ pub mod util;
 pub mod vereinsflieger;
 
 use core::fmt;
+use embassy_time::Timer;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::DrawTarget;
 use embedded_nal_async::{Dns, TcpConnect};
 use embedded_storage::Storage;
+use log::debug;
 use rand_core::RngCore;
 
 extern crate alloc;
@@ -56,17 +58,36 @@ pub trait NfcReader {
 
 /// Buzzer interface
 pub trait Buzzer {
-    /// Buzzer error type
-    type Error: fmt::Debug + fmt::Display;
+    /// Output the given tone for given duration
+    async fn tone(&mut self, frequency: u32, duration: u64);
 
     /// Output startup/testing tone
-    async fn startup(&mut self);
+    async fn startup(&mut self) {
+        debug!("Buzzer: Playing startup tone");
+        self.tone(3136, 1000).await; // G7
+    }
+
     /// Output a short confirmation tone
-    async fn confirm(&mut self);
+    async fn confirm(&mut self) {
+        debug!("Buzzer: Playing confirm tone");
+        self.tone(3136, 100).await; // G7
+    }
+
     /// Output a long denying tone
-    async fn deny(&mut self);
+    async fn deny(&mut self) {
+        debug!("Buzzer: Playing deny tone");
+        self.tone(392, 500).await; // G4
+    }
+
     /// Output an error tone
-    async fn error(&mut self);
+    async fn error(&mut self) {
+        debug!("Buzzer: Playing error tone");
+        self.tone(784, 200).await; // G5
+        Timer::after_millis(10).await;
+        self.tone(587, 200).await; // D5
+        Timer::after_millis(10).await;
+        self.tone(392, 500).await; // G4
+    }
 }
 
 /// Network stack interface
@@ -112,8 +133,6 @@ pub trait Frontend {
     type KeypadError: fmt::Debug + fmt::Display;
     /// NFC reader error type
     type NfcError: fmt::Debug + fmt::Display;
-    /// Buzzer error type
-    type BuzzerError: fmt::Debug + fmt::Display;
 
     /// Display
     type Display<'a>: Display<Error = Self::DisplayError>;
@@ -122,7 +141,7 @@ pub trait Frontend {
     /// NFC reader
     type NfcReader<'a>: NfcReader<Error = Self::NfcError>;
     /// Buzzer
-    type Buzzer<'a>: Buzzer<Error = Self::BuzzerError>;
+    type Buzzer<'a>: Buzzer;
 }
 
 /// Firmware frontend resources

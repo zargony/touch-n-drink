@@ -305,7 +305,6 @@ impl common::Frontend for Frontend {
     type DisplayError = display::Error;
     type KeypadError = Infallible;
     type NfcError = nfc::Error;
-    type BuzzerError = buzzer::Error;
 
     type Display<'a> = display::Display<I2cDevice<'a, NoopRawMutex, I2c<'a, esp_hal::Async>>>;
     type Keypad<'a> = keypad::Keypad<'a, 3, 4>;
