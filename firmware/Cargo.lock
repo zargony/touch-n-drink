@@ -2593,6 +2593,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio"
+version = "1.50.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27ad5e34374e03cfffefc301becb44e9dc3c17584f414349ebe29ed26661822d"
+dependencies = [
+ "pin-project-lite",
+ "tokio-macros",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "2.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c55a2eff8b69ce66c84f85e1da1c233edc36ceb85a2058d11b0d6a3c7e7569c"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "toml_datetime"
 version = "1.0.0+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2623,12 +2644,38 @@ dependencies = [
 ]
 
 [[package]]
-name = "touch-n-drink"
+name = "touch-n-drink-common"
 version = "2.0.0"
 dependencies = [
  "chrono",
  "const-hex",
  "der 0.8.0",
+ "derive_more",
+ "embassy-futures",
+ "embassy-time",
+ "embedded-graphics",
+ "embedded-io-async 0.7.0",
+ "embedded-layout",
+ "embedded-nal-async",
+ "embedded-storage",
+ "embedded-text",
+ "git2",
+ "log",
+ "rand_core 0.9.5",
+ "reqwless",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "sha2",
+ "tokio",
+]
+
+[[package]]
+name = "touch-n-drink-esp32"
+version = "2.0.0"
+dependencies = [
+ "chrono",
+ "const-hex",
  "derive_more",
  "display-interface",
  "embassy-embedded-hal",
@@ -2639,11 +2686,7 @@ dependencies = [
  "embassy-time",
  "embedded-graphics",
  "embedded-hal-async",
- "embedded-io-async 0.7.0",
- "embedded-layout",
- "embedded-nal-async",
  "embedded-storage",
- "embedded-text",
  "esp-alloc",
  "esp-backtrace",
  "esp-bootloader-esp-idf",
@@ -2652,7 +2695,6 @@ dependencies = [
  "esp-radio",
  "esp-rtos",
  "esp-storage",
- "git2",
  "log",
  "pn532",
  "rand_core 0.9.5",
@@ -2660,8 +2702,8 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "sha2",
  "ssd1306",
+ "touch-n-drink-common",
 ]
 
 [[package]]

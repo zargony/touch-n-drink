@@ -1,2 +1,2 @@
 [idf]
-partition_table = "partitions.csv"
+partition_table = "esp32/partitions.csv"

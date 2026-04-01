@@ -1,10 +1,11 @@
+[alias]
+build-esp32c3 = "build --target riscv32imc-unknown-none-elf --package touch-n-drink-esp32"
+run-esp32c3 = "run --target riscv32imc-unknown-none-elf --package touch-n-drink-esp32"
+
 [env]
 # Log filter for esp-println to apply at runtime. Also, a feature of the log crate strips all
 # logging above info level from release builds at compile time (feature `release_max_level_info`).
 ESP_LOG = "info,touch_n_drink=debug"
-
-[build]
-target = "riscv32imc-unknown-none-elf"
 
 [target.'cfg(all(target_arch = "riscv32", target_os = "none"))']
 runner = "espflash flash --monitor"
