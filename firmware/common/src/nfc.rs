@@ -83,3 +83,44 @@ impl AsRef<[u8]> for Uid {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::string::ToString;
+
+    #[tokio::test]
+    async fn parse_uid() {
+        assert_eq!(
+            "11223344".parse(),
+            Ok(Uid::Single([0x11, 0x22, 0x33, 0x44]))
+        );
+        assert_eq!(
+            "11223344556677".parse(),
+            Ok(Uid::Double([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]))
+        );
+        assert_eq!(
+            "112233445566778899aa".parse(),
+            Ok(Uid::Triple([
+                0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa
+            ]))
+        );
+        assert_eq!("foo".parse::<Uid>(), Err(InvalidUid));
+    }
+
+    #[tokio::test]
+    async fn display_uid() {
+        assert_eq!(
+            Uid::Single([0x11, 0x22, 0x33, 0x44]).to_string(),
+            "11223344"
+        );
+        assert_eq!(
+            Uid::Double([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77]).to_string(),
+            "11223344556677"
+        );
+        assert_eq!(
+            Uid::Triple([0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa]).to_string(),
+            "112233445566778899aa"
+        );
+    }
+}
