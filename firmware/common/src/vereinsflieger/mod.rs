@@ -108,6 +108,10 @@ impl<'a> Vereinsflieger<'a> {
 
     /// Connect to API server, check existing access token (if any) or fetch a new one and sign
     /// in. Returns connection for authenticated API requests.
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if a connection cannot be established.
     pub async fn connect<'vf, 'conn, T: TcpConnect, D: Dns>(
         &'vf mut self,
         http: &'conn mut HttpClient<'_, T, D>,
@@ -170,6 +174,10 @@ impl<T: TcpConnect> Connection<'_, '_, T> {
     }
 
     /// Fetch information about authenticated user
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if user information couldn't be fetched.
     pub async fn get_user_information(&mut self) -> Result<(), Error> {
         use proto_auth::{UserInformationRequest, UserInformationResponse};
 
@@ -186,6 +194,10 @@ impl<T: TcpConnect> Connection<'_, '_, T> {
     }
 
     /// Fetch list of articles and call closure with each
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if articles couldn't be fetched.
     pub async fn get_articles<F>(&mut self, mut f: F) -> Result<usize, Error>
     where
         F: AsyncFnMut(&Article),
@@ -224,6 +236,10 @@ impl<T: TcpConnect> Connection<'_, '_, T> {
     }
 
     /// Fetch list of users and call closure with each
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if users couldn't be fetched.
     pub async fn get_users<F>(&mut self, mut f: F) -> Result<usize, Error>
     where
         F: AsyncFnMut(&User),
@@ -262,6 +278,10 @@ impl<T: TcpConnect> Connection<'_, '_, T> {
     }
 
     /// Store a purchase
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if the purchase couldn't be stored.
     pub async fn purchase(
         &mut self,
         date: NaiveDate,

@@ -59,6 +59,10 @@ impl<'a> Mixpanel<'a> {
     }
 
     /// Connect to API server
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if a connection cannot be established.
     pub async fn connect<'conn, T: TcpConnect, D: Dns>(
         &mut self,
         http: &'conn mut HttpClient<'_, T, D>,
@@ -84,6 +88,10 @@ pub struct Connection<'conn, T: TcpConnect + 'conn> {
 
 impl<T: TcpConnect> Connection<'_, T> {
     /// Submit tracked events
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if events couldn't be submitted.
     pub async fn submit<P: Serialize>(&mut self, events: &[Event<'_, P>]) -> Result<(), Error> {
         use proto_event::{TrackRequest, TrackResponse};
 

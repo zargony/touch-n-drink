@@ -1,6 +1,5 @@
 #![no_std]
 #![expect(async_fn_in_trait)]
-#![expect(clippy::missing_errors_doc)]
 
 pub mod article;
 pub mod mixpanel;
@@ -113,8 +112,16 @@ pub trait Updater {
         Self: 'a;
 
     /// Flash region to write new firmware to
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if the region to write to could not be determined.
     fn region(&mut self) -> Result<Self::Region<'_>, Self::Error>;
     /// Confirm firmware update written, switch to new firmware for next system start
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if the firmware update could not be committed.
     fn commit(&mut self) -> Result<(), Self::Error>;
     /// Cancel firmware update
     fn cancel(&mut self);

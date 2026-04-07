@@ -99,6 +99,10 @@ pub trait UiContent {
     const FOOTER_RIGHT: &str = "";
 
     /// Draw user interface content
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if the content could not be drawn to the given target.
     fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error>;
 }
 

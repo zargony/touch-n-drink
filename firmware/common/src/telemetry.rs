@@ -197,6 +197,10 @@ impl<'a> Telemetry<'a> {
     }
 
     /// Submit tracked events to server
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if events couldn't be submitted.
     pub async fn flush<T: TcpConnect, D: Dns>(
         &mut self,
         http: &mut HttpClient<'_, T, D>,

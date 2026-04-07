@@ -57,6 +57,10 @@ impl<R: Read, const BUFSIZE: usize> BufferedReader<R, BUFSIZE> {
     }
 
     /// Move remaining buffer data to front and try to fill up the buffer by reading data
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if the wrapped reader returns an error.
     pub async fn read(&mut self) -> Result<(), Error<R::Error>> {
         if self.range.start > 0 && self.range.end > 0 {
             self.buffer.copy_within(self.range.clone(), 0);
@@ -98,6 +102,10 @@ impl<R: Read, const BUFSIZE: usize> BufferedReader<R, BUFSIZE> {
     }
 
     /// Peek next byte in buffer
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if the internal buffer is completely full or empty.
     pub fn peek(&mut self) -> Result<u8, Error<R::Error>> {
         match self.buffer().first() {
             Some(b) => Ok(*b),
@@ -107,6 +115,10 @@ impl<R: Read, const BUFSIZE: usize> BufferedReader<R, BUFSIZE> {
     }
 
     /// Peek next line in buffer
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if the next line doesn't fit into the internal buffer.
     pub fn peek_line(&mut self) -> Result<&[u8], Error<R::Error>> {
         match self.buffer().iter().position(|b| b"\r\n".contains(b)) {
             Some(pos) => Ok(&self.buffer()[..pos]),
@@ -134,6 +146,11 @@ impl<R: Read, const BUFSIZE: usize> LineReader<R, BUFSIZE> {
     }
 
     /// Return next line
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if the wrapped reader returns an error or the next line doesn't
+    /// fit into the internal buffer.
     pub async fn next(&mut self) -> Result<Option<&[u8]>, Error<R::Error>> {
         self.buffer.consume(self.last_line_len);
         self.buffer.read().await?;
@@ -169,6 +186,11 @@ impl<R: Read, T: DeserializeOwned, const BUFSIZE: usize> StreamingJsonObjectRead
     }
 
     /// Return next key and element
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if the wrapped reader returns an error or the next key and
+    /// element couldn't be parsed.
     pub async fn next(&mut self) -> Result<Option<(String, T)>, Error<R::Error>> {
         self.buffer.read().await?;
 

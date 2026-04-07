@@ -92,6 +92,10 @@ impl<'ota, 'http, T: TcpConnect, D: Dns> Ota<'ota, 'http, T, D> {
 
 impl<T: TcpConnect, D: Dns> Ota<'_, '_, T, D> {
     /// Check for latest release and update if a new release is available
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if checking or updating fails.
     pub async fn check_and_update<U: Updater>(
         &mut self,
         updater: &mut U,
@@ -106,6 +110,10 @@ impl<T: TcpConnect, D: Dns> Ota<'_, '_, T, D> {
 
     /// Get latest release version and return it when it's a different version than the currently
     /// running version. Returns None if the latest release version is already running.
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if checking for a new version fails.
     pub async fn check(&mut self) -> Result<Option<String>, Error> {
         let current = env!("CARGO_PKG_VERSION");
         let latest = self.get_latest_release_version().await?;
@@ -121,6 +129,10 @@ impl<T: TcpConnect, D: Dns> Ota<'_, '_, T, D> {
     }
 
     /// Update to given release version
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if updating to the new version fails.
     pub async fn update<U: Updater>(
         &mut self,
         updater: &mut U,
@@ -170,6 +182,10 @@ impl<T: TcpConnect, D: Dns> Ota<'_, '_, T, D> {
     }
 
     /// Get latest release version
+    ///
+    /// # Errors
+    ///
+    /// An error will be returned if the latest release version could not be determined.
     pub async fn get_latest_release_version(&mut self) -> Result<String, Error> {
         let tag = self.get_latest_release_tag().await?;
         if let Some(version) = tag.strip_prefix(RELEASE_TAG_VERSION_PREFIX) {
