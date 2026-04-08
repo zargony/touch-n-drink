@@ -20,35 +20,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix: &matrix
-        include:
-          - {
-              package: esp32,
-              chip: esp32c3,
-              target: riscv32imc-unknown-none-elf,
-            }
+        chip:
+          - esp32c3
     steps:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: riscv32imac-unknown-none-elf, riscv32imc-unknown-none-elf
           components: clippy, rustfmt
       - name: Check out repository
         uses: actions/checkout@v6
       - name: Cache cargo data
         uses: actions/cache@v5
         with:
+          # See https://doc.rust-lang.org/stable/cargo/guide/cargo-home.html#caching-the-cargo-home-in-ci
           path: |
-            ~/.cargo/git
-            ~/.cargo/registry
-          # intentionally not caching `target` here yet
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            ~/.cargo/git/db
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+          key: cargo-${{ runner.os }}
       - name: Check formatting
         run: cargo fmt --all --check
         working-directory: firmware
       - name: Clippy
-        run: |
-          cargo clippy -p touch-n-drink-common -- --deny warnings --allow deprecated
-          cargo clippy -p touch-n-drink-${{ matrix.package }} --target ${{ matrix.target }} -- --deny warnings --allow deprecated
+        run: cargo xtask clippy --chip ${{ matrix.chip }} -- --deny warnings --allow deprecated
         working-directory: firmware
 
   test:
@@ -63,10 +58,10 @@ jobs:
         uses: actions/cache@v5
         with:
           path: |
-            ~/.cargo/git
-            ~/.cargo/registry
-          # intentionally not caching `target` here yet
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            ~/.cargo/git/db
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+          key: cargo-${{ runner.os }}
       - name: Run tests
         run: cargo test
         working-directory: firmware
@@ -82,88 +77,54 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: riscv32imac-unknown-none-elf, riscv32imc-unknown-none-elf
       - name: Check out repository
         uses: actions/checkout@v6
       - name: Cache cargo data
         uses: actions/cache@v5
         with:
           path: |
-            ~/.cargo/git
-            ~/.cargo/registry
-          # intentionally not caching `target` here yet
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Build ELF firmware
-        run: cargo build -p touch-n-drink-${{ matrix.package }} --target ${{ matrix.target }} --release
-        working-directory: firmware
-      - name: Copy ELF firmware
-        run: cp target/${{ matrix.target }}/release/touch-n-drink-${{ matrix.package }} target/release/touch-n-drink-${{ matrix.chip }}.elf
+            ~/.cargo/git/db
+            ~/.cargo/registry/cache
+            ~/.cargo/registry/index
+          key: cargo-${{ runner.os }}
+      - name: Cache espflash
+        id: cache-espflash
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/espflash
+          key: espflash-${{ runner.os }}
+      - name: Install espflash
+        if: steps.cache-espflash.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install pkg-config libudev-dev
+          cargo install --locked espflash
+      - name: Build firmware
+        run: cargo xtask build --chip ${{ matrix.chip }} --release
         working-directory: firmware
       - name: Upload build artifact
         uses: actions/upload-artifact@v6
         with:
           name: touch-n-drink-${{ matrix.chip }}-elf
           path: |
-            firmware/target/release/touch-n-drink-${{ matrix.chip }}.elf
+            firmware/target/release/images/touch-n-drink-${{ matrix.chip }}.elf
           if-no-files-found: error
-
-  image:
-    name: Image
-    needs: [build]
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix: *matrix
-    steps:
-      - name: Cache espflash
-        id: cache-espflash
-        uses: actions/cache@v5
-        with:
-          path: ~/.cargo/bin/espflash
-          key: ${{ runner.os }}-espflash
-      - name: Install dependencies
-        if: steps.cache-espflash.outputs.cache-hit != 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install pkg-config libudev-dev
-      - name: Install espflash
-        if: steps.cache-espflash.outputs.cache-hit != 'true'
-        run: cargo install --locked espflash
-      - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          sparse-checkout: |
-            firmware/espflash.toml
-            firmware/esp32/partitions.csv
-      - name: Download build artifact
-        uses: actions/download-artifact@v7
-        with:
-          name: touch-n-drink-${{ matrix.chip }}-elf
-          path: firmware/images
-      - name: Generate OTA image
-        run: |
-          espflash save-image --chip ${{ matrix.chip }} images/touch-n-drink-${{ matrix.chip }}.elf images/touch-n-drink-${{ matrix.chip }}.bin
-          cd images && shasum -a 256 touch-n-drink-${{ matrix.chip }}.bin >touch-n-drink-${{ matrix.chip }}.sha256
-        working-directory: firmware
-      - name: Generate factory image
-        run: |
-          espflash save-image --chip ${{ matrix.chip }} --merge --skip-padding --partition-table esp32/partitions.csv images/touch-n-drink-${{ matrix.chip }}.elf images/touch-n-drink-${{ matrix.chip }}.factory.bin
-          cd images && shasum -a 256 touch-n-drink-${{ matrix.chip }}.factory.bin >touch-n-drink-${{ matrix.chip }}.factory.sha256
-        working-directory: firmware
       - name: Upload image artifact
         uses: actions/upload-artifact@v6
         with:
           name: touch-n-drink-${{ matrix.chip }}
           path: |
-            firmware/images/touch-n-drink-*.bin
-            firmware/images/touch-n-drink-*.sha256
+            firmware/target/release/images/touch-n-drink-${{ matrix.chip }}*.bin
+            firmware/target/release/images/touch-n-drink-${{ matrix.chip }}*.sha256
           if-no-files-found: error
 
   release:
     name: Release
     permissions:
       contents: write
-    needs: [image]
+    needs: [build]
     if: github.repository == 'zargony/touch-n-drink' && startsWith(github.ref, 'refs/tags/firmware-')
     runs-on: ubuntu-latest
     steps:

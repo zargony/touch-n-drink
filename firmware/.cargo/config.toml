@@ -1,6 +1,5 @@
 [alias]
-build-esp32c3 = "build --target riscv32imc-unknown-none-elf --package touch-n-drink-esp32"
-run-esp32c3 = "run --target riscv32imc-unknown-none-elf --package touch-n-drink-esp32"
+xtask = "run --package xtask --"
 
 [env]
 # Log filter for esp-println to apply at runtime. Also, a feature of the log crate strips all

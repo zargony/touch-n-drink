@@ -1,0 +1,20 @@
+[package]
+name = "xtask"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+description = "CLI scripts for building firmware"
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+sha2.workspace = true
+
+anyhow = "1.0"
+clap = { version = "4.6", features = ["derive", "env"] }
+clap-cargo = "0.18"
+xshell = "0.2"

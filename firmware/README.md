@@ -1,28 +1,34 @@
 # Touch 'n Drink Firmware
 
-Firmware images are automatically build by GitHub actions. They can be downloaded from the [releases] page and flashed [from your browser][esptool-js]. The setup described below is only needed for local development.
+Firmware images are automatically build by GitHub actions. They can be downloaded from the [releases] page and flashed to a microcontroller [from your browser][esptool-js]. The setup described below is only needed for local development.
 
 ## Requirements
 
-For local development, you need a [Rust] toolchain. If your OS doesn't already provide it, easiest way to install and manage Rust toolchains is to use [rustup]. Alternatively, you can run Rust using the official Docker image `rust:1`.
+For local development, you need a [Rust] toolchain. If your OS doesn't already provide it, easiest way to install and manage Rust toolchains is to use [rustup], or use the official Docker image `rust:1`.
 
-To flash the firmware to a device, the `espflash` tool can be used. It integrates well with the Rust build tools and can be installed with `cargo install espflash cargo-espflash`.
+The Rust toolchain needs to support cross-compiling to the microcontroller's target architecture. If you're using `rustup`, it'll automatically download the required components as specified in `rust-toolchain.toml`.
+
+To flash the firmware to a device, the `espflash` and `cargo-espflash` tools can be used. They integrate well with Rust build tools and can be installed with `cargo install espflash cargo-espflash`.
 
 ## Building the Firmware
 
-Use Rust's build tool `cargo` to build the firmware:
+To build the firmware using the debug profile, use:
 
 ```sh
-cargo build --release
+cargo xtask build
 ```
+
+This will run `cargo build` with options to build a firmware image for the microcontroller. It'll then use `espflash save-image` to produce OTA and factory images (.bin files) that can be flashed to the microcontroller.
 
 ## Flash Firmware to Device
 
-To flash the firmware to a device, connect the device via its USB-C serial port and use `espflash`:
+To build the firmware using the debug profile and flash it to a device, connect the device via its USB-C serial port and use:
 
 ```sh
-cargo espflash flash --release
+cargo xtask run
 ```
+
+This will build the firmware image and use `espflash` to flash the produced image to the microcontroller. It then resets the device and monitors any log output.
 
 ## Flash Configuration to Device
 
