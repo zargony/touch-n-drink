@@ -18,7 +18,7 @@ use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, TimeoutError, Timer, with_timeout};
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 
 /// Default timeout after which a user interaction is cancelled by default
 #[cfg(not(debug_assertions))]
@@ -354,7 +354,7 @@ async fn check_ota_update<FE: Frontend, BE: Backend>(
 
     // Don't actually apply OTA update in debug mode or when no updater is available
     if backend.updater.is_none() || cfg!(debug_assertions) {
-        info!("UI: Automatic OTA update unavailable. Please update manually.");
+        warn!("UI: Automatic OTA update unavailable. Please update manually.");
         return Ok(());
     }
 
