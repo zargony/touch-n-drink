@@ -171,7 +171,6 @@ impl ClippyArgs {
             .current_dir(workspace_root(&self.cargo)?)
             .arg("clippy")
             .args(self.chip.cargo_args())
-            .arg("--")
             .args(&self.args))?;
 
         Ok(())

@@ -43,7 +43,7 @@ jobs:
         run: cargo fmt --all --check
         working-directory: firmware
       - name: Clippy
-        run: cargo xtask clippy --chip ${{ matrix.chip }} -- --deny warnings --allow deprecated
+        run: cargo xtask clippy --chip ${{ matrix.chip }} -- -- --deny warnings --allow deprecated
         working-directory: firmware
 
   test:
