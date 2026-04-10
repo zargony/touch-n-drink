@@ -140,7 +140,7 @@ jobs:
           merge-multiple: true
       - name: Aggregate checksums
         run: |
-          cat images/touch-n-drink-*.sha256 |sort >images/SHA256SUMS
+          cat images/touch-n-drink-*.sha256 >images/SHA256SUMS
           cd images && shasum -a 256 -c SHA256SUMS
         working-directory: firmware
       - name: Release
