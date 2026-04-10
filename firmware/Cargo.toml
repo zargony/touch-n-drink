@@ -1,19 +1,48 @@
-[package]
-name = "touch-n-drink"
+[workspace]
+resolver = "3"
+members = [
+    "common",
+    "esp32",
+    "xtask",
+]
+default-members = ["common", "xtask"]
+
+[workspace.package]
 version = "2.0.0"
 authors = ["Andreas Neuhaus <git@zargony.com>"]
 edition = "2024"
 description = "Firmware for cashless payment device for cold drinks at the aeroclub at EDLH"
 repository = "https://github.com/zargony/touch-n-drink"
 license = "EUPL-1.2"
+publish = false
 
-[[bin]]
-name = "touch-n-drink"
-test = false
-bench = false
-
-[lints.clippy]
+[workspace.lints.clippy]
 pedantic = "warn"
+
+[workspace.dependencies]
+chrono = { version = "0.4", default-features = false, features = ["alloc"] }
+const-hex = { version = "1.14", default-features = false }
+derive_more = { version = "2.1", default-features = false }
+embassy-embedded-hal = "0.5"
+embassy-executor = "0.9"
+embassy-futures = "0.1"
+embassy-net = { version = "0.8", features = ["dhcpv4", "dns", "tcp", "proto-ipv4"] }
+embassy-sync = "0.7"
+embassy-time = "0.5"
+embedded-graphics = "0.8"
+embedded-hal-async = "1.0"
+embedded-io-async = { version = "0.7", features = ["alloc"] }
+embedded-layout = "0.4"
+embedded-nal-async = "0.9"
+embedded-storage = "0.3"
+embedded-text = "0.7"
+log = { version = "0.4", features = ["release_max_level_info"] }
+rand_core = "0.9"
+reqwless = { version = "0.14", default-features = false, features = ["alloc", "embedded-tls"] }
+serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+serde_with = { version = "3.17", default-features = false, features = ["alloc", "chrono", "macros"] }
+sha2 = { version = "0.10", default-features = false }
 
 [profile.dev]
 # FIXME: LTO slows down linking a lot! But it's required to keep the app image small enough :-(
@@ -27,53 +56,3 @@ codegen-units = 1
 debug = 2
 lto = "fat"
 opt-level = "s"
-
-[build-dependencies]
-git2 = { version = "0.20", default-features = false }
-
-[dependencies]
-chrono = { version = "0.4", default-features = false, features = ["alloc"] }
-const-hex = { version = "1.14", default-features = false }
-display-interface = "0.5"
-embassy-embedded-hal = "0.5"
-embassy-executor = "0.9"
-embassy-futures = "0.1"
-embassy-net = { version = "0.8", features = ["dhcpv4", "dns", "proto-ipv4", "tcp"] }
-embassy-sync = "0.7"
-embassy-time = "0.5"
-embedded-graphics = "0.8"
-embedded-hal-async = "1.0"
-embedded-io-async = { version = "0.7", features = ["alloc"] }
-embedded-nal-async = "0.9"
-embedded-storage = "0.3"
-embedded-text = "0.7"
-esp-alloc = { version = "0.9", features = ["esp32c3"] }
-esp-backtrace = { version = "0.18", features = ["esp32c3", "custom-halt", "panic-handler", "println"] }
-esp-bootloader-esp-idf = { version = "0.4", features = ["esp32c3"] }
-esp-hal = { version = "1.0", features = ["esp32c3", "unstable"] }
-esp-println = { version = "0.16", features = ["esp32c3", "log-04"] }
-esp-radio = { version = "0.17", features = ["esp32c3", "unstable", "wifi"] }
-esp-rtos = { version = "0.2", features = ["embassy", "esp-alloc", "esp-radio", "esp32c3"] }
-esp-storage = { version = "0.8", features = ["esp32c3"] }
-log = { version = "0.4", features = ["release_max_level_info"] }
-pn532 = "0.5"
-rand_core = "0.9"
-reqwless = { version = "0.14", default-features = false, features = ["alloc", "embedded-tls"] }
-serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
-serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
-serde_with = { version = "3.17", default-features = false, features = ["alloc", "chrono", "macros"] }
-sha2 = { version = "0.10", default-features = false }
-ssd1306 = { version = "0.10", features = ["async"] }
-
-# FIXME: Fix for compile failure of embedded-tls 0.18.0, see https://github.com/drogue-iot/embedded-tls/pull/182
-# Becomes obsolete once reqwless starts to use embedded-tls 0.19
-der = { version = "0.8", features = ["heapless"] }
-
-[features]
-default = []
-# Enable additional logging of dependencies
-log = [
-    "embassy-executor/log", "embassy-net/log", "embassy-sync/log", "embassy-time/log",
-    "esp-bootloader-esp-idf/log-04", "esp-hal/log-04", "esp-radio/log-04", "esp-rtos/log-04",
-    "reqwless/log",
-]

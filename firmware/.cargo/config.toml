@@ -1,10 +1,10 @@
+[alias]
+xtask = "run --package xtask --"
+
 [env]
 # Log filter for esp-println to apply at runtime. Also, a feature of the log crate strips all
 # logging above info level from release builds at compile time (feature `release_max_level_info`).
 ESP_LOG = "info,touch_n_drink=debug"
-
-[build]
-target = "riscv32imc-unknown-none-elf"
 
 [target.'cfg(all(target_arch = "riscv32", target_os = "none"))']
 runner = "espflash flash --monitor"

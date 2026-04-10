@@ -1,0 +1,52 @@
+[package]
+name = "touch-n-drink-common"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+description.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "touch_n_drink"
+
+[lints]
+workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+const-hex = { workspace = true }
+derive_more = { workspace = true, features = ["display", "from"] }
+embassy-futures = { workspace = true }
+embassy-time = { workspace = true }
+embedded-graphics = { workspace = true }
+embedded-io-async = { workspace = true }
+embedded-layout = { workspace = true }
+embedded-nal-async = { workspace = true }
+embedded-storage = { workspace = true }
+embedded-text = { workspace = true }
+log = { workspace = true }
+rand_core = { workspace = true }
+reqwless = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_with = { workspace = true }
+sha2 = { workspace = true }
+
+# FIXME: Fix for compile failure of embedded-tls 0.18.0, see https://github.com/drogue-iot/embedded-tls/pull/182
+# Becomes obsolete once reqwless starts to use embedded-tls 0.19
+der = { version = "0.8", features = ["heapless"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+
+[build-dependencies]
+git2 = { version = "0.20", default-features = false }
+
+[features]
+default = []
+# Enable additional logging of dependencies
+log = [
+    "embassy-time/log", "reqwless/log",
+]
