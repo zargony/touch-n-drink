@@ -46,7 +46,5 @@ git2 = { version = "0.20", default-features = false }
 
 [features]
 default = []
-# Enable additional logging of dependencies
-log = [
-    "embassy-time/log", "reqwless/log",
-]
+# Enable additional logging in dependencies
+log = ["embassy-futures/log", "embassy-time/log", "reqwless/log"]

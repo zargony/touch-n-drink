@@ -53,8 +53,8 @@ ssd1306 = { version = "0.10", features = ["async"] }
 
 [features]
 default = []
-# Enable additional logging of dependencies
+# Enable additional logging in dependencies
 log = [
-    "embassy-executor/log", "embassy-net/log", "embassy-sync/log", "embassy-time/log",
+    "embassy-executor/log", "embassy-futures/log", "embassy-net/log", "embassy-sync/log", "embassy-time/log",
     "esp-bootloader-esp-idf/log-04", "esp-hal/log-04", "esp-radio/log-04", "esp-rtos/log-04",
 ]
