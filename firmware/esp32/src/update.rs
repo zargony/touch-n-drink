@@ -29,6 +29,8 @@ pub struct Updater<'u> {
 }
 
 impl<'u> common::Updater for Updater<'u> {
+    const FIRMWARE_VARIANT: &'static str = "esp32c3";
+
     type Error = Error;
     type Region<'r>
         = FlashRegion<'r, FlashStorage<'u>>

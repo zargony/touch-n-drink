@@ -33,6 +33,7 @@ pub trait Display: DrawTarget<Color = BinaryColor, Error: fmt::Debug + fmt::Disp
     /// Flush the graphics buffer, making drawn graphics visible on the physical display.
     /// This is also expected to stop power saving and turn on the display again
     async fn flush(&mut self) -> Result<(), Self::Error>;
+
     /// Save power by turning off the display
     async fn power_save(&mut self);
 }
@@ -98,12 +99,16 @@ pub trait Network {
 
     /// Return whether network stack is up
     fn is_up(&self) -> bool;
+
     /// Wait for network stack to come up
     async fn wait_up(&self);
 }
 
 /// Firmware update interface
 pub trait Updater {
+    /// Firmware variant (xtask --chip) for OTA update image downloads
+    const FIRMWARE_VARIANT: &'static str;
+
     /// Firmware update error type
     type Error: fmt::Debug + fmt::Display;
     /// Flash region type
@@ -117,16 +122,20 @@ pub trait Updater {
     ///
     /// An error will be returned if the region to write to could not be determined.
     fn region(&mut self) -> Result<Self::Region<'_>, Self::Error>;
+
     /// Confirm firmware update written, switch to new firmware for next system start
     ///
     /// # Errors
     ///
     /// An error will be returned if the firmware update could not be committed.
     fn commit(&mut self) -> Result<(), Self::Error>;
+
     /// Cancel firmware update
     fn cancel(&mut self);
+
     /// Restart system
     fn restart() -> !;
+
     /// Whether the system was recently restarted after being updated. Can be used to avoid update
     /// loops if updates are checked on restart and something went wrong with release versioning.
     fn recently_restarted() -> bool;

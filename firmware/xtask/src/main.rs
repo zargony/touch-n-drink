@@ -60,7 +60,7 @@ struct Cli {
 /// Chip configuration (determines package, target and features to use)
 #[derive(Debug, Clone)]
 struct Chip<'a> {
-    /// Name of the chip, for use with `--chip name` options
+    /// Name of the chip (firmware variant), for use with `--chip name` options
     name: &'a str,
     /// Package to build for this chip
     package: &'a str,
@@ -149,16 +149,16 @@ impl Command {
 /// Print command
 #[derive(Debug, clap::Subcommand)]
 enum PrintCommand {
-    /// Print list of chips available for building
+    /// Print list of firmware variants (chips) available for building
     Chips,
 
-    /// Print package to use for the given chip
+    /// Print package to use for the given firmware variant (chip)
     Package {
         #[arg(long, value_enum)]
         chip: Chip<'static>,
     },
 
-    /// Print target triple to use for the given chip
+    /// Print target triple to use for the given firmware variant (chip)
     Target {
         #[arg(long, value_enum)]
         chip: Chip<'static>,
@@ -182,7 +182,7 @@ impl PrintCommand {
 /// Clippy command arguments
 #[derive(Debug, clap::Args)]
 struct ClippyArgs {
-    /// The chip to check for
+    /// The firmware variant (chip) to check
     #[arg(long, value_enum, default_value = DEFAULT_CHIP)]
     chip: Chip<'static>,
 
@@ -218,7 +218,7 @@ impl ClippyArgs {
 /// Build command arguments
 #[derive(Debug, clap::Args)]
 struct BuildArgs {
-    /// The chip to build for
+    /// The firmware variant (chip) to build
     #[arg(long, value_enum, default_value = DEFAULT_CHIP)]
     chip: Chip<'static>,
 
@@ -330,7 +330,7 @@ impl BuildArgs {
 /// Run command arguments
 #[derive(Debug, clap::Args)]
 struct RunArgs {
-    /// The chip to build for
+    /// The firmware variant (chip) to run
     #[arg(long, value_enum, default_value = DEFAULT_CHIP)]
     chip: Chip<'static>,
 

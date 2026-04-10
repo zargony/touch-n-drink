@@ -19,9 +19,6 @@ const REPOSITORY_URL: &str = env!("CARGO_PKG_REPOSITORY");
 /// Prefix to strip from the release tag to get the release version
 const RELEASE_TAG_VERSION_PREFIX: &str = "firmware-";
 
-/// OTA update name of image file to download
-const IMAGE_FILENAME: &str = concat!(env!("CARGO_PKG_NAME"), "-esp32c3.bin");
-
 /// OTA update name of checksum file to download
 const CHECKSUMS_FILENAME: &str = "SHA256SUMS";
 
@@ -141,7 +138,9 @@ impl<T: TcpConnect, D: Dns> Ota<'_, '_, T, D> {
         info!("Ota: Updating to release v{version}...");
 
         // Get checksum of release version
-        let expected_checksum = self.get_release_checksum(version).await?;
+        let expected_checksum = self
+            .get_release_checksum(U::FIRMWARE_VARIANT, version)
+            .await?;
 
         // Download and write firmware to flash region and calculate actual checksum
         let res = {
@@ -150,7 +149,8 @@ impl<T: TcpConnect, D: Dns> Ota<'_, '_, T, D> {
                 .region()
                 .map_err(|e| Error::Updater(e.to_string()))?;
 
-            self.download_and_flash_release(version, &mut region).await
+            self.download_and_flash_release(U::FIRMWARE_VARIANT, version, &mut region)
+                .await
         };
         match res {
             // Checksum of downloaded firmare matches listed release checksum: continue
@@ -197,14 +197,21 @@ impl<T: TcpConnect, D: Dns> Ota<'_, '_, T, D> {
 }
 
 impl<T: TcpConnect, D: Dns> Ota<'_, '_, T, D> {
+    /// Compose image filename
+    fn image_filename(variant: &str) -> String {
+        format!("touch-n-drink-{variant}.bin")
+    }
+
     /// Download release, store it in given flash region and return its calculated checksum
     async fn download_and_flash_release<F: Storage>(
         &mut self,
+        variant: &str,
         version: &str,
         flash_region: &mut F,
     ) -> Result<[u8; 32], Error> {
         let url = format!(
-            "{REPOSITORY_URL}/releases/download/{RELEASE_TAG_VERSION_PREFIX}{version}/{IMAGE_FILENAME}"
+            "{REPOSITORY_URL}/releases/download/{RELEASE_TAG_VERSION_PREFIX}{version}/{}",
+            Self::image_filename(variant),
         );
         self.http_get_fn(url, true, async |response| {
             with_timeout(FETCH_TIMEOUT, async {
@@ -232,12 +239,17 @@ impl<T: TcpConnect, D: Dns> Ota<'_, '_, T, D> {
     }
 
     /// Get checksum of given release version
-    async fn get_release_checksum(&mut self, version: &str) -> Result<[u8; 32], Error> {
+    async fn get_release_checksum(
+        &mut self,
+        variant: &str,
+        version: &str,
+    ) -> Result<[u8; 32], Error> {
         let url = format!(
             "{REPOSITORY_URL}/releases/download/{RELEASE_TAG_VERSION_PREFIX}{version}/{CHECKSUMS_FILENAME}"
         );
         self.http_get_fn(url, true, async |response| {
             with_timeout(TIMEOUT, async {
+                let image_filename = Self::image_filename(variant);
                 let mut reader: LineReader<_> = LineReader::new(response.body().reader());
                 while let Some(line) = reader
                     .next()
@@ -261,7 +273,7 @@ impl<T: TcpConnect, D: Dns> Ota<'_, '_, T, D> {
                     }
                     // Filename
                     match elements.next() {
-                        Some(filename) if filename == IMAGE_FILENAME.as_bytes() => {
+                        Some(filename) if filename == image_filename.as_bytes() => {
                             debug!(
                                 "Ota: Release v{version} checksum {}: {}",
                                 String::from_utf8_lossy(filename),
