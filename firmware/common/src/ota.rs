@@ -26,7 +26,7 @@ const CHECKSUMS_FILENAME: &str = "SHA256SUMS";
 const TIMEOUT: Duration = Duration::from_secs(10);
 
 /// How long to wait to finish streaming a server's response
-const FETCH_TIMEOUT: Duration = Duration::from_secs(60);
+const FETCH_TIMEOUT: Duration = Duration::from_secs(180);
 
 /// Maximum size of response headers from server
 /// Unfortunately, github.com download responses contain large headers and need >4k :-(
