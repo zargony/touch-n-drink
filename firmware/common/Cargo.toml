@@ -15,24 +15,24 @@ name = "touch_n_drink"
 workspace = true
 
 [dependencies]
-chrono = { workspace = true }
-const-hex = { workspace = true }
+chrono.workspace = true
+const-hex.workspace = true
 derive_more = { workspace = true, features = ["display", "from"] }
-embassy-futures = { workspace = true }
-embassy-time = { workspace = true }
-embedded-graphics = { workspace = true }
-embedded-io-async = { workspace = true }
-embedded-layout = { workspace = true }
-embedded-nal-async = { workspace = true }
-embedded-storage = { workspace = true }
-embedded-text = { workspace = true }
-log = { workspace = true }
-rand_core = { workspace = true }
-reqwless = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-serde_with = { workspace = true }
-sha2 = { workspace = true }
+embassy-futures.workspace = true
+embassy-time.workspace = true
+embedded-graphics.workspace = true
+embedded-io-async.workspace = true
+embedded-layout.workspace = true
+embedded-nal-async.workspace = true
+embedded-storage.workspace = true
+embedded-text.workspace = true
+log.workspace = true
+rand_core.workspace = true
+reqwless.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_with.workspace = true
+sha2.workspace = true
 
 # FIXME: Fix for compile failure of embedded-tls 0.18.0, see https://github.com/drogue-iot/embedded-tls/pull/182
 # Becomes obsolete once reqwless starts to use embedded-tls 0.19
