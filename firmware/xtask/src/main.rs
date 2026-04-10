@@ -19,7 +19,7 @@ const DEFAULT_CHIP: &str = "esp32c3";
 
 fn main() {
     if let Err(err) = Cli::parse().command.run() {
-        eprintln!("\n{ERROR}Error: {err:#} {ERROR:#}\n");
+        eprintln!("\n{ERROR}error{ERROR:#}: {err:#}\n");
         process::exit(-1);
     }
 }
@@ -204,7 +204,7 @@ impl ClippyArgs {
         let args = &self.args;
 
         // Cargo clippy
-        println!("{NOTE}    Checking{NOTE:#} code for {chip}",);
+        println!("       {NOTE}XTask{NOTE:#} Running code checks for firmware variant `{chip}`");
         cmd!(
             sh,
             "{cargo} clippy --package touch-n-drink-{package} --target {target} -- {args...}"
@@ -276,7 +276,7 @@ impl BuildArgs {
         };
 
         // Cargo build
-        println!("{NOTE}    Building{NOTE:#} firmware image for {chip}",);
+        println!("       {NOTE}XTask{NOTE:#} Building images for firmware variant `{chip}`");
         cmd!(
             sh,
             "{cargo} build --package touch-n-drink-{package} --target {target} {args...}"
@@ -306,8 +306,8 @@ impl BuildArgs {
         .run()?;
         generate_sha256(&ota_image)?;
         println!(
-            "{NOTE}       Image{NOTE:#} for {chip}, firware only (OTA): {}",
-            ota_image.display()
+            "       {NOTE}XTask{NOTE:#} OTA image for firmware variant `{chip}`: {}",
+            ota_image.display(),
         );
 
         // Generate factory image
@@ -319,8 +319,8 @@ impl BuildArgs {
         .run()?;
         generate_sha256(&factory_image)?;
         println!(
-            "{NOTE}       Image{NOTE:#} for {chip}, with bootloader (factory): {}",
-            factory_image.display()
+            "       {NOTE}XTask{NOTE:#} Factory image for firmware variant `{chip}`: {}",
+            factory_image.display(),
         );
 
         Ok(())
@@ -354,7 +354,7 @@ impl RunArgs {
         let args = &self.args;
 
         // Cargo run
-        println!("{NOTE}     Running{NOTE:#} firmware image for {chip}",);
+        println!("       {NOTE}XTask{NOTE:#} Running firmware variant `{chip}`");
         cmd!(
             sh,
             "{cargo} run --package touch-n-drink-{package} --target {target} {args...}"
