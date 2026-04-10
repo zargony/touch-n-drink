@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fixed a bug where errors weren't submitted via telemetry until another run succeeded
+
 ## 2.0.1 - 2026-04-10
 
 - Fixed a bug where errors during initial startup weren't tracked via telemetry
