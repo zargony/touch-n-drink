@@ -2766,7 +2766,7 @@ dependencies = [
 
 [[package]]
 name = "touch-n-drink-common"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "chrono",
  "const-hex",
@@ -2793,7 +2793,7 @@ dependencies = [
 
 [[package]]
 name = "touch-n-drink-esp32"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "chrono",
  "const-hex",
@@ -3004,7 +3004,7 @@ checksum = "32ac00cd3f8ec9c1d33fb3e7958a82df6989c42d747bd326c822b1d625283547"
 
 [[package]]
 name = "xtask"
-version = "2.0.1"
+version = "2.0.2"
 dependencies = [
  "anyhow",
  "clap",
