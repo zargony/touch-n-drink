@@ -265,6 +265,7 @@ pub async fn run<FE: Frontend, BE: Backend>(
             Err(ErrorWithUser(error, opt_user_id)) => {
                 error!("Error: {error}");
                 Event::Error(opt_user_id, error.to_string()).track(&mut backend.telemetry);
+                let _ = submit_telemetry(frontend, backend).await;
                 let _ = UserInterface(error::ErrorMessage::new(error, opt_user_id.is_some()))
                     .run_timeout_ok(frontend)
                     .await;

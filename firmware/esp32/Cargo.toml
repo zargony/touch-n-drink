@@ -20,24 +20,24 @@ workspace = true
 [dependencies]
 common = { path = "../common", package = "touch-n-drink-common" }
 
-chrono = { workspace = true }
-const-hex = { workspace = true }
+chrono.workspace = true
+const-hex.workspace = true
 derive_more = { workspace = true, features = ["display", "from"] }
-embassy-embedded-hal = { workspace = true }
-embassy-executor = { workspace = true }
-embassy-futures = { workspace = true }
-embassy-net = { workspace = true }
-embassy-sync = { workspace = true }
-embassy-time = { workspace = true }
-embedded-graphics = { workspace = true }
-embedded-hal-async = { workspace = true }
-embedded-storage = { workspace = true }
-log = { workspace = true }
-reqwless = { workspace = true }
-rand_core = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-serde_with = { workspace = true }
+embassy-embedded-hal.workspace = true
+embassy-executor.workspace = true
+embassy-futures.workspace = true
+embassy-net.workspace = true
+embassy-sync.workspace = true
+embassy-time.workspace = true
+embedded-graphics.workspace = true
+embedded-hal-async.workspace = true
+embedded-storage.workspace = true
+log.workspace = true
+reqwless.workspace = true
+rand_core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_with.workspace = true
 
 display-interface = "0.5"
 esp-alloc = { version = "0.9", features = ["esp32c3"] }
@@ -53,8 +53,8 @@ ssd1306 = { version = "0.10", features = ["async"] }
 
 [features]
 default = []
-# Enable additional logging of dependencies
+# Enable additional logging in dependencies
 log = [
-    "embassy-executor/log", "embassy-net/log", "embassy-sync/log", "embassy-time/log",
+    "embassy-executor/log", "embassy-futures/log", "embassy-net/log", "embassy-sync/log", "embassy-time/log",
     "esp-bootloader-esp-idf/log-04", "esp-hal/log-04", "esp-radio/log-04", "esp-rtos/log-04",
 ]
