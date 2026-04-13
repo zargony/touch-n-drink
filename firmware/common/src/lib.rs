@@ -2,6 +2,7 @@
 #![expect(async_fn_in_trait)]
 
 pub mod article;
+pub mod config;
 pub mod mixpanel;
 pub mod nfc;
 pub mod ota;

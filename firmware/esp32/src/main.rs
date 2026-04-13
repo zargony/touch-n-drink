@@ -161,7 +161,7 @@ async fn main(spawner: Spawner) -> ! {
         .expect("Failed to spawn watchdog task");
 
     // Read system configuration
-    let config = config::Config::read(&mut flash);
+    let config = config::read(&mut flash);
 
     // Initialize I2C controller
     let i2c_config = I2cConfig::default()
