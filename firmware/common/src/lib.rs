@@ -15,6 +15,7 @@ pub mod user;
 pub mod util;
 pub mod vereinsflieger;
 
+use alloc::vec;
 use core::fmt;
 use core::marker::PhantomData;
 use embassy_time::Timer;
@@ -24,7 +25,7 @@ use embedded_nal_async::{Dns, TcpConnect};
 use embedded_storage::Storage;
 use log::debug;
 use rand_core::RngCore;
-use reqwless::client::HttpClient;
+use reqwless::client::{HttpClient, TlsConfig, TlsVerify};
 
 extern crate alloc;
 
@@ -95,16 +96,22 @@ pub trait Buzzer {
 
 /// Network stack interface
 pub trait Network {
-    /// TCP client type
-    type TcpConnect<'a>: TcpConnect;
     /// DNS resolver type
-    type Dns<'a>: Dns;
+    type DnsSocket: Dns;
+    /// TCP client type
+    type TcpClient: TcpConnect;
 
     /// Return whether network stack is up
     fn is_up(&self) -> bool;
 
     /// Wait for network stack to come up
     async fn wait_up(&self);
+
+    /// Provide a DNS socket
+    fn dns(&self) -> &'_ Self::DnsSocket;
+
+    /// Provide a TCP client
+    fn tcp(&self) -> &'_ Self::TcpClient;
 }
 
 /// Firmware update interface
@@ -145,7 +152,7 @@ pub trait Updater {
 }
 
 /// Firmware frontend
-pub trait Frontend {
+trait Frontend {
     /// Display error type
     type DisplayError: fmt::Debug + fmt::Display;
     /// Keypad error type
@@ -184,15 +191,15 @@ impl<DP: Display, KP: Keypad, NFC: NfcReader, BZZ: Buzzer> Frontend
 
 /// Firmware frontend resources
 #[must_use]
-pub struct FrontendResources<'fe, FE: Frontend> {
-    pub display: FE::Display<'fe>,
-    pub keypad: FE::Keypad<'fe>,
-    pub nfc: FE::NfcReader<'fe>,
-    pub buzzer: FE::Buzzer<'fe>,
+struct FrontendResources<'fe, FE: Frontend> {
+    display: FE::Display<'fe>,
+    keypad: FE::Keypad<'fe>,
+    nfc: FE::NfcReader<'fe>,
+    buzzer: FE::Buzzer<'fe>,
 }
 
 /// Firmware backend
-pub trait Backend {
+trait Backend {
     /// Random number generator type
     type Rng<'a>: RngCore;
     /// Network stack type
@@ -213,27 +220,26 @@ impl<RNG: RngCore, NET: Network, UPD: Updater> Backend for BackendAdapter<RNG, N
 
 /// Firmware backend resources
 #[must_use]
-pub struct BackendResources<'be, BE: Backend> {
-    pub rng: BE::Rng<'be>,
-    pub rtc: time::Rtc,
-    pub network: BE::Network<'be>,
-    pub articles: article::Articles,
-    pub users: user::Users,
-    pub schedule: schedule::Daily,
-    pub http: reqwless::client::HttpClient<
+struct BackendResources<'be, BE: Backend> {
+    rng: BE::Rng<'be>,
+    rtc: time::Rtc,
+    network: &'be BE::Network<'be>,
+    articles: article::Articles,
+    users: user::Users,
+    schedule: schedule::Daily,
+    http: reqwless::client::HttpClient<
         'be,
-        <BE::Network<'be> as Network>::TcpConnect<'be>,
-        <BE::Network<'be> as Network>::Dns<'be>,
+        <BE::Network<'be> as Network>::TcpClient,
+        <BE::Network<'be> as Network>::DnsSocket,
     >,
-    pub vereinsflieger: vereinsflieger::Vereinsflieger<'be>,
-    pub telemetry: telemetry::Telemetry<'be>,
-    pub updater: Option<BE::Updater<'be>>,
+    vereinsflieger: vereinsflieger::Vereinsflieger<'be>,
+    telemetry: telemetry::Telemetry<'be>,
+    updater: Option<BE::Updater<'be>>,
 }
 
 /// Run firmware
 #[expect(clippy::too_many_arguments)]
 pub async fn run<
-    'a,
     DP: Display,
     KP: Keypad,
     NFC: NfcReader,
@@ -242,31 +248,67 @@ pub async fn run<
     NET: Network,
     UPD: Updater,
 >(
+    config: config::Config,
+    device_id: &str,
     display: DP,
     keypad: KP,
     nfc: NFC,
     buzzer: BZZ,
-    rng: RNG,
-    rtc: time::Rtc,
+    mut rng: RNG,
     network: NET,
-    articles: article::Articles,
-    users: user::Users,
-    schedule: schedule::Daily,
-    http: HttpClient<'a, NET::TcpConnect<'a>, NET::Dns<'a>>,
-    vereinsflieger: vereinsflieger::Vereinsflieger<'a>,
-    telemetry: telemetry::Telemetry<'a>,
     updater: Option<UPD>,
 ) -> ! {
+    // Initialize real time clock
+    let rtc = time::Rtc::new();
+
+    // Initialize article and user look up tables
+    let articles = article::Articles::new(config.vf_article_ids);
+    let users = user::Users::new();
+
+    // Initialize scheduler
+    let schedule = schedule::Daily::new();
+
+    // Initialize HTTP client
+    // As this allocates quite a bit of memory (e.g. for TLS buffers), only a single http client
+    // is created that can be passed to an API client whenever a connection needs to be established
+    // TLS read buffer needs to fit an encrypted TLS record. Actual size depends on server
+    // configuration. Maximum allowed value for a TLS record is 16640, so this is a safe amount.
+    let mut tls_read_buffer = vec![0; 16640].into_boxed_slice();
+    let mut tls_write_buffer = vec![0; 2048].into_boxed_slice();
+    // FIXME: reqwless with embedded-tls can't verify TLS certificates (though pinning is
+    // supported). This is bad since it makes communication vulnerable to MITM attacks.
+    let tls_config = TlsConfig::new(
+        rng.next_u64(),
+        &mut tls_read_buffer,
+        &mut tls_write_buffer,
+        TlsVerify::None,
+    );
+    let http = HttpClient::new_with_tls(network.tcp(), network.dns(), tls_config);
+
+    // Initialize Vereinsflieger API client
+    let vereinsflieger = vereinsflieger::Vereinsflieger::new(
+        &config.vf_username,
+        &config.vf_password_md5,
+        &config.vf_appkey,
+        config.vf_cid,
+    );
+
+    // Initialize telemetry
+    let telemetry = telemetry::Telemetry::new(config.mp_token.as_deref(), device_id);
+
+    // Initialize frontend resources
     let mut frontend = FrontendResources::<FrontendAdapter<DP, KP, NFC, BZZ>> {
         display,
         keypad,
         nfc,
         buzzer,
     };
+
+    // Initialize backend resources
     let mut backend = BackendResources::<BackendAdapter<RNG, NET, UPD>> {
         rng,
         rtc,
-        network,
+        network: &network,
         articles,
         users,
         schedule,
@@ -275,5 +317,7 @@ pub async fn run<
         telemetry,
         updater,
     };
-    ui::run(&mut frontend, &mut backend).await;
+
+    // Run user interface
+    ui::run(&mut frontend, &mut backend).await
 }

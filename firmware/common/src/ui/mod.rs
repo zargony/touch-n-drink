@@ -74,7 +74,7 @@ impl<FE: Frontend> From<Error<FE>> for ErrorWithUser<FE> {
 impl<FE: Frontend> ErrorWithUser<FE> {
     /// Try running the provided closure and associate the given user id with any error returned
     #[expect(dead_code)]
-    pub fn try_as_user<R, F>(user_id: UserId, f: F) -> Result<R, Self>
+    fn try_as_user<R, F>(user_id: UserId, f: F) -> Result<R, Self>
     where
         F: FnOnce() -> Result<R, Error<FE>>,
     {
@@ -82,7 +82,7 @@ impl<FE: Frontend> ErrorWithUser<FE> {
     }
 
     /// Try running the provided closure and associate the given user id with any error returned
-    pub async fn try_as_user_async<R, F>(user_id: UserId, f: F) -> Result<R, Self>
+    async fn try_as_user_async<R, F>(user_id: UserId, f: F) -> Result<R, Self>
     where
         F: AsyncFnOnce() -> Result<R, Error<FE>>,
     {
@@ -91,7 +91,7 @@ impl<FE: Frontend> ErrorWithUser<FE> {
 }
 
 /// User interface content
-pub trait UiContent {
+pub(crate) trait UiContent {
     /// Footer left text
     const FOOTER_LEFT: &str = "";
 
@@ -107,7 +107,7 @@ pub trait UiContent {
 }
 
 /// User interface interaction
-pub trait UiInteraction<FE: Frontend> {
+pub(crate) trait UiInteraction<FE: Frontend> {
     /// Type of value returned by this interaction
     type Output;
 
@@ -163,7 +163,7 @@ impl<UI: UiContent> UserInterface<UI> {
     }
 
     /// Draw user interface
-    pub fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
         // Clear screen
         target.clear(BinaryColor::Off)?;
 
@@ -218,7 +218,7 @@ async fn wait_network_up<FE: Frontend, BE: Backend>(
 }
 
 /// Run main user interface loop
-pub async fn run<FE: Frontend, BE: Backend>(
+pub(crate) async fn run<FE: Frontend, BE: Backend>(
     frontend: &mut FrontendResources<'_, FE>,
     backend: &mut BackendResources<'_, BE>,
 ) -> ! {

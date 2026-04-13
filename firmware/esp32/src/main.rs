@@ -49,8 +49,7 @@ mod update;
 mod wifi;
 
 use alloc::boxed::Box;
-use alloc::vec;
-use common::{GIT_SHA_STR, VERSION_STR, article, schedule, telemetry, time, user, vereinsflieger};
+use common::{GIT_SHA_STR, VERSION_STR};
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
@@ -69,8 +68,6 @@ use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
 use esp_storage::FlashStorage;
 use log::{debug, info, warn};
-use rand_core::RngCore;
-use reqwless::client::{HttpClient, TlsConfig, TlsVerify};
 
 extern crate alloc;
 
@@ -148,7 +145,7 @@ async fn main(spawner: Spawner) -> ! {
     info!("Touch 'n Drink v{VERSION_STR} ({GIT_SHA_STR})");
 
     // Initialize system devices
-    let mut rng = Rng::new();
+    let rng = Rng::new();
     let mut flash = FlashStorage::new(peripherals.FLASH);
     let _led = Output::new(peripherals.GPIO8, Level::High, OutputConfig::default());
 
@@ -214,16 +211,6 @@ async fn main(spawner: Spawner) -> ! {
     // Initialize buzzer
     let buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
 
-    // Initialize real time clock
-    let rtc = time::Rtc::new();
-
-    // Initialize article and user look up tables
-    let articles = article::Articles::new(config.vf_article_ids);
-    let users = user::Users::new();
-
-    // Initialize scheduler
-    let schedule = schedule::Daily::new();
-
     // Initialize Wifi
     let wifi = wifi::Wifi::new(
         rng,
@@ -236,35 +223,9 @@ async fn main(spawner: Spawner) -> ! {
     // Panic on failure since an initialization error indicates a static configuration error
     .expect("Wifi initialization failed");
 
-    // Initialize HTTP client
-    // As this allocates quite a bit of memory (e.g. for TLS buffers), only a single http client
-    // is created that can be passed to an API client whenever a connection needs to be established
-    // TLS read buffer needs to fit an encrypted TLS record. Actual size depends on server
-    // configuration. Maximum allowed value for a TLS record is 16640, so this is a safe amount.
-    let mut tls_read_buffer = vec![0; 16640].into_boxed_slice();
-    let mut tls_write_buffer = vec![0; 2048].into_boxed_slice();
-    // FIXME: reqwless with embedded-tls can't verify TLS certificates (though pinning is
-    // supported). This is bad since it makes communication vulnerable to MITM attacks.
-    let tls_config = TlsConfig::new(
-        rng.next_u64(),
-        &mut tls_read_buffer,
-        &mut tls_write_buffer,
-        TlsVerify::None,
-    );
-    let http = HttpClient::new_with_tls(wifi.tcp(), wifi.dns(), tls_config);
-
-    // Initialize Vereinsflieger API client
-    let vereinsflieger = vereinsflieger::Vereinsflieger::new(
-        &config.vf_username,
-        &config.vf_password_md5,
-        &config.vf_appkey,
-        config.vf_cid,
-    );
-
-    // Initialize telemetry
+    // Get device id (MAC address)
     let device_id: const_hex::Buffer<6, false> =
         const_hex::Buffer::new().const_format(&Efuse::read_base_mac_address());
-    let telemetry = telemetry::Telemetry::new(config.mp_token.as_deref(), device_id.as_str());
 
     // Initialize firmware updater
     let mut updater_buffer = [0; update::BUFFER_SIZE];
@@ -278,19 +239,14 @@ async fn main(spawner: Spawner) -> ! {
 
     // Run firmware
     Box::pin(common::run(
+        config,
+        device_id.as_str(),
         display,
         keypad,
         nfc,
         buzzer,
         rng,
-        rtc,
-        &wifi,
-        articles,
-        users,
-        schedule,
-        http,
-        vereinsflieger,
-        telemetry,
+        wifi,
         updater,
     ))
     .await
