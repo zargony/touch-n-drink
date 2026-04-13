@@ -33,9 +33,9 @@ pub struct Articles {
 
 impl Articles {
     /// Create new article lookup table
-    pub fn new(ids: Vec<ArticleId>) -> Self {
+    pub fn new(ids: &[ArticleId]) -> Self {
         Self {
-            ids,
+            ids: Vec::from(ids),
             articles: BTreeMap::new(),
         }
     }
@@ -108,11 +108,10 @@ impl Articles {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec;
 
     #[test]
     fn smoke() {
-        let mut articles = Articles::new(vec!["1111".into(), "2222".into()]);
+        let mut articles = Articles::new(&["1111".into(), "2222".into()]);
         articles.update_article(&"1111".into(), "Cold Drink", 11.11);
         articles.update_article(&"2222".into(), "Hot Drink", 22.22);
         assert_eq!(articles.count(), 2);
@@ -128,7 +127,7 @@ mod tests {
 
     #[test]
     fn no_articles() {
-        let mut articles = Articles::new(vec![]);
+        let mut articles = Articles::new(&[]);
         articles.update_article(&"1111".into(), "Cold Drink", 11.11);
         articles.update_article(&"2222".into(), "Hot Drink", 22.22);
         assert_eq!(articles.count(), 0);
@@ -137,7 +136,7 @@ mod tests {
 
     #[test]
     fn ignore_missing_and_unwanted() {
-        let mut articles = Articles::new(vec!["9999".into(), "2222".into()]);
+        let mut articles = Articles::new(&["9999".into(), "2222".into()]);
         articles.update_article(&"1111".into(), "Cold Drink", 11.11);
         articles.update_article(&"2222".into(), "Hot Drink", 22.22);
         assert_eq!(articles.count(), 1);

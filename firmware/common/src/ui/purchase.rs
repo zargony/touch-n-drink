@@ -1,7 +1,7 @@
 use super::common::{MEDIUM_STYLE, SMALL_STYLE, TITLE_STYLE};
-use super::{Error, Frontend, FrontendResources, UiContent, UiInteraction};
+use super::{DeviceTypes, Error, Frontend, UiContent, UiInteraction};
 use crate::Keypad;
-use crate::article::{Article, Articles};
+use crate::article::{Article, ArticleId};
 use crate::util::RectangleExt;
 use alloc::format;
 use alloc::vec::Vec;
@@ -25,11 +25,15 @@ static GREETINGS: [&str; 20] = [
 pub struct SelectArticle<'a> {
     greeting: &'static str,
     name: &'a str,
-    articles: &'a Articles,
+    articles: &'a [(ArticleId, Article)],
 }
 
 impl<'a> SelectArticle<'a> {
-    pub fn new<RNG: RngCore>(mut rng: RNG, name: &'a str, articles: &'a Articles) -> Self {
+    pub fn new<RNG: RngCore>(
+        rng: &mut RNG,
+        name: &'a str,
+        articles: &'a [(ArticleId, Article)],
+    ) -> Self {
         let greeting = GREETINGS[rng.next_u32() as usize % GREETINGS.len()];
         Self {
             greeting,
@@ -59,7 +63,7 @@ impl UiContent for SelectArticle<'_> {
         }
         greeting.draw(target)?;
 
-        if self.articles.iter().count() == 0 {
+        if self.articles.is_empty() {
             Text::with_alignment(
                 "Keine Artikel\nverfügbar",
                 Point::zero(),
@@ -104,16 +108,16 @@ impl UiContent for SelectArticle<'_> {
     }
 }
 
-impl<FE: Frontend> UiInteraction<FE> for SelectArticle<'_> {
+impl UiInteraction for SelectArticle<'_> {
     type Output = usize;
 
-    async fn run(
+    async fn run<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Output, Error<D>> {
         info!("UI: Asking to select article...");
 
-        let num_articles = self.articles.count();
+        let num_articles = self.articles.len();
         loop {
             match frontend.keypad.read().await.map_err(Error::Keypad)? {
                 // Any digit 1..=num_articles selects article
@@ -166,13 +170,13 @@ impl UiContent for EnterAmount<'_> {
     }
 }
 
-impl<FE: Frontend> UiInteraction<FE> for EnterAmount<'_> {
+impl UiInteraction for EnterAmount<'_> {
     type Output = usize;
 
-    async fn run(
+    async fn run<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Output, Error<D>> {
         info!(
             "UI: Asking to enter amount for {}, {:.02} EUR...",
             self.article.name, self.article.price
@@ -235,13 +239,13 @@ impl UiContent for Checkout<'_> {
     }
 }
 
-impl<FE: Frontend> UiInteraction<FE> for Checkout<'_> {
+impl UiInteraction for Checkout<'_> {
     type Output = ();
 
-    async fn run(
+    async fn run<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Output, Error<D>> {
         info!(
             "UI: Asking for purchase confirmation of {}x {}, {:.02} EUR...",
             self.amount, self.article.name, self.total_price
@@ -292,13 +296,13 @@ impl UiContent for Success {
     }
 }
 
-impl<FE: Frontend> UiInteraction<FE> for Success {
+impl UiInteraction for Success {
     type Output = ();
 
-    async fn run(
+    async fn run<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Output, Error<D>> {
         info!("UI: Displaying success, {} items", self.amount);
 
         // Wait at least 1s without responding to keypad

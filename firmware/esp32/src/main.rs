@@ -145,9 +145,13 @@ async fn main(spawner: Spawner) -> ! {
     info!("Touch 'n Drink v{VERSION_STR} ({GIT_SHA_STR})");
 
     // Initialize system devices
-    let rng = Rng::new();
+    let mut rng = Rng::new();
     let mut flash = FlashStorage::new(peripherals.FLASH);
     let _led = Output::new(peripherals.GPIO8, Level::High, OutputConfig::default());
+
+    // Get device id (MAC address)
+    let device_id: const_hex::Buffer<6, false> =
+        const_hex::Buffer::new().const_format(&Efuse::read_base_mac_address());
 
     // Start feeding the watchdog
     let rtc = Rtc::new(peripherals.LPWR);
@@ -178,7 +182,7 @@ async fn main(spawner: Spawner) -> ! {
     let i2c: Mutex<NoopRawMutex, _> = Mutex::new(i2c);
 
     // Initialize display
-    let display = display::Display::new(I2cDevice::new(&i2c))
+    let mut display = display::Display::new(I2cDevice::new(&i2c))
         .await
         // Panic on failure since without a display there's no reasonable way to tell the user
         .expect("Display initialization failed");
@@ -186,7 +190,7 @@ async fn main(spawner: Spawner) -> ! {
     // Initialize keypad
     let keypad_input_config = InputConfig::default().with_pull(Pull::Up);
     let keypad_output_config = OutputConfig::default().with_drive_mode(DriveMode::OpenDrain);
-    let keypad = keypad::Keypad::new(
+    let mut keypad = keypad::Keypad::new(
         [
             Input::new(peripherals.GPIO5, keypad_input_config),
             Input::new(peripherals.GPIO6, keypad_input_config),
@@ -203,13 +207,13 @@ async fn main(spawner: Spawner) -> ! {
     // Initialize NFC reader
     let nfc_irq_input_config = InputConfig::default().with_pull(Pull::Up);
     let nfc_irq = Input::new(peripherals.GPIO20, nfc_irq_input_config);
-    let nfc = nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq)
+    let mut nfc = nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq)
         .await
         // Panic on failure since an initialization error indicates a serious error
         .expect("NFC reader initialization failed");
 
     // Initialize buzzer
-    let buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
+    let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
 
     // Initialize Wifi
     let wifi = wifi::Wifi::new(
@@ -223,13 +227,9 @@ async fn main(spawner: Spawner) -> ! {
     // Panic on failure since an initialization error indicates a static configuration error
     .expect("Wifi initialization failed");
 
-    // Get device id (MAC address)
-    let device_id: const_hex::Buffer<6, false> =
-        const_hex::Buffer::new().const_format(&Efuse::read_base_mac_address());
-
     // Initialize firmware updater
     let mut updater_buffer = [0; update::BUFFER_SIZE];
-    let updater = match update::Updater::new(&mut flash, &mut updater_buffer) {
+    let mut updater = match update::Updater::new(&mut flash, &mut updater_buffer) {
         Ok(updater) => Some(updater),
         Err(err) => {
             warn!("Firmware updates unavailable: {err}");
@@ -238,16 +238,14 @@ async fn main(spawner: Spawner) -> ! {
     };
 
     // Run firmware
-    Box::pin(common::run(
-        config,
-        device_id.as_str(),
-        display,
-        keypad,
-        nfc,
-        buzzer,
-        rng,
-        wifi,
-        updater,
-    ))
-    .await
+    let devices = common::Devices {
+        rng: &mut rng,
+        display: &mut display,
+        keypad: &mut keypad,
+        nfc: &mut nfc,
+        buzzer: &mut buzzer,
+        network: &wifi,
+        updater: updater.as_mut(),
+    };
+    Box::pin(common::run(&config, device_id.as_str(), devices)).await
 }

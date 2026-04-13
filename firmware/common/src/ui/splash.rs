@@ -1,4 +1,4 @@
-use super::{Error, Frontend, FrontendResources, UiContent, UiInteraction};
+use super::{DeviceTypes, Error, Frontend, UiContent, UiInteraction};
 use crate::{Buzzer, GIT_SHA_STR, Keypad, VERSION_STR};
 use alloc::format;
 use embassy_time::Duration;
@@ -70,14 +70,14 @@ impl UiContent for Splash {
     }
 }
 
-impl<FE: Frontend> UiInteraction<FE> for Splash {
+impl UiInteraction for Splash {
     type Output = ();
     const TIMEOUT: Option<Duration> = Some(TIMEOUT);
 
-    async fn run(
+    async fn run<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Output, Error<D>> {
         info!("UI: Displaying splash screen");
 
         // Output startup/testing tone

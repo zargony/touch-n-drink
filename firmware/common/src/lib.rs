@@ -151,8 +151,29 @@ pub trait Updater {
     fn recently_restarted() -> bool;
 }
 
-/// Firmware frontend
-trait Frontend {
+/// Firmware devices
+#[must_use]
+pub struct Devices<
+    'd,
+    RNG: RngCore,
+    DP: Display,
+    KP: Keypad,
+    NFC: NfcReader,
+    BZZ: Buzzer,
+    NET: Network,
+    UPD: Updater,
+> {
+    pub rng: &'d mut RNG,
+    pub display: &'d mut DP,
+    pub keypad: &'d mut KP,
+    pub nfc: &'d mut NFC,
+    pub buzzer: &'d mut BZZ,
+    pub network: &'d NET,
+    pub updater: Option<&'d mut UPD>,
+}
+
+/// Firmware device types. Groups all device generics into one trait for convenience.
+trait DeviceTypes {
     /// Display error type
     type DisplayError: fmt::Debug + fmt::Display;
     /// Keypad error type
@@ -160,109 +181,97 @@ trait Frontend {
     /// NFC reader error type
     type NfcError: fmt::Debug + fmt::Display;
 
-    /// Display
-    type Display<'a>: Display<Error = Self::DisplayError>;
-    /// Keypad
-    type Keypad<'a>: Keypad<Error = Self::KeypadError>;
-    /// NFC reader
-    type NfcReader<'a>: NfcReader<Error = Self::NfcError>;
-    /// Buzzer
-    type Buzzer<'a>: Buzzer;
-}
-
-/// Firmware frontend adapter that allows to move separate generics to a `Frontend` implementation
-#[must_use]
-struct FrontendAdapter<DP: Display, KP: Keypad, NFC: NfcReader, BZZ: Buzzer>(
-    PhantomData<(DP, KP, NFC, BZZ)>,
-);
-
-impl<DP: Display, KP: Keypad, NFC: NfcReader, BZZ: Buzzer> Frontend
-    for FrontendAdapter<DP, KP, NFC, BZZ>
-{
-    type DisplayError = DP::Error;
-    type KeypadError = KP::Error;
-    type NfcError = NFC::Error;
-
-    type Display<'a> = DP;
-    type Keypad<'a> = KP;
-    type NfcReader<'a> = NFC;
-    type Buzzer<'a> = BZZ;
-}
-
-/// Firmware frontend resources
-#[must_use]
-struct FrontendResources<'fe, FE: Frontend> {
-    display: FE::Display<'fe>,
-    keypad: FE::Keypad<'fe>,
-    nfc: FE::NfcReader<'fe>,
-    buzzer: FE::Buzzer<'fe>,
-}
-
-/// Firmware backend
-trait Backend {
     /// Random number generator type
     type Rng<'a>: RngCore;
+    /// Display type
+    type Display<'a>: Display<Error = Self::DisplayError>;
+    /// Keypad type
+    type Keypad<'a>: Keypad<Error = Self::KeypadError>;
+    /// NFC reader type
+    type NfcReader<'a>: NfcReader<Error = Self::NfcError>;
+    /// Buzzer type
+    type Buzzer<'a>: Buzzer;
     /// Network stack type
     type Network<'a>: Network;
     /// Firmware updater type
     type Updater<'a>: Updater;
 }
 
-/// Firmware backend adapter that allows to move separate generics to a `Backend` implementation
+/// Firmware device types adapter. Allows switching from multiple generics `<RNG, DP, KP, ...>`
+/// to a single generic `D: DeviceTypes`, which is a lot more convenient to use.
 #[must_use]
-struct BackendAdapter<RNG: RngCore, NET: Network, UPD: Updater>(PhantomData<(RNG, NET, UPD)>);
-
-impl<RNG: RngCore, NET: Network, UPD: Updater> Backend for BackendAdapter<RNG, NET, UPD> {
-    type Rng<'a> = RNG;
-    type Network<'a> = NET;
-    type Updater<'a> = UPD;
-}
-
-/// Firmware backend resources
-#[must_use]
-struct BackendResources<'be, BE: Backend> {
-    rng: BE::Rng<'be>,
-    rtc: time::Rtc,
-    network: &'be BE::Network<'be>,
-    articles: article::Articles,
-    users: user::Users,
-    schedule: schedule::Daily,
-    http: reqwless::client::HttpClient<
-        'be,
-        <BE::Network<'be> as Network>::TcpClient,
-        <BE::Network<'be> as Network>::DnsSocket,
-    >,
-    vereinsflieger: vereinsflieger::Vereinsflieger<'be>,
-    telemetry: telemetry::Telemetry<'be>,
-    updater: Option<BE::Updater<'be>>,
-}
-
-/// Run firmware
-#[expect(clippy::too_many_arguments)]
-pub async fn run<
+struct DeviceTypeAdapter<
+    RNG: RngCore,
     DP: Display,
     KP: Keypad,
     NFC: NfcReader,
     BZZ: Buzzer,
+    NET: Network,
+    UPD: Updater,
+>(PhantomData<(RNG, DP, KP, NFC, BZZ, NET, UPD)>);
+
+impl<RNG: RngCore, DP: Display, KP: Keypad, NFC: NfcReader, BZZ: Buzzer, NET: Network, UPD: Updater>
+    DeviceTypes for DeviceTypeAdapter<RNG, DP, KP, NFC, BZZ, NET, UPD>
+{
+    type DisplayError = DP::Error;
+    type KeypadError = KP::Error;
+    type NfcError = NFC::Error;
+
+    type Rng<'a> = RNG;
+    type Display<'a> = DP;
+    type Keypad<'a> = KP;
+    type NfcReader<'a> = NFC;
+    type Buzzer<'a> = BZZ;
+    type Network<'a> = NET;
+    type Updater<'a> = UPD;
+}
+
+/// Firmware context (devices and resources)
+#[must_use]
+struct Context<'c, D: DeviceTypes> {
+    #[expect(clippy::type_complexity)]
+    dev: Devices<
+        'c,
+        D::Rng<'c>,
+        D::Display<'c>,
+        D::Keypad<'c>,
+        D::NfcReader<'c>,
+        D::Buzzer<'c>,
+        D::Network<'c>,
+        D::Updater<'c>,
+    >,
+    rtc: time::Rtc,
+    articles: article::Articles,
+    users: user::Users,
+    schedule: schedule::Daily,
+    http: HttpClient<
+        'c,
+        <D::Network<'c> as Network>::TcpClient,
+        <D::Network<'c> as Network>::DnsSocket,
+    >,
+    vereinsflieger: vereinsflieger::Vereinsflieger<'c>,
+    telemetry: telemetry::Telemetry<'c>,
+}
+
+/// Run firmware
+pub async fn run<
     RNG: RngCore,
+    DP: Display,
+    KP: Keypad,
+    NFC: NfcReader,
+    BZZ: Buzzer,
     NET: Network,
     UPD: Updater,
 >(
-    config: config::Config,
+    config: &config::Config,
     device_id: &str,
-    display: DP,
-    keypad: KP,
-    nfc: NFC,
-    buzzer: BZZ,
-    mut rng: RNG,
-    network: NET,
-    updater: Option<UPD>,
+    devices: Devices<'_, RNG, DP, KP, NFC, BZZ, NET, UPD>,
 ) -> ! {
     // Initialize real time clock
     let rtc = time::Rtc::new();
 
     // Initialize article and user look up tables
-    let articles = article::Articles::new(config.vf_article_ids);
+    let articles = article::Articles::new(&config.vf_article_ids);
     let users = user::Users::new();
 
     // Initialize scheduler
@@ -278,12 +287,12 @@ pub async fn run<
     // FIXME: reqwless with embedded-tls can't verify TLS certificates (though pinning is
     // supported). This is bad since it makes communication vulnerable to MITM attacks.
     let tls_config = TlsConfig::new(
-        rng.next_u64(),
+        devices.rng.next_u64(),
         &mut tls_read_buffer,
         &mut tls_write_buffer,
         TlsVerify::None,
     );
-    let http = HttpClient::new_with_tls(network.tcp(), network.dns(), tls_config);
+    let http = HttpClient::new_with_tls(devices.network.tcp(), devices.network.dns(), tls_config);
 
     // Initialize Vereinsflieger API client
     let vereinsflieger = vereinsflieger::Vereinsflieger::new(
@@ -296,28 +305,18 @@ pub async fn run<
     // Initialize telemetry
     let telemetry = telemetry::Telemetry::new(config.mp_token.as_deref(), device_id);
 
-    // Initialize frontend resources
-    let mut frontend = FrontendResources::<FrontendAdapter<DP, KP, NFC, BZZ>> {
-        display,
-        keypad,
-        nfc,
-        buzzer,
-    };
-
-    // Initialize backend resources
-    let mut backend = BackendResources::<BackendAdapter<RNG, NET, UPD>> {
-        rng,
+    // Build context (devices and resources)
+    let mut ctx = Context::<DeviceTypeAdapter<RNG, DP, KP, NFC, BZZ, NET, UPD>> {
+        dev: devices,
         rtc,
-        network: &network,
         articles,
         users,
         schedule,
         http,
         vereinsflieger,
         telemetry,
-        updater,
     };
 
     // Run user interface
-    ui::run(&mut frontend, &mut backend).await
+    ui::run(&mut ctx).await
 }

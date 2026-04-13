@@ -1,5 +1,5 @@
 use super::common::{SMALL_STYLE, TITLE_STYLE};
-use super::{Error, Frontend, FrontendResources, UiContent, UiInteraction};
+use super::{DeviceTypes, Error, Frontend, UiContent, UiInteraction};
 use crate::util::RectangleExt;
 use crate::{Buzzer, Keypad};
 use alloc::format;
@@ -62,14 +62,14 @@ impl<M: fmt::Display> UiContent for ErrorMessage<M> {
     }
 }
 
-impl<M: fmt::Display, FE: Frontend> UiInteraction<FE> for ErrorMessage<M> {
+impl<M: fmt::Display> UiInteraction for ErrorMessage<M> {
     type Output = ();
     const TIMEOUT: Option<Duration> = Some(TIMEOUT);
 
-    async fn run(
+    async fn run<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Output, Error<D>> {
         info!("UI: Displaying error: {}", self.message);
 
         // Sound the error buzzer if the error was caused by a user's interaction

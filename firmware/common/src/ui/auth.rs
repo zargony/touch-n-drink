@@ -1,5 +1,5 @@
 use super::common::TITLE_STYLE;
-use super::{Error, Frontend, FrontendResources, UiContent, UiInteraction};
+use super::{DeviceTypes, Error, Frontend, UiContent, UiInteraction};
 use crate::nfc::Uid;
 use crate::{Display, Keypad, NfcReader};
 use embassy_futures::select::{Either, select};
@@ -36,15 +36,15 @@ impl UiContent for Authentication {
     }
 }
 
-impl<FE: Frontend> UiInteraction<FE> for Authentication {
+impl UiInteraction for Authentication {
     type Output = Uid;
     // No user interaction timeout since there is no user when waiting for a user
     const TIMEOUT: Option<Duration> = None;
 
-    async fn run(
+    async fn run<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Output, Error<D>> {
         info!("UI: Waiting for NFC card...");
 
         loop {
