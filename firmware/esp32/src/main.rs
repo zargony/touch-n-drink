@@ -48,9 +48,9 @@ mod pn532;
 mod update;
 mod wifi;
 
+use alloc::boxed::Box;
 use alloc::vec;
 use common::{GIT_SHA_STR, VERSION_STR, article, schedule, telemetry, time, user, vereinsflieger};
-use core::convert::Infallible;
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
@@ -133,8 +133,6 @@ async fn watchdog(mut rtc: Rtc<'static>) -> ! {
 async fn main(spawner: Spawner) -> ! {
     let esp_config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(esp_config);
-    let mut rng = Rng::new();
-    let _led = Output::new(peripherals.GPIO8, Level::High, OutputConfig::default());
 
     // Initialize global allocator
     esp_alloc::heap_allocator!(#[esp_hal::ram(reclaimed)] size: 64 * 1024);
@@ -149,6 +147,11 @@ async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     info!("Touch 'n Drink v{VERSION_STR} ({GIT_SHA_STR})");
 
+    // Initialize system devices
+    let mut rng = Rng::new();
+    let mut flash = FlashStorage::new(peripherals.FLASH);
+    let _led = Output::new(peripherals.GPIO8, Level::High, OutputConfig::default());
+
     // Start feeding the watchdog
     let rtc = Rtc::new(peripherals.LPWR);
     debug!("Spawning watchdog task...");
@@ -158,7 +161,6 @@ async fn main(spawner: Spawner) -> ! {
         .expect("Failed to spawn watchdog task");
 
     // Read system configuration
-    let mut flash = FlashStorage::new(peripherals.FLASH);
     let config = config::Config::read(&mut flash);
 
     // Initialize I2C controller
@@ -274,17 +276,15 @@ async fn main(spawner: Spawner) -> ! {
         }
     };
 
-    // Prepare firmware frontend and backend
-    let mut frontend = common::FrontendResources::<Frontend> {
+    // Run firmware
+    Box::pin(common::run(
         display,
         keypad,
         nfc,
         buzzer,
-    };
-    let mut backend = common::BackendResources::<Backend> {
         rng,
         rtc,
-        network: &wifi,
+        &wifi,
         articles,
         users,
         schedule,
@@ -292,31 +292,6 @@ async fn main(spawner: Spawner) -> ! {
         vereinsflieger,
         telemetry,
         updater,
-    };
-
-    // Run firmware
-    common::run(&mut frontend, &mut backend).await
-}
-
-/// Firmware frontend
-pub struct Frontend;
-
-impl common::Frontend for Frontend {
-    type DisplayError = display::Error;
-    type KeypadError = Infallible;
-    type NfcError = nfc::Error;
-
-    type Display<'a> = display::Display<I2cDevice<'a, NoopRawMutex, I2c<'a, esp_hal::Async>>>;
-    type Keypad<'a> = keypad::Keypad<'a, 3, 4>;
-    type NfcReader<'a> = nfc::Nfc<I2cDevice<'a, NoopRawMutex, I2c<'a, esp_hal::Async>>, Input<'a>>;
-    type Buzzer<'a> = buzzer::Buzzer<'a>;
-}
-
-/// Firmware backend
-struct Backend;
-
-impl common::Backend for Backend {
-    type Rng<'a> = Rng;
-    type Network<'a> = &'a wifi::Wifi;
-    type Updater<'a> = update::Updater<'a>;
+    ))
+    .await
 }

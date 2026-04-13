@@ -15,6 +15,7 @@ pub mod util;
 pub mod vereinsflieger;
 
 use core::fmt;
+use core::marker::PhantomData;
 use embassy_time::Timer;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::DrawTarget;
@@ -22,6 +23,7 @@ use embedded_nal_async::{Dns, TcpConnect};
 use embedded_storage::Storage;
 use log::debug;
 use rand_core::RngCore;
+use reqwless::client::HttpClient;
 
 extern crate alloc;
 
@@ -160,6 +162,25 @@ pub trait Frontend {
     type Buzzer<'a>: Buzzer;
 }
 
+/// Firmware frontend adapter that allows to move separate generics to a `Frontend` implementation
+#[must_use]
+struct FrontendAdapter<DP: Display, KP: Keypad, NFC: NfcReader, BZZ: Buzzer>(
+    PhantomData<(DP, KP, NFC, BZZ)>,
+);
+
+impl<DP: Display, KP: Keypad, NFC: NfcReader, BZZ: Buzzer> Frontend
+    for FrontendAdapter<DP, KP, NFC, BZZ>
+{
+    type DisplayError = DP::Error;
+    type KeypadError = KP::Error;
+    type NfcError = NFC::Error;
+
+    type Display<'a> = DP;
+    type Keypad<'a> = KP;
+    type NfcReader<'a> = NFC;
+    type Buzzer<'a> = BZZ;
+}
+
 /// Firmware frontend resources
 #[must_use]
 pub struct FrontendResources<'fe, FE: Frontend> {
@@ -177,6 +198,16 @@ pub trait Backend {
     type Network<'a>: Network;
     /// Firmware updater type
     type Updater<'a>: Updater;
+}
+
+/// Firmware backend adapter that allows to move separate generics to a `Backend` implementation
+#[must_use]
+struct BackendAdapter<RNG: RngCore, NET: Network, UPD: Updater>(PhantomData<(RNG, NET, UPD)>);
+
+impl<RNG: RngCore, NET: Network, UPD: Updater> Backend for BackendAdapter<RNG, NET, UPD> {
+    type Rng<'a> = RNG;
+    type Network<'a> = NET;
+    type Updater<'a> = UPD;
 }
 
 /// Firmware backend resources
@@ -199,9 +230,49 @@ pub struct BackendResources<'be, BE: Backend> {
 }
 
 /// Run firmware
-pub async fn run<FE: Frontend, BE: Backend>(
-    frontend: &mut FrontendResources<'_, FE>,
-    backend: &mut BackendResources<'_, BE>,
+#[expect(clippy::too_many_arguments)]
+pub async fn run<
+    'a,
+    DP: Display,
+    KP: Keypad,
+    NFC: NfcReader,
+    BZZ: Buzzer,
+    RNG: RngCore,
+    NET: Network,
+    UPD: Updater,
+>(
+    display: DP,
+    keypad: KP,
+    nfc: NFC,
+    buzzer: BZZ,
+    rng: RNG,
+    rtc: time::Rtc,
+    network: NET,
+    articles: article::Articles,
+    users: user::Users,
+    schedule: schedule::Daily,
+    http: HttpClient<'a, NET::TcpConnect<'a>, NET::Dns<'a>>,
+    vereinsflieger: vereinsflieger::Vereinsflieger<'a>,
+    telemetry: telemetry::Telemetry<'a>,
+    updater: Option<UPD>,
 ) -> ! {
-    ui::run(frontend, backend).await;
+    let mut frontend = FrontendResources::<FrontendAdapter<DP, KP, NFC, BZZ>> {
+        display,
+        keypad,
+        nfc,
+        buzzer,
+    };
+    let mut backend = BackendResources::<BackendAdapter<RNG, NET, UPD>> {
+        rng,
+        rtc,
+        network,
+        articles,
+        users,
+        schedule,
+        http,
+        vereinsflieger,
+        telemetry,
+        updater,
+    };
+    ui::run(&mut frontend, &mut backend).await;
 }
