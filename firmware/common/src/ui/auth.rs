@@ -1,5 +1,5 @@
 use super::common::TITLE_STYLE;
-use super::{Error, Frontend, FrontendResources, UiContent, UiInteraction};
+use super::{DeviceTypes, Error, Frontend, UiContent, UiInteraction};
 use crate::nfc::Uid;
 use crate::{Display, Keypad, NfcReader};
 use embassy_futures::select::{Either, select};
@@ -23,7 +23,10 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 pub struct Authentication;
 
 impl UiContent for Authentication {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         Text::with_alignment(
             "Mitgliedsausweis\nscannen",
             Point::zero(),
@@ -36,15 +39,15 @@ impl UiContent for Authentication {
     }
 }
 
-impl<FE: Frontend> UiInteraction<FE> for Authentication {
-    type Output = Uid;
+impl UiInteraction for Authentication {
+    type Input = Uid;
     // No user interaction timeout since there is no user when waiting for a user
     const TIMEOUT: Option<Duration> = None;
 
-    async fn run(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Input, Error<D>> {
         info!("UI: Waiting for NFC card...");
 
         loop {

@@ -33,9 +33,9 @@ pub struct Articles {
 
 impl Articles {
     /// Create new article lookup table
-    pub fn new(ids: Vec<ArticleId>) -> Self {
+    pub fn new(ids: &[ArticleId]) -> Self {
         Self {
-            ids,
+            ids: Vec::from(ids),
             articles: BTreeMap::new(),
         }
     }
@@ -75,24 +75,17 @@ impl Articles {
         }
     }
 
-    /// Number of ids
-    #[must_use]
-    pub fn count_ids(&self) -> usize {
-        self.ids.len()
-    }
-
-    /// Number of articles
+    /// Number of articles available
     #[must_use]
     pub fn count(&self) -> usize {
         self.articles.len()
     }
 
     /// Iterate over articles in order given on initialization
-    pub fn iter(&self) -> impl Iterator<Item = (usize, &ArticleId, &Article)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&ArticleId, &Article)> {
         self.ids
             .iter()
-            .enumerate()
-            .filter_map(|(idx, id)| self.get(id).map(|article| (idx, id, article)))
+            .filter_map(|id| self.get(id).map(|article| (id, article)))
     }
 
     /// Look up article by article id
@@ -104,12 +97,47 @@ impl Articles {
     {
         self.articles.get(id)
     }
+}
 
-    /// Look up article at given index
-    #[must_use]
-    pub fn get_by_index(&self, index: usize) -> Option<(&ArticleId, &Article)> {
-        let id = self.ids.get(index)?;
-        let article = self.get(id)?;
-        Some((id, article))
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn smoke() {
+        let mut articles = Articles::new(&["1111".into(), "2222".into()]);
+        articles.update_article(&"1111".into(), "Cold Drink", 11.11);
+        articles.update_article(&"2222".into(), "Hot Drink", 22.22);
+        assert_eq!(articles.count(), 2);
+        assert_eq!(articles.get("1111").unwrap().name, "Cold Drink");
+        assert_eq!(articles.get("1111").unwrap().price, 11.11);
+        assert_eq!(articles.get("2222").unwrap().name, "Hot Drink");
+        assert_eq!(articles.get("2222").unwrap().price, 22.22);
+        let mut iter = articles.iter();
+        assert_eq!(iter.next().unwrap().0, "1111");
+        assert_eq!(iter.next().unwrap().0, "2222");
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn no_articles() {
+        let mut articles = Articles::new(&[]);
+        articles.update_article(&"1111".into(), "Cold Drink", 11.11);
+        articles.update_article(&"2222".into(), "Hot Drink", 22.22);
+        assert_eq!(articles.count(), 0);
+        let mut iter = articles.iter();
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn ignore_missing_and_unwanted() {
+        let mut articles = Articles::new(&["9999".into(), "2222".into()]);
+        articles.update_article(&"1111".into(), "Cold Drink", 11.11);
+        articles.update_article(&"2222".into(), "Hot Drink", 22.22);
+        assert_eq!(articles.count(), 1);
+        assert_eq!(articles.get("1111"), None);
+        let mut iter = articles.iter();
+        assert_eq!(iter.next().unwrap().0, "2222");
+        assert_eq!(iter.next(), None);
     }
 }

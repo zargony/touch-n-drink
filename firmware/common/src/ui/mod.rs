@@ -4,15 +4,14 @@ mod error;
 mod purchase;
 mod splash;
 
-use crate::article::ArticleId;
+use crate::article::{Article, ArticleId};
 use crate::ota::{self, Ota};
 use crate::telemetry::Event;
 use crate::user::{User, UserId};
 use crate::util::RectangleExt;
-use crate::{
-    Backend, BackendResources, Buzzer, Display, Frontend, FrontendResources, Network, Updater,
-};
+use crate::{Buzzer, Context, DeviceTypes, Display, Network, Updater};
 use alloc::string::ToString;
+use alloc::vec::Vec;
 use derive_more::{Display, From};
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, TimeoutError, Timer, with_timeout};
@@ -28,7 +27,7 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// User interface error
 #[derive(Debug, Display, From)]
-enum Error<FE: Frontend> {
+enum Error<D: DeviceTypes> {
     /// User interaction timeout
     #[display("Timeout waiting for user input")]
     UserTimeout,
@@ -43,13 +42,13 @@ enum Error<FE: Frontend> {
     CurrentTimeNotSet,
     /// Display output error
     #[display("Display: {_0}")]
-    Display(FE::DisplayError),
+    Display(D::DisplayError),
     /// Keypad error
     #[display("Keypad: {_0}")]
-    Keypad(FE::KeypadError),
+    Keypad(D::KeypadError),
     /// NFC reader error
     #[display("NFC: {_0}")]
-    Nfc(FE::NfcError),
+    Nfc(D::NfcError),
     /// Vereinsflieger API error
     #[display("Vereinsflieger: {_0}")]
     #[from]
@@ -63,35 +62,54 @@ enum Error<FE: Frontend> {
 /// User interface error with optional user id
 #[derive(Display)]
 #[display("{_0}")]
-struct ErrorWithUser<FE: Frontend>(Error<FE>, Option<UserId>);
+struct ErrorWithUser<D: DeviceTypes>(Error<D>, Option<UserId>);
 
-impl<FE: Frontend> From<Error<FE>> for ErrorWithUser<FE> {
-    fn from(err: Error<FE>) -> Self {
+impl<D: DeviceTypes> From<Error<D>> for ErrorWithUser<D> {
+    fn from(err: Error<D>) -> Self {
         Self(err, None)
     }
 }
 
-impl<FE: Frontend> ErrorWithUser<FE> {
+impl<D: DeviceTypes> ErrorWithUser<D> {
     /// Try running the provided closure and associate the given user id with any error returned
     #[expect(dead_code)]
-    pub fn try_as_user<R, F>(user_id: UserId, f: F) -> Result<R, Self>
+    fn try_as_user<R, F>(user_id: UserId, f: F) -> Result<R, Self>
     where
-        F: FnOnce() -> Result<R, Error<FE>>,
+        F: FnOnce() -> Result<R, Error<D>>,
     {
         f().map_err(|err| Self(err, Some(user_id)))
     }
 
     /// Try running the provided closure and associate the given user id with any error returned
-    pub async fn try_as_user_async<R, F>(user_id: UserId, f: F) -> Result<R, Self>
+    async fn try_as_user_async<R, F>(user_id: UserId, f: F) -> Result<R, Self>
     where
-        F: AsyncFnOnce() -> Result<R, Error<FE>>,
+        F: AsyncFnOnce() -> Result<R, Error<D>>,
     {
         f().await.map_err(|err| Self(err, Some(user_id)))
     }
 }
 
+/// User interface frontend
+pub(crate) struct Frontend<'fe, 'dev, D: DeviceTypes> {
+    display: &'fe mut D::Display<'dev>,
+    keypad: &'fe mut D::Keypad<'dev>,
+    nfc: &'fe mut D::NfcReader<'dev>,
+    buzzer: &'fe mut D::Buzzer<'dev>,
+}
+
+impl<'fe, 'dev, D: DeviceTypes> From<&'fe mut Context<'dev, D>> for Frontend<'fe, 'dev, D> {
+    fn from(ctx: &'fe mut Context<'dev, D>) -> Self {
+        Self {
+            display: ctx.dev.display,
+            keypad: ctx.dev.keypad,
+            nfc: ctx.dev.nfc,
+            buzzer: ctx.dev.buzzer,
+        }
+    }
+}
+
 /// User interface content
-pub trait UiContent {
+pub(crate) trait UiContent {
     /// Footer left text
     const FOOTER_LEFT: &str = "";
 
@@ -103,73 +121,39 @@ pub trait UiContent {
     /// # Errors
     ///
     /// An error will be returned if the content could not be drawn to the given target.
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error>;
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error>;
 }
 
 /// User interface interaction
-pub trait UiInteraction<FE: Frontend> {
+pub(crate) trait UiInteraction {
     /// Type of value returned by this interaction
-    type Output;
+    type Input;
 
     /// Timeout after which the user interaction is cancelled
     const TIMEOUT: Option<Duration> = Some(DEFAULT_TIMEOUT);
 
     /// Run user interaction and return the determined value
-    async fn run(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>>;
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Input, Error<D>>;
 }
 
 /// User interface
 struct UserInterface<UI>(pub UI);
 
 impl<UI: UiContent> UserInterface<UI> {
-    /// Run user interface (draw content, wait for interaction, return determined value). Ignores
-    /// user interaction timeout errors and returns ok instead (useful for a final step).
-    async fn run_timeout_ok<FE: Frontend>(
-        &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<(), Error<FE>>
-    where
-        UI: UiInteraction<FE, Output = ()>,
-    {
-        match self.run(frontend).await {
-            Err(Error::UserTimeout) => Ok(()),
-            res => res,
-        }
-    }
-
-    /// Run user interface (draw content, wait for interaction, return determined value)
-    async fn run<FE: Frontend>(
-        &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<UI::Output, Error<FE>>
-    where
-        UI: UiInteraction<FE>,
-    {
-        // Draw user interface
-        self.draw(&mut frontend.display).map_err(Error::Display)?;
-        frontend.display.flush().await.map_err(Error::Display)?;
-
-        // Run user interaction with or without timeout
-        if let Some(timeout) = UI::TIMEOUT {
-            with_timeout(timeout, self.0.run(frontend))
-                .await
-                .map_err(|TimeoutError| Error::UserTimeout)?
-        } else {
-            self.0.run(frontend).await
-        }
-    }
-
     /// Draw user interface
-    pub fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
         // Clear screen
         target.clear(BinaryColor::Off)?;
 
         // Draw content full-screen (no footer)
         if UI::FOOTER_LEFT.is_empty() && UI::FOOTER_RIGHT.is_empty() {
-            self.0.draw(target)?;
+            self.0.draw_content(target)?;
 
         // Draw footer and content in a clipped area
         } else {
@@ -181,57 +165,88 @@ impl<UI: UiContent> UserInterface<UI> {
 
             // Draw content
             let mut content_area = target.clipped(&content_box);
-            self.0.draw(&mut content_area)?;
+            self.0.draw_content(&mut content_area)?;
         }
 
         Ok(())
     }
 }
 
+impl<UI: UiContent + UiInteraction> UserInterface<UI> {
+    /// Run user interface (draw content, wait for interaction, return determined value)
+    async fn run<D: DeviceTypes>(
+        &mut self,
+        ctx: &mut Context<'_, D>,
+    ) -> Result<UI::Input, Error<D>> {
+        // Draw user interface
+        self.draw(ctx.dev.display).map_err(Error::Display)?;
+        ctx.dev.display.flush().await.map_err(Error::Display)?;
+
+        // Run user interaction with or without timeout
+        let mut frontend = Frontend::from(ctx);
+        if let Some(timeout) = UI::TIMEOUT {
+            with_timeout(timeout, self.0.read_input(&mut frontend))
+                .await
+                .map_err(|TimeoutError| Error::UserTimeout)?
+        } else {
+            self.0.read_input(&mut frontend).await
+        }
+    }
+
+    /// Run user interface (draw content, wait for interaction, return determined value). Ignores
+    /// user interaction timeout errors and returns ok instead (useful for a final step).
+    async fn run_timeout_ok<D: DeviceTypes>(
+        &mut self,
+        ctx: &mut Context<'_, D>,
+    ) -> Result<(), Error<D>>
+    where
+        UI: UiInteraction<Input = ()>,
+    {
+        match self.run(ctx).await {
+            Err(Error::UserTimeout) => Ok(()),
+            res => res,
+        }
+    }
+}
+
 /// Display waiting screen
-async fn show_please_wait<FE: Frontend>(
-    frontend: &mut FrontendResources<'_, FE>,
+async fn show_please_wait<D: DeviceTypes>(
+    display: &mut D::Display<'_>,
     reason: common::PleaseWait,
-) -> Result<(), Error<FE>> {
+) -> Result<(), Error<D>> {
     UserInterface(reason)
-        .draw(&mut frontend.display)
+        .draw(display)
         .map_err(Error::Display)?;
-    frontend.display.flush().await.map_err(Error::Display)?;
+    display.flush().await.map_err(Error::Display)?;
     Ok(())
 }
 
 /// Wait for network to become available (if not already)
-async fn wait_network_up<FE: Frontend, BE: Backend>(
-    frontend: &mut FrontendResources<'_, FE>,
-    backend: &mut BackendResources<'_, BE>,
-) -> Result<(), Error<FE>> {
-    if backend.network.is_up() {
+async fn wait_network_up<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> Result<(), Error<D>> {
+    if ctx.dev.network.is_up() {
         return Ok(());
     }
 
     info!("UI: Waiting for network to become available...");
-    show_please_wait(frontend, common::PleaseWait::WifiConnecting).await?;
+    show_please_wait(ctx.dev.display, common::PleaseWait::WifiConnecting).await?;
 
-    backend.network.wait_up().await;
+    ctx.dev.network.wait_up().await;
 
     Ok(())
 }
 
 /// Run main user interface loop
-pub async fn run<FE: Frontend, BE: Backend>(
-    frontend: &mut FrontendResources<'_, FE>,
-    backend: &mut BackendResources<'_, BE>,
-) -> ! {
+pub(crate) async fn run<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> ! {
     // Track system start
-    Event::SystemStart.track(&mut backend.telemetry);
+    Event::SystemStart.track(&mut ctx.telemetry);
 
     // Show splash screen for a while
-    let _ = UserInterface(splash::Splash).run_timeout_ok(frontend).await;
+    let _ = UserInterface(splash::Splash).run_timeout_ok(ctx).await;
 
     // Run initialization flow once
     loop {
         #[expect(clippy::match_same_arms)]
-        match run_init_flow(frontend, backend).await {
+        match run_init_flow(ctx).await {
             // Success: continue
             Ok(()) => break,
             // User interaction timeout: continue
@@ -241,10 +256,10 @@ pub async fn run<FE: Frontend, BE: Backend>(
             // Display error to user and try again
             Err(err) => {
                 error!("Initialization error: {err}");
-                Event::Error(None, err.to_string()).track(&mut backend.telemetry);
-                let _ = submit_telemetry(frontend, backend).await;
+                Event::Error(None, err.to_string()).track(&mut ctx.telemetry);
+                let _ = submit_telemetry(ctx).await;
                 let _ = UserInterface(error::ErrorMessage::new(err, false))
-                    .run_timeout_ok(frontend)
+                    .run_timeout_ok(ctx)
                     .await;
             }
         }
@@ -252,7 +267,7 @@ pub async fn run<FE: Frontend, BE: Backend>(
 
     // Run main user interface flow forever
     loop {
-        match run_main_flow(frontend, backend).await {
+        match run_main_flow(ctx).await {
             // Success: start over again
             Ok(()) => (),
             // User interaction timeout: start over again
@@ -264,10 +279,10 @@ pub async fn run<FE: Frontend, BE: Backend>(
             // Display error to user and start over again
             Err(ErrorWithUser(error, opt_user_id)) => {
                 error!("Error: {error}");
-                Event::Error(opt_user_id, error.to_string()).track(&mut backend.telemetry);
-                let _ = submit_telemetry(frontend, backend).await;
+                Event::Error(opt_user_id, error.to_string()).track(&mut ctx.telemetry);
+                let _ = submit_telemetry(ctx).await;
                 let _ = UserInterface(error::ErrorMessage::new(error, opt_user_id.is_some()))
-                    .run_timeout_ok(frontend)
+                    .run_timeout_ok(ctx)
                     .await;
             }
         }
@@ -275,77 +290,65 @@ pub async fn run<FE: Frontend, BE: Backend>(
 }
 
 /// Run initialization flow
-async fn run_init_flow<FE: Frontend, BE: Backend>(
-    frontend: &mut FrontendResources<'_, FE>,
-    backend: &mut BackendResources<'_, BE>,
-) -> Result<(), Error<FE>> {
+async fn run_init_flow<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> Result<(), Error<D>> {
     // Run daily schedule
-    run_schedule(frontend, backend).await?;
+    run_schedule(ctx).await?;
 
     Ok(())
 }
 
 /// Run main user interface flow
-async fn run_main_flow<FE: Frontend, BE: Backend>(
-    frontend: &mut FrontendResources<'_, FE>,
-    backend: &mut BackendResources<'_, BE>,
-) -> Result<(), ErrorWithUser<FE>> {
+async fn run_main_flow<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> Result<(), ErrorWithUser<D>> {
     // Submit telemetry data if needed
-    submit_telemetry(frontend, backend).await?;
+    submit_telemetry(ctx).await?;
 
     // Wait for user authentication or schedule time
-    let schedule_timer = backend.schedule.timer();
-    let (user_id, user) = match select(authenticate_user(frontend, backend), schedule_timer).await {
+    let schedule_timer = ctx.schedule.timer();
+    let (user_id, user) = match select(authenticate_user(ctx), schedule_timer).await {
         // User authenticated
         Either::First(res) => res?,
         // Schedule time
         Either::Second(()) => {
-            run_schedule(frontend, backend).await?;
+            run_schedule(ctx).await?;
             return Ok(());
         }
     };
 
     // Run purchase flow with authorized user
     ErrorWithUser::try_as_user_async(user_id, async || {
-        run_purchase_flow(frontend, backend, user_id, &user).await
+        run_purchase_flow(ctx, user_id, &user).await
     })
     .await
 }
 
 /// Run daily schedule
-async fn run_schedule<FE: Frontend, BE: Backend>(
-    frontend: &mut FrontendResources<'_, FE>,
-    backend: &mut BackendResources<'_, BE>,
-) -> Result<(), Error<FE>> {
+async fn run_schedule<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> Result<(), Error<D>> {
     info!("UI: Running schedule...");
 
     // Schedule next event
-    backend.schedule.schedule_next();
+    ctx.schedule.schedule_next();
 
     // Check for OTA update
-    if !BE::Updater::recently_restarted() {
-        check_ota_update(frontend, backend).await?;
+    if !D::Updater::recently_restarted() {
+        check_ota_update(ctx).await?;
     }
 
     // Refresh article and user information
-    refresh_articles_and_users(frontend, backend).await?;
+    refresh_articles_and_users(ctx).await?;
 
     Ok(())
 }
 
 /// Check for OTA update
-async fn check_ota_update<FE: Frontend, BE: Backend>(
-    frontend: &mut FrontendResources<'_, FE>,
-    backend: &mut BackendResources<'_, BE>,
-) -> Result<(), Error<FE>> {
+async fn check_ota_update<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> Result<(), Error<D>> {
     // Wait for network to become available (if not already)
-    wait_network_up(frontend, backend).await?;
+    wait_network_up(ctx).await?;
 
     info!("UI: Checking for OTA update...");
-    show_please_wait(frontend, common::PleaseWait::UpdateCheck).await?;
+    show_please_wait(ctx.dev.display, common::PleaseWait::UpdateCheck).await?;
 
     // Check for latest release
-    let mut ota = Ota::new(&mut backend.http);
+    let mut ota = Ota::new(&mut ctx.http);
     let new_version = {
         match ota.check().await.map_err(Error::Ota)? {
             Some(new_version) => new_version,
@@ -354,163 +357,155 @@ async fn check_ota_update<FE: Frontend, BE: Backend>(
     };
 
     // Don't actually apply OTA update in debug mode or when no updater is available
-    if backend.updater.is_none() || cfg!(debug_assertions) {
+    if ctx.dev.updater.is_none() || cfg!(debug_assertions) {
         warn!("UI: Automatic OTA update unavailable. Please update manually.");
         return Ok(());
     }
 
     // Do automatic OTA update when updater is available
-    if let Some(ref mut updater) = backend.updater {
-        show_please_wait(frontend, common::PleaseWait::UpdatingFirmware).await?;
+    if let Some(updater) = ctx.dev.updater.as_mut() {
+        show_please_wait(ctx.dev.display, common::PleaseWait::UpdatingFirmware).await?;
 
         // Download and apply OTA update
-        ota.update(updater, &new_version)
+        ota.update(*updater, &new_version)
             .await
             .map_err(Error::Ota)?;
 
         // OTA update completed, restart system
-        BE::Updater::restart();
+        D::Updater::restart();
     }
 
     Ok(())
 }
 
 /// Refresh article and user information
-async fn refresh_articles_and_users<FE: Frontend, BE: Backend>(
-    frontend: &mut FrontendResources<'_, FE>,
-    backend: &mut BackendResources<'_, BE>,
-) -> Result<(), Error<FE>> {
+async fn refresh_articles_and_users<D: DeviceTypes>(
+    ctx: &mut Context<'_, D>,
+) -> Result<(), Error<D>> {
     // Wait for network to become available (if not already)
-    wait_network_up(frontend, backend).await?;
+    wait_network_up(ctx).await?;
 
     info!("UI: Refreshing articles and users...");
-    show_please_wait(frontend, common::PleaseWait::UpdatingData).await?;
+    show_please_wait(ctx.dev.display, common::PleaseWait::UpdatingData).await?;
 
     // Connect to Vereinsflieger API
-    let mut vf = backend.vereinsflieger.connect(&mut backend.http).await?;
+    let mut vf = ctx.vereinsflieger.connect(&mut ctx.http).await?;
 
     // Set current date and time based on time gathered from API response
     if let Some(time_reference) = vf.last_response_time() {
-        backend.rtc.set_by_reference(time_reference);
+        ctx.rtc.set_by_reference(time_reference);
     }
 
     // Refresh article information
     debug!("UI: Refreshing articles...");
-    let today = backend.rtc.today().ok_or(Error::CurrentTimeNotSet)?;
-    backend.articles.clear();
+    let today = ctx.rtc.today().ok_or(Error::CurrentTimeNotSet)?;
+    ctx.articles.clear();
     let total_articles = vf
         .get_articles(async |article| {
-            backend
-                .articles
-                .update_vereinsflieger_article(article, today);
+            ctx.articles.update_vereinsflieger_article(article, today);
         })
         .await?;
     info!(
         "UI: Refreshed {} of {} articles",
-        backend.articles.count(),
+        ctx.articles.count(),
         total_articles
     );
 
     // Refresh user information
     debug!("UI: Refreshing users...");
-    backend.users.clear();
+    ctx.users.clear();
     let total_users = vf
         .get_users(async |user| {
-            backend.users.update_vereinsflieger_user(user);
+            ctx.users.update_vereinsflieger_user(user);
         })
         .await?;
     info!(
         "UI: Refreshed {} of {} users",
-        backend.users.count(),
+        ctx.users.count(),
         total_users
     );
 
     Event::DataRefreshed(
-        backend.articles.count(),
-        backend.users.count_uids(),
-        backend.users.count(),
+        ctx.articles.count(),
+        ctx.users.count_uids(),
+        ctx.users.count(),
     )
-    .track(&mut backend.telemetry);
+    .track(&mut ctx.telemetry);
 
     Ok(())
 }
 
 /// Submit telemetry data if needed
-async fn submit_telemetry<FE: Frontend, BE: Backend>(
-    frontend: &mut FrontendResources<'_, FE>,
-    backend: &mut BackendResources<'_, BE>,
-) -> Result<(), Error<FE>> {
-    if !backend.telemetry.needs_flush() {
+async fn submit_telemetry<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> Result<(), Error<D>> {
+    if !ctx.telemetry.needs_flush() {
         return Ok(());
     }
 
     // Wait for network to become available (if not already)
-    wait_network_up(frontend, backend).await?;
+    wait_network_up(ctx).await?;
 
     info!("UI: Submitting telemetry data...");
-    show_please_wait(frontend, common::PleaseWait::SubmittingTelemetry).await?;
+    show_please_wait(ctx.dev.display, common::PleaseWait::SubmittingTelemetry).await?;
 
     // Submit telemetry data, ignore any error
-    let _ = backend
-        .telemetry
-        .flush(&mut backend.http, &backend.rtc)
-        .await;
+    let _ = ctx.telemetry.flush(&mut ctx.http, &ctx.rtc).await;
 
     Ok(())
 }
 
 /// Wait for user authentication
-async fn authenticate_user<FE: Frontend, BE: Backend>(
-    frontend: &mut FrontendResources<'_, FE>,
-    backend: &mut BackendResources<'_, BE>,
-) -> Result<(UserId, User), ErrorWithUser<FE>> {
+async fn authenticate_user<D: DeviceTypes>(
+    ctx: &mut Context<'_, D>,
+) -> Result<(UserId, User), ErrorWithUser<D>> {
     loop {
-        let uid = UserInterface(auth::Authentication).run(frontend).await?;
+        let uid = UserInterface(auth::Authentication).run(ctx).await?;
 
         // Look up user by detected NFC uid
-        if let Some((user_id, user)) = backend.users.get_by_uid(&uid) {
+        if let Some((user_id, user)) = ctx.users.get_by_uid(&uid) {
             // User found, authorized
             info!("UI: NFC card {uid} identified as user {user_id}");
-            Event::UserAuthenticated(user_id, uid).track(&mut backend.telemetry);
-            frontend.buzzer.confirm().await;
+            Event::UserAuthenticated(user_id, uid).track(&mut ctx.telemetry);
+            ctx.dev.buzzer.confirm().await;
             break Ok((user_id, user.clone()));
         }
 
         // User not found, unauthorized
         info!("UI: NFC card {uid} unknown, rejecting");
-        Event::AuthenticationFailed(uid).track(&mut backend.telemetry);
-        frontend.buzzer.deny().await;
+        Event::AuthenticationFailed(uid).track(&mut ctx.telemetry);
+        ctx.dev.buzzer.deny().await;
         Timer::after_secs(1).await;
     }
 }
 
 /// Run purchase flow with given user
-async fn run_purchase_flow<FE: Frontend, BE: Backend>(
-    frontend: &mut FrontendResources<'_, FE>,
-    backend: &mut BackendResources<'_, BE>,
+async fn run_purchase_flow<D: DeviceTypes>(
+    ctx: &mut Context<'_, D>,
     user_id: UserId,
     user: &User,
-) -> Result<(), Error<FE>> {
+) -> Result<(), Error<D>> {
+    // Collect list of articles
+    // FIXME: Needs to clone because lifetime issue if we borrow ctx.articles and call run(ctx)
+    let articles: Vec<(ArticleId, Article)> = ctx
+        .articles
+        .iter()
+        .map(|(article_id, article)| (article_id.clone(), article.clone()))
+        .collect();
+
     // Ask for article to purchase
     let article_idx = UserInterface(purchase::SelectArticle::new(
-        &mut backend.rng,
+        ctx.dev.rng,
         &user.name,
-        &backend.articles,
+        &articles,
     ))
-    .run(frontend)
+    .run(ctx)
     .await?;
 
     // Get article information
-    let (article_id, article) = backend
-        .articles
-        .get_by_index(article_idx)
-        .ok_or(Error::ArticleNotFound)?;
-    let article_id = article_id.clone();
-    let article = article.clone();
+    let (article_id, article) = articles.get(article_idx).ok_or(Error::ArticleNotFound)?;
 
     // Ask for amount to purchase
-    let amount = UserInterface(purchase::EnterAmount::new(&article))
-        .run(frontend)
+    let amount = UserInterface(purchase::EnterAmount::new(article))
+        .run(ctx)
         .await?;
 
     // Calculate total price. It's ok to cast amount to f32 as it's always a small number.
@@ -518,55 +513,47 @@ async fn run_purchase_flow<FE: Frontend, BE: Backend>(
     let total_price = article.price * amount as f32;
 
     // Show total price and ask for confirmation
-    UserInterface(purchase::Checkout::new(&article, amount, total_price))
-        .run(frontend)
+    UserInterface(purchase::Checkout::new(article, amount, total_price))
+        .run(ctx)
         .await?;
 
     // Submit purchase
     #[expect(clippy::cast_precision_loss)]
-    submit_purchase(
-        frontend,
-        backend,
-        article_id,
-        amount as f32,
-        user_id,
-        total_price,
-    )
-    .await?;
+    submit_purchase(ctx, article_id, amount as f32, user_id, total_price).await?;
 
     // Show success and affirm to take items
-    frontend.buzzer.confirm().await;
+    ctx.dev.buzzer.confirm().await;
     UserInterface(purchase::Success::new(amount))
-        .run_timeout_ok(frontend)
+        .run_timeout_ok(ctx)
         .await?;
 
     Ok(())
 }
 
 /// Submit purchase for the given article
-async fn submit_purchase<FE: Frontend, BE: Backend>(
-    frontend: &mut FrontendResources<'_, FE>,
-    backend: &mut BackendResources<'_, BE>,
-    article_id: ArticleId,
+async fn submit_purchase<D: DeviceTypes>(
+    ctx: &mut Context<'_, D>,
+    article_id: &ArticleId,
     amount: f32,
     user_id: UserId,
     total_price: f32,
-) -> Result<(), Error<FE>> {
+) -> Result<(), Error<D>> {
     // Wait for network to become available (if not already)
-    wait_network_up(frontend, backend).await?;
+    wait_network_up(ctx).await?;
 
     // Submit purchase
     info!("UI: Purchasing {amount}x {article_id}, {total_price:.02} EUR for user {user_id}...");
-    show_please_wait(frontend, common::PleaseWait::Purchasing).await?;
+    show_please_wait(ctx.dev.display, common::PleaseWait::Purchasing).await?;
 
     // Connect to Vereinsflieger API
-    let mut vf = backend.vereinsflieger.connect(&mut backend.http).await?;
+    let mut vf = ctx.vereinsflieger.connect(&mut ctx.http).await?;
 
     // Submit purchase
-    let today = backend.rtc.today().ok_or(Error::CurrentTimeNotSet)?;
-    vf.purchase(today, &article_id, amount, user_id, total_price)
+    let today = ctx.rtc.today().ok_or(Error::CurrentTimeNotSet)?;
+    vf.purchase(today, article_id, amount, user_id, total_price)
         .await?;
-    Event::ArticlePurchased(user_id, article_id, amount, total_price).track(&mut backend.telemetry);
+    Event::ArticlePurchased(user_id, article_id.clone(), amount, total_price)
+        .track(&mut ctx.telemetry);
 
     Ok(())
 }

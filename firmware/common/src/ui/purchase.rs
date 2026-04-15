@@ -1,7 +1,7 @@
 use super::common::{MEDIUM_STYLE, SMALL_STYLE, TITLE_STYLE};
-use super::{Error, Frontend, FrontendResources, UiContent, UiInteraction};
+use super::{DeviceTypes, Error, Frontend, UiContent, UiInteraction};
 use crate::Keypad;
-use crate::article::{Article, Articles};
+use crate::article::{Article, ArticleId};
 use crate::util::RectangleExt;
 use alloc::format;
 use alloc::vec::Vec;
@@ -25,11 +25,15 @@ static GREETINGS: [&str; 20] = [
 pub struct SelectArticle<'a> {
     greeting: &'static str,
     name: &'a str,
-    articles: &'a Articles,
+    articles: &'a [(ArticleId, Article)],
 }
 
 impl<'a> SelectArticle<'a> {
-    pub fn new<RNG: RngCore>(mut rng: RNG, name: &'a str, articles: &'a Articles) -> Self {
+    pub fn new<RNG: RngCore>(
+        rng: &mut RNG,
+        name: &'a str,
+        articles: &'a [(ArticleId, Article)],
+    ) -> Self {
         let greeting = GREETINGS[rng.next_u32() as usize % GREETINGS.len()];
         Self {
             greeting,
@@ -44,7 +48,10 @@ impl UiContent for SelectArticle<'_> {
     // FIXME: Should show actual selectable numbers instead "1-9" fixed
     const FOOTER_RIGHT: &'static str = "1-9 Weiter";
 
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let (greeting_box, articles_box) = target
             .bounding_box()
             .header(MEDIUM_STYLE.font.character_size.height);
@@ -59,7 +66,7 @@ impl UiContent for SelectArticle<'_> {
         }
         greeting.draw(target)?;
 
-        if self.articles.iter().count() == 0 {
+        if self.articles.is_empty() {
             Text::with_alignment(
                 "Keine Artikel\nverfügbar",
                 Point::zero(),
@@ -74,7 +81,8 @@ impl UiContent for SelectArticle<'_> {
         let articles: Vec<_> = self
             .articles
             .iter()
-            .map(|(idx, _article_id, article)| {
+            .enumerate()
+            .map(|(idx, (_article_id, article))| {
                 (
                     format!("{}:{}", idx + 1, article.name),
                     format!("{:.02}", article.price),
@@ -103,16 +111,16 @@ impl UiContent for SelectArticle<'_> {
     }
 }
 
-impl<FE: Frontend> UiInteraction<FE> for SelectArticle<'_> {
-    type Output = usize;
+impl UiInteraction for SelectArticle<'_> {
+    type Input = usize;
 
-    async fn run(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Input, Error<D>> {
         info!("UI: Asking to select article...");
 
-        let num_articles = self.articles.count_ids();
+        let num_articles = self.articles.len();
         loop {
             match frontend.keypad.read().await.map_err(Error::Keypad)? {
                 // Any digit 1..=num_articles selects article
@@ -148,7 +156,10 @@ impl UiContent for EnterAmount<'_> {
     const FOOTER_LEFT: &'static str = "* Abbruch";
     const FOOTER_RIGHT: &'static str = "1-9 Weiter";
 
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let article_text = format!("{}: {:.02}", self.article.name, self.article.price);
         let article = Text::new(&article_text, Point::zero(), MEDIUM_STYLE);
 
@@ -165,13 +176,13 @@ impl UiContent for EnterAmount<'_> {
     }
 }
 
-impl<FE: Frontend> UiInteraction<FE> for EnterAmount<'_> {
-    type Output = usize;
+impl UiInteraction for EnterAmount<'_> {
+    type Input = usize;
 
-    async fn run(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Input, Error<D>> {
         info!(
             "UI: Asking to enter amount for {}, {:.02} EUR...",
             self.article.name, self.article.price
@@ -216,7 +227,10 @@ impl UiContent for Checkout<'_> {
     const FOOTER_LEFT: &'static str = "* Abbruch";
     const FOOTER_RIGHT: &'static str = "# BEZAHLEN";
 
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let articles_text = format!("{}x {}", self.amount, self.article.name);
         let articles = Text::new(&articles_text, Point::zero(), MEDIUM_STYLE);
 
@@ -234,13 +248,13 @@ impl UiContent for Checkout<'_> {
     }
 }
 
-impl<FE: Frontend> UiInteraction<FE> for Checkout<'_> {
-    type Output = ();
+impl UiInteraction for Checkout<'_> {
+    type Input = ();
 
-    async fn run(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Input, Error<D>> {
         info!(
             "UI: Asking for purchase confirmation of {}x {}, {:.02} EUR...",
             self.amount, self.article.name, self.total_price
@@ -274,7 +288,10 @@ impl Success {
 impl UiContent for Success {
     const FOOTER_RIGHT: &'static str = "# Roger";
 
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let title = Text::new("Affirm!", Point::zero(), TITLE_STYLE);
 
         let affirm_text = format!("{} Getränke genehmigt", self.amount);
@@ -291,13 +308,13 @@ impl UiContent for Success {
     }
 }
 
-impl<FE: Frontend> UiInteraction<FE> for Success {
-    type Output = ();
+impl UiInteraction for Success {
+    type Input = ();
 
-    async fn run(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Input, Error<D>> {
         info!("UI: Displaying success, {} items", self.amount);
 
         // Wait at least 1s without responding to keypad

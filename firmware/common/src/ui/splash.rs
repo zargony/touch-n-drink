@@ -1,4 +1,4 @@
-use super::{Error, Frontend, FrontendResources, UiContent, UiInteraction};
+use super::{DeviceTypes, Error, Frontend, UiContent, UiInteraction};
 use crate::{Buzzer, GIT_SHA_STR, Keypad, VERSION_STR};
 use alloc::format;
 use embassy_time::Duration;
@@ -53,7 +53,10 @@ impl UiContent for Splash {
     const FOOTER_LEFT: &str = "(DEBUG)";
     const FOOTER_RIGHT: &str = GIT_SHA_STR;
 
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let logo = Image::new(&LOGO, Point::zero());
 
         let version_text = format!("v{VERSION_STR}");
@@ -70,14 +73,14 @@ impl UiContent for Splash {
     }
 }
 
-impl<FE: Frontend> UiInteraction<FE> for Splash {
-    type Output = ();
+impl UiInteraction for Splash {
+    type Input = ();
     const TIMEOUT: Option<Duration> = Some(TIMEOUT);
 
-    async fn run(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Input, Error<D>> {
         info!("UI: Displaying splash screen");
 
         // Output startup/testing tone

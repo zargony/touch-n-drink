@@ -124,3 +124,37 @@ impl Users {
         Some((id, user))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extra_user_present() {
+        let users = Users::new();
+        assert!(users.count_uids() > 0);
+        assert_eq!(users.count_uids(), EXTRA_UIDS.len());
+        assert_eq!(users.count(), 1);
+    }
+
+    #[test]
+    fn smoke() {
+        let uid: Uid = "42424242".parse().unwrap();
+
+        let mut users = Users::new();
+
+        assert_eq!(users.get(42), None);
+        assert_eq!(users.get_by_uid(&uid), None);
+
+        users.update_user(42, "Arthur Dent".into());
+        assert_eq!(users.count_uids(), EXTRA_UIDS.len());
+        assert_eq!(users.count(), 2);
+        users.update_uid(uid.clone(), 42);
+        assert_eq!(users.count_uids(), EXTRA_UIDS.len() + 1);
+        assert_eq!(users.count(), 2);
+
+        assert_eq!(users.get(42).unwrap().name, "Arthur Dent");
+        assert_eq!(users.get_by_uid(&uid).unwrap().0, 42);
+        assert_eq!(users.get_by_uid(&uid).unwrap().1.name, "Arthur Dent");
+    }
+}

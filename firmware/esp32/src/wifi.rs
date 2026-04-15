@@ -97,9 +97,9 @@ pub struct Wifi {
     last_up_state: Cell<bool>,
 }
 
-impl common::Network for &'_ Wifi {
-    type TcpConnect<'a> = TcpClient<'a>;
-    type Dns<'a> = DnsSocket<'a>;
+impl common::Network for Wifi {
+    type DnsSocket = DnsSocket<'static>;
+    type TcpClient = TcpClient<'static>;
 
     fn is_up(&self) -> bool {
         (*self).is_up()
@@ -107,6 +107,14 @@ impl common::Network for &'_ Wifi {
 
     async fn wait_up(&self) {
         (*self).wait_up().await;
+    }
+
+    fn dns(&self) -> &'_ Self::DnsSocket {
+        &self.dns_socket
+    }
+
+    fn tcp(&self) -> &'_ Self::TcpClient {
+        &self.tcp_client
     }
 }
 
@@ -224,6 +232,7 @@ impl Wifi {
     }
 
     /// Query DNS for IP address of given name
+    #[expect(dead_code)]
     pub async fn dns_query(&self, name: &str) -> Result<IpAddress, dns::Error> {
         match self.stack.dns_query(name, DnsQueryType::A).await {
             Ok(addrs) if addrs.is_empty() => {
@@ -239,16 +248,6 @@ impl Wifi {
                 Err(err)
             }
         }
-    }
-
-    /// Provide an embedded-nal-async compatible DNS socket
-    pub fn dns(&self) -> &'_ DnsSocket<'_> {
-        &self.dns_socket
-    }
-
-    /// Provide an embedded-nal-async compatible TCP client
-    pub fn tcp(&self) -> &'_ TcpClient<'_> {
-        &self.tcp_client
     }
 }
 

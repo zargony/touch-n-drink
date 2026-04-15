@@ -1,5 +1,5 @@
 use super::common::{SMALL_STYLE, TITLE_STYLE};
-use super::{Error, Frontend, FrontendResources, UiContent, UiInteraction};
+use super::{DeviceTypes, Error, Frontend, UiContent, UiInteraction};
 use crate::util::RectangleExt;
 use crate::{Buzzer, Keypad};
 use alloc::format;
@@ -34,7 +34,10 @@ impl<M: fmt::Display> ErrorMessage<M> {
 impl<M: fmt::Display> UiContent for ErrorMessage<M> {
     const FOOTER_LEFT: &str = "* Abbruch";
 
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let (_title_box, message_box) = target
             .bounding_box()
             .header(TITLE_STYLE.font.character_size.height);
@@ -62,14 +65,14 @@ impl<M: fmt::Display> UiContent for ErrorMessage<M> {
     }
 }
 
-impl<M: fmt::Display, FE: Frontend> UiInteraction<FE> for ErrorMessage<M> {
-    type Output = ();
+impl<M: fmt::Display> UiInteraction for ErrorMessage<M> {
+    type Input = ();
     const TIMEOUT: Option<Duration> = Some(TIMEOUT);
 
-    async fn run(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
-        frontend: &mut FrontendResources<'_, FE>,
-    ) -> Result<Self::Output, Error<FE>> {
+        frontend: &mut Frontend<'_, '_, D>,
+    ) -> Result<Self::Input, Error<D>> {
         info!("UI: Displaying error: {}", self.message);
 
         // Sound the error buzzer if the error was caused by a user's interaction

@@ -17,4 +17,3 @@ sha2.workspace = true
 anyhow = "1.0"
 clap = { version = "4.6", features = ["derive", "env"] }
 clap-cargo = "0.18"
-xshell = "0.2"

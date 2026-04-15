@@ -74,7 +74,10 @@ pub enum PleaseWait {
 }
 
 impl UiContent for PleaseWait {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let title = Text::new("Stand By...", Point::zero(), TITLE_STYLE);
 
         let message_text = match self {

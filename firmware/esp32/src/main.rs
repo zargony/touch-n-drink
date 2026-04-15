@@ -48,9 +48,8 @@ mod pn532;
 mod update;
 mod wifi;
 
-use alloc::vec;
-use common::{GIT_SHA_STR, VERSION_STR, article, schedule, telemetry, time, user, vereinsflieger};
-use core::convert::Infallible;
+use alloc::boxed::Box;
+use common::{GIT_SHA_STR, VERSION_STR};
 use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
 use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
@@ -69,8 +68,6 @@ use esp_hal::timer::timg::TimerGroup;
 use esp_println::println;
 use esp_storage::FlashStorage;
 use log::{debug, info, warn};
-use rand_core::RngCore;
-use reqwless::client::{HttpClient, TlsConfig, TlsVerify};
 
 extern crate alloc;
 
@@ -133,8 +130,6 @@ async fn watchdog(mut rtc: Rtc<'static>) -> ! {
 async fn main(spawner: Spawner) -> ! {
     let esp_config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(esp_config);
-    let mut rng = Rng::new();
-    let _led = Output::new(peripherals.GPIO8, Level::High, OutputConfig::default());
 
     // Initialize global allocator
     esp_alloc::heap_allocator!(#[esp_hal::ram(reclaimed)] size: 64 * 1024);
@@ -149,6 +144,15 @@ async fn main(spawner: Spawner) -> ! {
     esp_println::logger::init_logger_from_env();
     info!("Touch 'n Drink v{VERSION_STR} ({GIT_SHA_STR})");
 
+    // Initialize system devices
+    let mut rng = Rng::new();
+    let mut flash = FlashStorage::new(peripherals.FLASH);
+    let _led = Output::new(peripherals.GPIO8, Level::High, OutputConfig::default());
+
+    // Get device id (MAC address)
+    let device_id: const_hex::Buffer<6, false> =
+        const_hex::Buffer::new().const_format(&Efuse::read_base_mac_address());
+
     // Start feeding the watchdog
     let rtc = Rtc::new(peripherals.LPWR);
     debug!("Spawning watchdog task...");
@@ -158,8 +162,7 @@ async fn main(spawner: Spawner) -> ! {
         .expect("Failed to spawn watchdog task");
 
     // Read system configuration
-    let mut flash = FlashStorage::new(peripherals.FLASH);
-    let config = config::Config::read(&mut flash);
+    let config = config::read(&mut flash);
 
     // Initialize I2C controller
     let i2c_config = I2cConfig::default()
@@ -179,7 +182,7 @@ async fn main(spawner: Spawner) -> ! {
     let i2c: Mutex<NoopRawMutex, _> = Mutex::new(i2c);
 
     // Initialize display
-    let display = display::Display::new(I2cDevice::new(&i2c))
+    let mut display = display::Display::new(I2cDevice::new(&i2c))
         .await
         // Panic on failure since without a display there's no reasonable way to tell the user
         .expect("Display initialization failed");
@@ -187,7 +190,7 @@ async fn main(spawner: Spawner) -> ! {
     // Initialize keypad
     let keypad_input_config = InputConfig::default().with_pull(Pull::Up);
     let keypad_output_config = OutputConfig::default().with_drive_mode(DriveMode::OpenDrain);
-    let keypad = keypad::Keypad::new(
+    let mut keypad = keypad::Keypad::new(
         [
             Input::new(peripherals.GPIO5, keypad_input_config),
             Input::new(peripherals.GPIO6, keypad_input_config),
@@ -204,23 +207,13 @@ async fn main(spawner: Spawner) -> ! {
     // Initialize NFC reader
     let nfc_irq_input_config = InputConfig::default().with_pull(Pull::Up);
     let nfc_irq = Input::new(peripherals.GPIO20, nfc_irq_input_config);
-    let nfc = nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq)
+    let mut nfc = nfc::Nfc::new(I2cDevice::new(&i2c), nfc_irq)
         .await
         // Panic on failure since an initialization error indicates a serious error
         .expect("NFC reader initialization failed");
 
     // Initialize buzzer
-    let buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
-
-    // Initialize real time clock
-    let rtc = time::Rtc::new();
-
-    // Initialize article and user look up tables
-    let articles = article::Articles::new(config.vf_article_ids);
-    let users = user::Users::new();
-
-    // Initialize scheduler
-    let schedule = schedule::Daily::new();
+    let mut buzzer = buzzer::Buzzer::new(peripherals.LEDC, peripherals.GPIO4);
 
     // Initialize Wifi
     let wifi = wifi::Wifi::new(
@@ -234,39 +227,9 @@ async fn main(spawner: Spawner) -> ! {
     // Panic on failure since an initialization error indicates a static configuration error
     .expect("Wifi initialization failed");
 
-    // Initialize HTTP client
-    // As this allocates quite a bit of memory (e.g. for TLS buffers), only a single http client
-    // is created that can be passed to an API client whenever a connection needs to be established
-    // TLS read buffer needs to fit an encrypted TLS record. Actual size depends on server
-    // configuration. Maximum allowed value for a TLS record is 16640, so this is a safe amount.
-    let mut tls_read_buffer = vec![0; 16640].into_boxed_slice();
-    let mut tls_write_buffer = vec![0; 2048].into_boxed_slice();
-    // FIXME: reqwless with embedded-tls can't verify TLS certificates (though pinning is
-    // supported). This is bad since it makes communication vulnerable to MITM attacks.
-    let tls_config = TlsConfig::new(
-        rng.next_u64(),
-        &mut tls_read_buffer,
-        &mut tls_write_buffer,
-        TlsVerify::None,
-    );
-    let http = HttpClient::new_with_tls(wifi.tcp(), wifi.dns(), tls_config);
-
-    // Initialize Vereinsflieger API client
-    let vereinsflieger = vereinsflieger::Vereinsflieger::new(
-        &config.vf_username,
-        &config.vf_password_md5,
-        &config.vf_appkey,
-        config.vf_cid,
-    );
-
-    // Initialize telemetry
-    let device_id: const_hex::Buffer<6, false> =
-        const_hex::Buffer::new().const_format(&Efuse::read_base_mac_address());
-    let telemetry = telemetry::Telemetry::new(config.mp_token.as_deref(), device_id.as_str());
-
     // Initialize firmware updater
     let mut updater_buffer = [0; update::BUFFER_SIZE];
-    let updater = match update::Updater::new(&mut flash, &mut updater_buffer) {
+    let mut updater = match update::Updater::new(&mut flash, &mut updater_buffer) {
         Ok(updater) => Some(updater),
         Err(err) => {
             warn!("Firmware updates unavailable: {err}");
@@ -274,49 +237,15 @@ async fn main(spawner: Spawner) -> ! {
         }
     };
 
-    // Prepare firmware frontend and backend
-    let mut frontend = common::FrontendResources::<Frontend> {
-        display,
-        keypad,
-        nfc,
-        buzzer,
-    };
-    let mut backend = common::BackendResources::<Backend> {
-        rng,
-        rtc,
-        network: &wifi,
-        articles,
-        users,
-        schedule,
-        http,
-        vereinsflieger,
-        telemetry,
-        updater,
-    };
-
     // Run firmware
-    common::run(&mut frontend, &mut backend).await
-}
-
-/// Firmware frontend
-pub struct Frontend;
-
-impl common::Frontend for Frontend {
-    type DisplayError = display::Error;
-    type KeypadError = Infallible;
-    type NfcError = nfc::Error;
-
-    type Display<'a> = display::Display<I2cDevice<'a, NoopRawMutex, I2c<'a, esp_hal::Async>>>;
-    type Keypad<'a> = keypad::Keypad<'a, 3, 4>;
-    type NfcReader<'a> = nfc::Nfc<I2cDevice<'a, NoopRawMutex, I2c<'a, esp_hal::Async>>, Input<'a>>;
-    type Buzzer<'a> = buzzer::Buzzer<'a>;
-}
-
-/// Firmware backend
-struct Backend;
-
-impl common::Backend for Backend {
-    type Rng<'a> = Rng;
-    type Network<'a> = &'a wifi::Wifi;
-    type Updater<'a> = update::Updater<'a>;
+    let devices = common::Devices {
+        rng: &mut rng,
+        display: &mut display,
+        keypad: &mut keypad,
+        nfc: &mut nfc,
+        buzzer: &mut buzzer,
+        network: &wifi,
+        updater: updater.as_mut(),
+    };
+    Box::pin(common::run(&config, device_id.as_str(), devices)).await
 }
