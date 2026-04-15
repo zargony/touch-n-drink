@@ -48,7 +48,10 @@ impl UiContent for SelectArticle<'_> {
     // FIXME: Should show actual selectable numbers instead "1-9" fixed
     const FOOTER_RIGHT: &'static str = "1-9 Weiter";
 
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let (greeting_box, articles_box) = target
             .bounding_box()
             .header(MEDIUM_STYLE.font.character_size.height);
@@ -109,12 +112,12 @@ impl UiContent for SelectArticle<'_> {
 }
 
 impl UiInteraction for SelectArticle<'_> {
-    type Output = usize;
+    type Input = usize;
 
-    async fn run<D: DeviceTypes>(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
         frontend: &mut Frontend<'_, '_, D>,
-    ) -> Result<Self::Output, Error<D>> {
+    ) -> Result<Self::Input, Error<D>> {
         info!("UI: Asking to select article...");
 
         let num_articles = self.articles.len();
@@ -153,7 +156,10 @@ impl UiContent for EnterAmount<'_> {
     const FOOTER_LEFT: &'static str = "* Abbruch";
     const FOOTER_RIGHT: &'static str = "1-9 Weiter";
 
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let article_text = format!("{}: {:.02}", self.article.name, self.article.price);
         let article = Text::new(&article_text, Point::zero(), MEDIUM_STYLE);
 
@@ -171,12 +177,12 @@ impl UiContent for EnterAmount<'_> {
 }
 
 impl UiInteraction for EnterAmount<'_> {
-    type Output = usize;
+    type Input = usize;
 
-    async fn run<D: DeviceTypes>(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
         frontend: &mut Frontend<'_, '_, D>,
-    ) -> Result<Self::Output, Error<D>> {
+    ) -> Result<Self::Input, Error<D>> {
         info!(
             "UI: Asking to enter amount for {}, {:.02} EUR...",
             self.article.name, self.article.price
@@ -221,7 +227,10 @@ impl UiContent for Checkout<'_> {
     const FOOTER_LEFT: &'static str = "* Abbruch";
     const FOOTER_RIGHT: &'static str = "# BEZAHLEN";
 
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let articles_text = format!("{}x {}", self.amount, self.article.name);
         let articles = Text::new(&articles_text, Point::zero(), MEDIUM_STYLE);
 
@@ -240,12 +249,12 @@ impl UiContent for Checkout<'_> {
 }
 
 impl UiInteraction for Checkout<'_> {
-    type Output = ();
+    type Input = ();
 
-    async fn run<D: DeviceTypes>(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
         frontend: &mut Frontend<'_, '_, D>,
-    ) -> Result<Self::Output, Error<D>> {
+    ) -> Result<Self::Input, Error<D>> {
         info!(
             "UI: Asking for purchase confirmation of {}x {}, {:.02} EUR...",
             self.amount, self.article.name, self.total_price
@@ -279,7 +288,10 @@ impl Success {
 impl UiContent for Success {
     const FOOTER_RIGHT: &'static str = "# Roger";
 
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let title = Text::new("Affirm!", Point::zero(), TITLE_STYLE);
 
         let affirm_text = format!("{} Getränke genehmigt", self.amount);
@@ -297,12 +309,12 @@ impl UiContent for Success {
 }
 
 impl UiInteraction for Success {
-    type Output = ();
+    type Input = ();
 
-    async fn run<D: DeviceTypes>(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
         frontend: &mut Frontend<'_, '_, D>,
-    ) -> Result<Self::Output, Error<D>> {
+    ) -> Result<Self::Input, Error<D>> {
         info!("UI: Displaying success, {} items", self.amount);
 
         // Wait at least 1s without responding to keypad

@@ -34,7 +34,10 @@ impl<M: fmt::Display> ErrorMessage<M> {
 impl<M: fmt::Display> UiContent for ErrorMessage<M> {
     const FOOTER_LEFT: &str = "* Abbruch";
 
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let (_title_box, message_box) = target
             .bounding_box()
             .header(TITLE_STYLE.font.character_size.height);
@@ -63,13 +66,13 @@ impl<M: fmt::Display> UiContent for ErrorMessage<M> {
 }
 
 impl<M: fmt::Display> UiInteraction for ErrorMessage<M> {
-    type Output = ();
+    type Input = ();
     const TIMEOUT: Option<Duration> = Some(TIMEOUT);
 
-    async fn run<D: DeviceTypes>(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
         frontend: &mut Frontend<'_, '_, D>,
-    ) -> Result<Self::Output, Error<D>> {
+    ) -> Result<Self::Input, Error<D>> {
         info!("UI: Displaying error: {}", self.message);
 
         // Sound the error buzzer if the error was caused by a user's interaction

@@ -23,7 +23,10 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 pub struct Authentication;
 
 impl UiContent for Authentication {
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         Text::with_alignment(
             "Mitgliedsausweis\nscannen",
             Point::zero(),
@@ -37,14 +40,14 @@ impl UiContent for Authentication {
 }
 
 impl UiInteraction for Authentication {
-    type Output = Uid;
+    type Input = Uid;
     // No user interaction timeout since there is no user when waiting for a user
     const TIMEOUT: Option<Duration> = None;
 
-    async fn run<D: DeviceTypes>(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
         frontend: &mut Frontend<'_, '_, D>,
-    ) -> Result<Self::Output, Error<D>> {
+    ) -> Result<Self::Input, Error<D>> {
         info!("UI: Waiting for NFC card...");
 
         loop {

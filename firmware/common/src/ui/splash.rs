@@ -53,7 +53,10 @@ impl UiContent for Splash {
     const FOOTER_LEFT: &str = "(DEBUG)";
     const FOOTER_RIGHT: &str = GIT_SHA_STR;
 
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error> {
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error> {
         let logo = Image::new(&LOGO, Point::zero());
 
         let version_text = format!("v{VERSION_STR}");
@@ -71,13 +74,13 @@ impl UiContent for Splash {
 }
 
 impl UiInteraction for Splash {
-    type Output = ();
+    type Input = ();
     const TIMEOUT: Option<Duration> = Some(TIMEOUT);
 
-    async fn run<D: DeviceTypes>(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
         frontend: &mut Frontend<'_, '_, D>,
-    ) -> Result<Self::Output, Error<D>> {
+    ) -> Result<Self::Input, Error<D>> {
         info!("UI: Displaying splash screen");
 
         // Output startup/testing tone

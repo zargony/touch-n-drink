@@ -121,22 +121,25 @@ pub(crate) trait UiContent {
     /// # Errors
     ///
     /// An error will be returned if the content could not be drawn to the given target.
-    fn draw<D: DrawTarget<Color = BinaryColor>>(&self, target: &mut D) -> Result<(), D::Error>;
+    fn draw_content<D: DrawTarget<Color = BinaryColor>>(
+        &self,
+        target: &mut D,
+    ) -> Result<(), D::Error>;
 }
 
 /// User interface interaction
 pub(crate) trait UiInteraction {
     /// Type of value returned by this interaction
-    type Output;
+    type Input;
 
     /// Timeout after which the user interaction is cancelled
     const TIMEOUT: Option<Duration> = Some(DEFAULT_TIMEOUT);
 
     /// Run user interaction and return the determined value
-    async fn run<D: DeviceTypes>(
+    async fn read_input<D: DeviceTypes>(
         &mut self,
         frontend: &mut Frontend<'_, '_, D>,
-    ) -> Result<Self::Output, Error<D>>;
+    ) -> Result<Self::Input, Error<D>>;
 }
 
 /// User interface
@@ -150,7 +153,7 @@ impl<UI: UiContent> UserInterface<UI> {
 
         // Draw content full-screen (no footer)
         if UI::FOOTER_LEFT.is_empty() && UI::FOOTER_RIGHT.is_empty() {
-            self.0.draw(target)?;
+            self.0.draw_content(target)?;
 
         // Draw footer and content in a clipped area
         } else {
@@ -162,7 +165,7 @@ impl<UI: UiContent> UserInterface<UI> {
 
             // Draw content
             let mut content_area = target.clipped(&content_box);
-            self.0.draw(&mut content_area)?;
+            self.0.draw_content(&mut content_area)?;
         }
 
         Ok(())
@@ -174,18 +177,19 @@ impl<UI: UiContent + UiInteraction> UserInterface<UI> {
     async fn run<D: DeviceTypes>(
         &mut self,
         ctx: &mut Context<'_, D>,
-    ) -> Result<UI::Output, Error<D>> {
+    ) -> Result<UI::Input, Error<D>> {
         // Draw user interface
         self.draw(ctx.dev.display).map_err(Error::Display)?;
         ctx.dev.display.flush().await.map_err(Error::Display)?;
 
         // Run user interaction with or without timeout
+        let mut frontend = Frontend::from(ctx);
         if let Some(timeout) = UI::TIMEOUT {
-            with_timeout(timeout, self.0.run(&mut Frontend::from(ctx)))
+            with_timeout(timeout, self.0.read_input(&mut frontend))
                 .await
                 .map_err(|TimeoutError| Error::UserTimeout)?
         } else {
-            self.0.run(&mut Frontend::from(ctx)).await
+            self.0.read_input(&mut frontend).await
         }
     }
 
@@ -196,7 +200,7 @@ impl<UI: UiContent + UiInteraction> UserInterface<UI> {
         ctx: &mut Context<'_, D>,
     ) -> Result<(), Error<D>>
     where
-        UI: UiInteraction<Output = ()>,
+        UI: UiInteraction<Input = ()>,
     {
         match self.run(ctx).await {
             Err(Error::UserTimeout) => Ok(()),
