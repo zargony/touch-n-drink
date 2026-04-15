@@ -47,7 +47,7 @@ struct Cli {
     espflash: PathBuf,
 
     #[command(subcommand)]
-    command: Command,
+    command: MainCommand,
 }
 
 fn shell(cargo: &Path) -> Result<Shell> {
@@ -68,7 +68,7 @@ fn shell(cargo: &Path) -> Result<Shell> {
 }
 
 #[derive(Debug, clap::Subcommand)]
-enum Command {
+enum MainCommand {
     /// Print build information
     #[command(subcommand)]
     Print(PrintCommand),
@@ -90,16 +90,16 @@ enum Command {
     Run(RunArgs),
 }
 
-impl Command {
+impl MainCommand {
     fn run(self) -> Result<()> {
         match self {
-            Command::Print(print) => {
+            Self::Print(print) => {
                 print.run();
                 Ok(())
             }
-            Command::Clippy(clippy) => clippy.run(),
-            Command::Build(build) => build.run(),
-            Command::Run(run) => run.run(),
+            Self::Clippy(clippy) => clippy.run(),
+            Self::Build(build) => build.run(),
+            Self::Run(run) => run.run(),
         }
     }
 }
