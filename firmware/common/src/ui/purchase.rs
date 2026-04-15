@@ -74,7 +74,8 @@ impl UiContent for SelectArticle<'_> {
         let articles: Vec<_> = self
             .articles
             .iter()
-            .map(|(idx, _article_id, article)| {
+            .enumerate()
+            .map(|(idx, (_article_id, article))| {
                 (
                     format!("{}:{}", idx + 1, article.name),
                     format!("{:.02}", article.price),
@@ -112,7 +113,7 @@ impl<FE: Frontend> UiInteraction<FE> for SelectArticle<'_> {
     ) -> Result<Self::Output, Error<FE>> {
         info!("UI: Asking to select article...");
 
-        let num_articles = self.articles.count_ids();
+        let num_articles = self.articles.count();
         loop {
             match frontend.keypad.read().await.map_err(Error::Keypad)? {
                 // Any digit 1..=num_articles selects article
