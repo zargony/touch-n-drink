@@ -104,3 +104,45 @@ impl Articles {
         self.iter().nth(index)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+
+    #[test]
+    fn smoke() {
+        let mut articles = Articles::new(vec!["1111".into(), "2222".into()]);
+        articles.update_article(&"1111".into(), "Cold Drink", 11.11);
+        articles.update_article(&"2222".into(), "Hot Drink", 22.22);
+        assert_eq!(articles.count(), 2);
+        assert_eq!(articles.get("1111").unwrap().name, "Cold Drink");
+        assert_eq!(articles.get("1111").unwrap().price, 11.11);
+        assert_eq!(articles.get("2222").unwrap().name, "Hot Drink");
+        assert_eq!(articles.get("2222").unwrap().price, 22.22);
+        assert_eq!(articles.get_by_index(0).unwrap().0, "1111");
+        assert_eq!(articles.get_by_index(0).unwrap().1.name, "Cold Drink");
+        assert_eq!(articles.get_by_index(1).unwrap().0, "2222");
+        assert_eq!(articles.get_by_index(1).unwrap().1.name, "Hot Drink");
+    }
+
+    #[test]
+    fn no_articles() {
+        let mut articles = Articles::new(vec![]);
+        articles.update_article(&"1111".into(), "Cold Drink", 11.11);
+        articles.update_article(&"2222".into(), "Hot Drink", 22.22);
+        assert_eq!(articles.count(), 0);
+        assert_eq!(articles.get_by_index(0), None);
+    }
+
+    #[test]
+    fn ignore_missing_and_unwanted() {
+        let mut articles = Articles::new(vec!["9999".into(), "2222".into()]);
+        articles.update_article(&"1111".into(), "Cold Drink", 11.11);
+        articles.update_article(&"2222".into(), "Hot Drink", 22.22);
+        assert_eq!(articles.count(), 1);
+        assert_eq!(articles.get("1111"), None);
+        assert_eq!(articles.get_by_index(0).unwrap().0, "2222");
+        assert_eq!(articles.get_by_index(1), None);
+    }
+}
