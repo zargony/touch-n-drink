@@ -1,21 +1,14 @@
-use anyhow::{Error, Result, anyhow};
-use clap::builder::PossibleValue;
-use clap::{Parser, ValueEnum};
+mod chip;
+use self::chip::{ALL_CHIPS, Chip, DEFAULT_CHIP};
+
+use anyhow::{Result, anyhow};
+use clap::Parser;
 use clap_cargo::style::{CLAP_STYLING, ERROR, NOTE};
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::{fs, process};
 use xshell::{Shell, cmd};
-
-// TODO: Instead of defining these ourselves, use esp_metadata::Chip? (implements ValueEnum)
-#[rustfmt::skip]
-const CHIPS: [Chip; 1] = [
-    Chip { name: "esp32c3", package: "esp32", target: "riscv32imc-unknown-none-elf" },
-];
-
-const DEFAULT_CHIP: &str = "esp32c3";
 
 fn main() {
     if let Err(err) = Cli::parse().command.run() {
@@ -55,41 +48,6 @@ struct Cli {
 
     #[command(subcommand)]
     command: Command,
-}
-
-/// Chip configuration (determines package, target and features to use)
-#[derive(Debug, Clone)]
-struct Chip<'a> {
-    /// Name of the chip (firmware variant), for use with `--chip name` options
-    name: &'a str,
-    /// Package to build for this chip
-    package: &'a str,
-    /// Target triple to use to build for this chip
-    target: &'a str,
-    // /// Features to use to build for this chip
-    // features: &'a [&'a str],
-}
-
-impl FromStr for Chip<'_> {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        CHIPS
-            .iter()
-            .find(|chip| chip.name == s)
-            .cloned()
-            .ok_or_else(|| anyhow!("Unknown chip"))
-    }
-}
-
-impl ValueEnum for Chip<'static> {
-    fn value_variants<'a>() -> &'a [Self] {
-        &CHIPS
-    }
-
-    fn to_possible_value(&self) -> Option<PossibleValue> {
-        Some(PossibleValue::new(self.name))
-    }
 }
 
 fn shell(cargo: &Path) -> Result<Shell> {
@@ -169,7 +127,7 @@ impl PrintCommand {
     fn run(self) {
         match self {
             Self::Chips => {
-                for chip in CHIPS {
+                for chip in ALL_CHIPS {
                     println!("{}", chip.name);
                 }
             }
