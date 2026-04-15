@@ -97,12 +97,6 @@ impl Articles {
     {
         self.articles.get(id)
     }
-
-    /// Look up article at given index
-    #[must_use]
-    pub fn get_by_index(&self, index: usize) -> Option<(&ArticleId, &Article)> {
-        self.iter().nth(index)
-    }
 }
 
 #[cfg(test)]
@@ -119,10 +113,10 @@ mod tests {
         assert_eq!(articles.get("1111").unwrap().price, 11.11);
         assert_eq!(articles.get("2222").unwrap().name, "Hot Drink");
         assert_eq!(articles.get("2222").unwrap().price, 22.22);
-        assert_eq!(articles.get_by_index(0).unwrap().0, "1111");
-        assert_eq!(articles.get_by_index(0).unwrap().1.name, "Cold Drink");
-        assert_eq!(articles.get_by_index(1).unwrap().0, "2222");
-        assert_eq!(articles.get_by_index(1).unwrap().1.name, "Hot Drink");
+        let mut iter = articles.iter();
+        assert_eq!(iter.next().unwrap().0, "1111");
+        assert_eq!(iter.next().unwrap().0, "2222");
+        assert_eq!(iter.next(), None);
     }
 
     #[test]
@@ -131,7 +125,8 @@ mod tests {
         articles.update_article(&"1111".into(), "Cold Drink", 11.11);
         articles.update_article(&"2222".into(), "Hot Drink", 22.22);
         assert_eq!(articles.count(), 0);
-        assert_eq!(articles.get_by_index(0), None);
+        let mut iter = articles.iter();
+        assert_eq!(iter.next(), None);
     }
 
     #[test]
@@ -141,7 +136,8 @@ mod tests {
         articles.update_article(&"2222".into(), "Hot Drink", 22.22);
         assert_eq!(articles.count(), 1);
         assert_eq!(articles.get("1111"), None);
-        assert_eq!(articles.get_by_index(0).unwrap().0, "2222");
-        assert_eq!(articles.get_by_index(1), None);
+        let mut iter = articles.iter();
+        assert_eq!(iter.next().unwrap().0, "2222");
+        assert_eq!(iter.next(), None);
     }
 }

@@ -497,15 +497,10 @@ async fn run_purchase_flow<D: DeviceTypes>(
     .await?;
 
     // Get article information
-    let (article_id, article) = ctx
-        .articles
-        .get_by_index(article_idx)
-        .ok_or(Error::ArticleNotFound)?;
-    let article_id = article_id.clone();
-    let article = article.clone();
+    let (article_id, article) = articles.get(article_idx).ok_or(Error::ArticleNotFound)?;
 
     // Ask for amount to purchase
-    let amount = UserInterface(purchase::EnterAmount::new(&article))
+    let amount = UserInterface(purchase::EnterAmount::new(article))
         .run(ctx)
         .await?;
 
@@ -514,7 +509,7 @@ async fn run_purchase_flow<D: DeviceTypes>(
     let total_price = article.price * amount as f32;
 
     // Show total price and ask for confirmation
-    UserInterface(purchase::Checkout::new(&article, amount, total_price))
+    UserInterface(purchase::Checkout::new(article, amount, total_price))
         .run(ctx)
         .await?;
 
@@ -534,7 +529,7 @@ async fn run_purchase_flow<D: DeviceTypes>(
 /// Submit purchase for the given article
 async fn submit_purchase<D: DeviceTypes>(
     ctx: &mut Context<'_, D>,
-    article_id: ArticleId,
+    article_id: &ArticleId,
     amount: f32,
     user_id: UserId,
     total_price: f32,
@@ -551,9 +546,10 @@ async fn submit_purchase<D: DeviceTypes>(
 
     // Submit purchase
     let today = ctx.rtc.today().ok_or(Error::CurrentTimeNotSet)?;
-    vf.purchase(today, &article_id, amount, user_id, total_price)
+    vf.purchase(today, article_id, amount, user_id, total_price)
         .await?;
-    Event::ArticlePurchased(user_id, article_id, amount, total_price).track(&mut ctx.telemetry);
+    Event::ArticlePurchased(user_id, article_id.clone(), amount, total_price)
+        .track(&mut ctx.telemetry);
 
     Ok(())
 }
