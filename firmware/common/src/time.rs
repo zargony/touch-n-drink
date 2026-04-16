@@ -1,6 +1,14 @@
+//! Real time clock that calculates the current time by adding the relative uptime (duration since
+//! system start) to the absolute system start time (must be provided at least once)
+
 use chrono::{DateTime, Duration, NaiveDate, Utc};
+use embassy_sync::blocking_mutex::CriticalSectionMutex;
 use embassy_time::Instant;
 use log::debug;
+
+/// Absolute time at system start (epoch of `Instant`)
+static SYSTEM_START_TIME: CriticalSectionMutex<Option<DateTime<Utc>>> =
+    CriticalSectionMutex::new(None);
 
 /// Time reference of a known absolute time to a given system time
 #[derive(Debug, Clone)]
@@ -39,83 +47,73 @@ impl TimeReference {
     }
 }
 
-/// Real time clock that calculates the current time by adding the relative uptime (duration since
-/// system start) to the absolute system start time (must be provided at least once)
-#[must_use]
-pub struct Rtc {
-    /// Absolute time at system start (epoch of `Instant`)
-    system_start_time: Option<DateTime<Utc>>,
-}
-
-impl Default for Rtc {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Rtc {
-    /// Create new real time clock
-    pub fn new() -> Self {
-        Self {
-            system_start_time: None,
-        }
-    }
-
-    /// Get current date (if known)
-    #[must_use]
-    pub fn today(&self) -> Option<NaiveDate> {
-        Some(self.now()?.date_naive())
-    }
-
-    /// Get current date and time (if known)
-    #[must_use]
-    pub fn now(&self) -> Option<DateTime<Utc>> {
-        // Calculate current date and time by adding the uptime duration to the previously set
-        // system start time
-        Some(self.system_start_time? + Self::uptime())
-    }
-
-    /// Set current date and time
-    ///
-    /// # Panics
-    ///
-    /// Panics when system uptime is longer than `i64::MAX` microseconds (~292,277 years)
-    pub fn set(&mut self, time_now: DateTime<Utc>) {
-        self.set_by_reference(&TimeReference::now(time_now));
-    }
-
-    /// Set current date and time by a known time at the given reference
-    ///
-    /// # Panics
-    ///
-    /// Panics when reference time is later than `i64::MAX` microseconds (~292,277 years) after start
-    pub fn set_by_reference(&mut self, reference: &TimeReference) {
-        // Remember current date and time by calculating the system start time
-        self.system_start_time = Some(reference.epoch());
-        // Safe to unwrap after setting self.system_start_time
-        debug!("Time: Current time set to {}", self.now().unwrap());
-    }
-
-    /// Converts an `Instant` to a `DateTime<Utc>` if current date and time is known
-    #[must_use]
-    pub fn instant_to_datetime(&self, time: Instant) -> Option<DateTime<Utc>> {
-        Some(self.system_start_time? + instant_to_duration(time)?)
-    }
-
-    /// Duration of system run time
-    ///
-    /// # Panics
-    ///
-    /// Panics when system uptime is longer than `i64::MAX` microseconds (~292,277 years)
-    #[must_use]
-    pub fn uptime() -> Duration {
-        // Safe to unwrap as long as system uptime is less than ~292,277 years
-        instant_to_duration(Instant::now()).unwrap()
-    }
-}
-
 /// Helper to convert `Instant` to `Duration`
 fn instant_to_duration(time: Instant) -> Option<Duration> {
     let us = i64::try_from(time.as_micros()).ok()?;
     Some(Duration::microseconds(us))
+}
+
+/// Get system start time (if known)
+fn system_start_time() -> Option<DateTime<Utc>> {
+    SYSTEM_START_TIME.lock(|system_start_time| *system_start_time)
+}
+
+/// Set system start time
+fn set_system_start_time(time: DateTime<Utc>) {
+    // Safety: lock_mut() is safe if not called re-entrantly, which can't happen here
+    unsafe {
+        SYSTEM_START_TIME.lock_mut(|system_start_time| *system_start_time = Some(time));
+    }
+}
+
+/// Duration of system run time
+///
+/// # Panics
+///
+/// Panics when system uptime is longer than `i64::MAX` microseconds (~292,277 years)
+#[must_use]
+pub fn uptime() -> Duration {
+    // Safe to unwrap as long as system uptime is less than ~292,277 years
+    instant_to_duration(Instant::now()).unwrap()
+}
+
+/// Get current date (if known)
+#[must_use]
+pub fn today() -> Option<NaiveDate> {
+    Some(now()?.date_naive())
+}
+
+/// Get current date and time (if known)
+#[must_use]
+pub fn now() -> Option<DateTime<Utc>> {
+    // Calculate current date and time by adding the uptime duration to the previously set
+    // system start time
+    Some(system_start_time()? + uptime())
+}
+
+/// Set current date and time
+///
+/// # Panics
+///
+/// Panics when system uptime is longer than `i64::MAX` microseconds (~292,277 years)
+pub fn set(time_now: DateTime<Utc>) {
+    set_by_reference(&TimeReference::now(time_now));
+}
+
+/// Set current date and time by a known time at the given reference
+///
+/// # Panics
+///
+/// Panics when reference time is later than `i64::MAX` microseconds (~292,277 years) after start
+pub fn set_by_reference(reference: &TimeReference) {
+    // Remember current date and time by calculating the system start time
+    set_system_start_time(reference.epoch());
+    // Safe to unwrap after setting self.system_start_time
+    debug!("Time: Current time set to {}", now().unwrap());
+}
+
+/// Converts an `Instant` to a `DateTime<Utc>` if current date and time is known
+#[must_use]
+pub fn instant_to_datetime(time: Instant) -> Option<DateTime<Utc>> {
+    Some(system_start_time()? + instant_to_duration(time)?)
 }

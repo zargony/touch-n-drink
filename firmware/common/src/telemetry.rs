@@ -1,6 +1,5 @@
 use crate::mixpanel::{self, Event as MixpanelEvent, Mixpanel};
-use crate::time::Rtc;
-use crate::{GIT_SHA_STR, VERSION_STR, article, nfc, user};
+use crate::{GIT_SHA_STR, VERSION_STR, article, nfc, time, user};
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -204,7 +203,6 @@ impl<'a> Telemetry<'a> {
     pub async fn flush<T: TcpConnect, D: Dns>(
         &mut self,
         http: &mut HttpClient<'_, T, D>,
-        rtc: &Rtc,
     ) -> Result<(), Error> {
         if self.events.is_empty() {
             return Ok(());
@@ -220,9 +218,7 @@ impl<'a> Telemetry<'a> {
                 .events
                 .iter()
                 .map(|(time, event)| -> Result<_, Error> {
-                    let time = rtc
-                        .instant_to_datetime(*time)
-                        .ok_or(Error::CurrentTimeNotSet)?;
+                    let time = time::instant_to_datetime(*time).ok_or(Error::CurrentTimeNotSet)?;
                     if let Some(user_id) = event.user_id() {
                         Ok(MixpanelEvent::new(
                             event.event_name(),

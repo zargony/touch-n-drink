@@ -240,7 +240,6 @@ struct Context<'c, D: DeviceTypes> {
         D::Network<'c>,
         D::Updater<'c>,
     >,
-    rtc: time::Rtc,
     articles: article::Articles,
     users: user::Users,
     schedule: schedule::Daily,
@@ -267,9 +266,6 @@ pub async fn run<
     device_id: &str,
     devices: Devices<'_, RNG, DP, KP, NFC, BZZ, NET, UPD>,
 ) -> ! {
-    // Initialize real time clock
-    let rtc = time::Rtc::new();
-
     // Initialize article and user look up tables
     let articles = article::Articles::new(&config.vf_article_ids);
     let users = user::Users::new();
@@ -308,7 +304,6 @@ pub async fn run<
     // Build context (devices and resources)
     let mut ctx = Context::<DeviceTypeAdapter<RNG, DP, KP, NFC, BZZ, NET, UPD>> {
         dev: devices,
-        rtc,
         articles,
         users,
         schedule,

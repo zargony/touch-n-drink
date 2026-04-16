@@ -19,6 +19,7 @@ chrono.workspace = true
 const-hex.workspace = true
 derive_more = { workspace = true, features = ["display", "from"] }
 embassy-futures.workspace = true
+embassy-sync.workspace = true
 embassy-time.workspace = true
 embedded-graphics.workspace = true
 embedded-io-async.workspace = true
