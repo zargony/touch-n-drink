@@ -90,7 +90,7 @@ impl<D: DeviceTypes> ErrorWithUser<D> {
 }
 
 /// User interface frontend
-pub(crate) struct Frontend<'fe, 'dev, D: DeviceTypes> {
+struct Frontend<'fe, 'dev, D: DeviceTypes> {
     display: &'fe mut D::Display<'dev>,
     keypad: &'fe mut D::Keypad<'dev>,
     nfc: &'fe mut D::NfcReader<'dev>,
@@ -109,7 +109,7 @@ impl<'fe, 'dev, D: DeviceTypes> From<&'fe mut Context<'dev, D>> for Frontend<'fe
 }
 
 /// User interface content
-pub(crate) trait UiContent {
+trait UiContent {
     /// Footer left text
     const FOOTER_LEFT: &str = "";
 
@@ -128,7 +128,7 @@ pub(crate) trait UiContent {
 }
 
 /// User interface interaction
-pub(crate) trait UiInteraction {
+trait UiInteraction {
     /// Type of value returned by this interaction
     type Input;
 
