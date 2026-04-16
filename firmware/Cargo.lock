@@ -2773,6 +2773,7 @@ dependencies = [
  "der 0.8.0",
  "derive_more",
  "embassy-futures",
+ "embassy-sync 0.7.2",
  "embassy-time",
  "embedded-graphics",
  "embedded-io-async 0.7.0",

@@ -9,7 +9,7 @@ use crate::ota::{self, Ota};
 use crate::telemetry::Event;
 use crate::user::{User, UserId};
 use crate::util::RectangleExt;
-use crate::{Buzzer, Context, DeviceTypes, Display, Network, Updater};
+use crate::{Buzzer, Context, DeviceTypes, Display, Network, Updater, time};
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use derive_more::{Display, From};
@@ -393,12 +393,12 @@ async fn refresh_articles_and_users<D: DeviceTypes>(
 
     // Set current date and time based on time gathered from API response
     if let Some(time_reference) = vf.last_response_time() {
-        ctx.rtc.set_by_reference(time_reference);
+        time::set_by_reference(time_reference);
     }
 
     // Refresh article information
     debug!("UI: Refreshing articles...");
-    let today = ctx.rtc.today().ok_or(Error::CurrentTimeNotSet)?;
+    let today = time::today().ok_or(Error::CurrentTimeNotSet)?;
     ctx.articles.clear();
     let total_articles = vf
         .get_articles(async |article| {
@@ -448,7 +448,7 @@ async fn submit_telemetry<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> Result<()
     show_please_wait(ctx.dev.display, common::PleaseWait::SubmittingTelemetry).await?;
 
     // Submit telemetry data, ignore any error
-    let _ = ctx.telemetry.flush(&mut ctx.http, &ctx.rtc).await;
+    let _ = ctx.telemetry.flush(&mut ctx.http).await;
 
     Ok(())
 }
@@ -549,7 +549,7 @@ async fn submit_purchase<D: DeviceTypes>(
     let mut vf = ctx.vereinsflieger.connect(&mut ctx.http).await?;
 
     // Submit purchase
-    let today = ctx.rtc.today().ok_or(Error::CurrentTimeNotSet)?;
+    let today = time::today().ok_or(Error::CurrentTimeNotSet)?;
     vf.purchase(today, article_id, amount, user_id, total_price)
         .await?;
     Event::ArticlePurchased(user_id, article_id.clone(), amount, total_price)
