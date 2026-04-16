@@ -22,6 +22,7 @@ pub use nfc::Uid;
 use alloc::vec;
 use core::fmt;
 use core::marker::PhantomData;
+use embassy_futures::join::join;
 use embassy_time::Timer;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::DrawTarget;
@@ -253,11 +254,10 @@ struct Context<'c, D: DeviceTypes> {
         <D::Network<'c> as Network>::DnsSocket,
     >,
     vereinsflieger: vereinsflieger::Vereinsflieger<'c>,
-    telemetry: telemetry::Telemetry<'c>,
 }
 
-/// Run firmware
-pub async fn run<
+/// Run user interface loop
+async fn run_ui<
     RNG: Rng,
     DP: Display,
     KP: Keypad,
@@ -267,7 +267,6 @@ pub async fn run<
     UPD: Updater,
 >(
     config: &Config,
-    device_id: &str,
     devices: Devices<'_, RNG, DP, KP, NFC, BZZ, NET, UPD>,
 ) -> ! {
     // Initialize article and user look up tables
@@ -302,9 +301,6 @@ pub async fn run<
         config.vf_cid,
     );
 
-    // Initialize telemetry
-    let telemetry = telemetry::Telemetry::new(config.mp_token.as_deref(), device_id);
-
     // Build context (devices and resources)
     let mut ctx = Context::<DeviceTypeAdapter<RNG, DP, KP, NFC, BZZ, NET, UPD>> {
         dev: devices,
@@ -313,9 +309,53 @@ pub async fn run<
         schedule,
         http,
         vereinsflieger,
-        telemetry,
     };
 
     // Run user interface
     ui::run(&mut ctx).await
+}
+
+/// Run telemetry submission loop
+async fn run_telemetry<NET: Network>(
+    config: &Config,
+    device_id: &str,
+    seed: u64,
+    network: &NET,
+) -> ! {
+    // Initialize HTTP client
+    let mut tls_read_buffer = vec![0; 16640].into_boxed_slice();
+    let mut tls_write_buffer = vec![0; 2048].into_boxed_slice();
+    // FIXME: reqwless with embedded-tls can't verify TLS certificates (though pinning is
+    // supported). This is bad since it makes communication vulnerable to MITM attacks.
+    let tls_config = TlsConfig::new(
+        seed,
+        &mut tls_read_buffer,
+        &mut tls_write_buffer,
+        TlsVerify::None,
+    );
+    let mut http = HttpClient::new_with_tls(network.tcp(), network.dns(), tls_config);
+
+    // Initialize telemetry and run submission loop
+    telemetry::Telemetry::new(config.mp_token.as_deref(), device_id)
+        .run(&mut http)
+        .await
+}
+
+/// Run firmware
+pub async fn run<
+    RNG: Rng,
+    DP: Display,
+    KP: Keypad,
+    NFC: NfcReader,
+    BZZ: Buzzer,
+    NET: Network,
+    UPD: Updater,
+>(
+    config: &Config,
+    device_id: &str,
+    devices: Devices<'_, RNG, DP, KP, NFC, BZZ, NET, UPD>,
+) -> ! {
+    let fut_telemetry = run_telemetry(config, device_id, devices.rng.next_u64(), devices.network);
+    let fut_ui = run_ui(config, devices);
+    join(fut_ui, fut_telemetry).await.0
 }
