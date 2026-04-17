@@ -1,4 +1,4 @@
-use common::config::Config;
+use common::Config;
 use esp_bootloader_esp_idf::partitions::{self, DataPartitionSubType, PartitionType};
 use esp_storage::FlashStorage;
 use log::{debug, info, warn};

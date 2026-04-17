@@ -1,19 +1,23 @@
 #![no_std]
 #![expect(async_fn_in_trait)]
 
-pub mod article;
-pub mod config;
-pub mod mixpanel;
-pub mod nfc;
-pub mod ota;
-pub mod reader;
-pub mod schedule;
-pub mod telemetry;
-pub mod time;
-pub mod ui;
-pub mod user;
 pub mod util;
-pub mod vereinsflieger;
+
+mod article;
+mod config;
+mod mixpanel;
+mod nfc;
+mod ota;
+mod reader;
+mod schedule;
+mod telemetry;
+mod time;
+mod ui;
+mod user;
+mod vereinsflieger;
+
+pub use config::Config;
+pub use nfc::Uid;
 
 use alloc::vec;
 use core::fmt;
@@ -57,7 +61,7 @@ pub trait NfcReader {
     type Error: fmt::Debug + fmt::Display;
 
     /// Read uid from NFC reader
-    async fn read(&mut self) -> Result<nfc::Uid, Self::Error>;
+    async fn read(&mut self) -> Result<Uid, Self::Error>;
 }
 
 /// Buzzer interface
@@ -262,7 +266,7 @@ pub async fn run<
     NET: Network,
     UPD: Updater,
 >(
-    config: &config::Config,
+    config: &Config,
     device_id: &str,
     devices: Devices<'_, RNG, DP, KP, NFC, BZZ, NET, UPD>,
 ) -> ! {

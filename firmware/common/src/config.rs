@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde_with::{Bytes, serde_as};
 
 /// Maximum size of configuration data
-const MAX_CONFIG_SIZE: usize = 8192;
+pub const MAX_CONFIG_SIZE: usize = 8192;
 
 /// System configuration
 ///

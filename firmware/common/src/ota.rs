@@ -93,6 +93,7 @@ impl<T: TcpConnect, D: Dns> Ota<'_, '_, T, D> {
     /// # Errors
     ///
     /// An error will be returned if checking or updating fails.
+    #[expect(dead_code)]
     pub async fn check_and_update<U: Updater>(
         &mut self,
         updater: &mut U,

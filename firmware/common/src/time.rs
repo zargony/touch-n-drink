@@ -96,6 +96,7 @@ pub fn now() -> Option<DateTime<Utc>> {
 /// # Panics
 ///
 /// Panics when system uptime is longer than `i64::MAX` microseconds (~292,277 years)
+#[expect(dead_code)]
 pub fn set(time_now: DateTime<Utc>) {
     set_by_reference(&TimeReference::now(time_now));
 }

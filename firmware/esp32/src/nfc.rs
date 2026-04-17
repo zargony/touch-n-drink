@@ -1,7 +1,7 @@
 // Use custom pn532 driver instead of pn532 crate
 use crate::pn532;
 
-use common::nfc::Uid;
+use common::Uid;
 use core::convert::Infallible;
 use core::fmt::{self, Debug};
 use embassy_time::{Duration, Timer};
