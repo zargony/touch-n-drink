@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## 2.0.3 - 2026-04-17
+
 - Fixed a bug introduced in 2.0.1 where an expired Vereinsflieger access token (after long
   inactivity) wasn't detected and caused an error message instead an automatic relogin
 
