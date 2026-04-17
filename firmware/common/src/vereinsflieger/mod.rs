@@ -342,7 +342,9 @@ impl<T: TcpConnect> Connection<'_, '_, T> {
                 debug!("Vereinsflieger: Access token valid");
                 Ok(true)
             }
-            Err(Error::RequestFailed(status)) if status.0 == 401 => {
+            Err(Error::RequestFailed(status) | Error::RequestFailedWithMessage(status, _))
+                if status.0 == 401 =>
+            {
                 debug!("Vereinsflieger: Access token expired");
                 Ok(false)
             }
