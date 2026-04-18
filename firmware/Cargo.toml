@@ -9,7 +9,7 @@ default-members = ["common", "xtask"]
 
 [workspace.package]
 version = "2.0.3"
-authors = ["Andreas Neuhaus <git@zargony.com>"]
+authors = ["Andreas Neuhaus <git@zargony.dev>"]
 edition = "2024"
 description = "Firmware for cashless payment device for cold drinks at the aeroclub at EDLH"
 repository = "https://github.com/zargony/touch-n-drink"
