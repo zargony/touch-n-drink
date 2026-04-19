@@ -34,14 +34,14 @@ log.workspace = true
 rand_core.workspace = true
 
 display-interface = "0.5"
-esp-alloc = { version = "0.9", features = ["esp32c3"] }
-esp-backtrace = { version = "0.18", features = ["esp32c3", "custom-halt", "panic-handler", "println"] }
-esp-bootloader-esp-idf = { version = "0.4", features = ["esp32c3"] }
-esp-hal = { version = "1.0", features = ["esp32c3", "unstable"] }
-esp-println = { version = "0.16", features = ["esp32c3", "log-04"] }
-esp-radio = { version = "0.17", features = ["esp32c3", "unstable", "wifi"] }
-esp-rtos = { version = "0.2", features = ["embassy", "esp-alloc", "esp-radio", "esp32c3"] }
-esp-storage = { version = "0.8", features = ["esp32c3"] }
+esp-alloc = { version = "0.10", features = ["esp32c3"] }
+esp-backtrace = { version = "0.19", features = ["esp32c3", "custom-halt", "panic-handler", "println"] }
+esp-bootloader-esp-idf = { version = "0.5", features = ["esp32c3"] }
+esp-hal = { version = "1.1.0-rc.0", features = ["esp32c3", "unstable"] }
+esp-println = { version = "0.17", features = ["esp32c3", "log-04"] }
+esp-radio = { version = "0.18", features = ["esp32c3", "unstable", "wifi"] }
+esp-rtos = { version = "0.3", features = ["embassy", "esp-alloc", "esp-radio", "esp32c3"] }
+esp-storage = { version = "0.9", features = ["esp32c3"] }
 pn532 = "0.5"
 ssd1306 = { version = "0.10", features = ["async"] }
 

@@ -56,7 +56,7 @@ use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::clock::CpuClock;
-use esp_hal::efuse::Efuse;
+use esp_hal::efuse;
 use esp_hal::gpio::{DriveMode, Input, InputConfig, Level, Output, OutputConfig, Pull};
 use esp_hal::i2c::master::{BusTimeout, Config as I2cConfig, I2c};
 use esp_hal::interrupt::software::SoftwareInterruptControl;
@@ -150,16 +150,14 @@ async fn main(spawner: Spawner) -> ! {
     let _led = Output::new(peripherals.GPIO8, Level::High, OutputConfig::default());
 
     // Get device id (MAC address)
-    let device_id: const_hex::Buffer<6, false> =
-        const_hex::Buffer::new().const_format(&Efuse::read_base_mac_address());
+    let mut mac_address: const_hex::Buffer<6, false> = const_hex::Buffer::new();
+    let device_id = mac_address.format_slice(efuse::base_mac_address().as_bytes());
 
     // Start feeding the watchdog
     let rtc = Rtc::new(peripherals.LPWR);
     debug!("Spawning watchdog task...");
-    spawner
-        .spawn(watchdog(rtc))
-        // Panic on failure since failing to spawn a task indicates a serious error
-        .expect("Failed to spawn watchdog task");
+    // Panic on failure since failing to spawn a task indicates a serious error
+    spawner.spawn(watchdog(rtc).expect("Failed to spawn watchdog task"));
 
     // Read system configuration
     let config = config::read(&mut flash);
@@ -247,5 +245,5 @@ async fn main(spawner: Spawner) -> ! {
         network: &wifi,
         updater: updater.as_mut(),
     };
-    Box::pin(common::run(&config, device_id.as_str(), devices)).await
+    Box::pin(common::run(&config, device_id, devices)).await
 }

@@ -12,7 +12,7 @@ use embedded_graphics::text::{Alignment, Text};
 use embedded_layout::layout::linear::{LinearLayout, spacing};
 use embedded_layout::prelude::*;
 use log::info;
-use rand_core::RngCore;
+use rand_core::Rng;
 
 /// User greetings (choosen randomly)
 static GREETINGS: [&str; 20] = [
@@ -29,7 +29,7 @@ pub struct SelectArticle<'a> {
 }
 
 impl<'a> SelectArticle<'a> {
-    pub fn new<RNG: RngCore>(
+    pub fn new<RNG: Rng>(
         rng: &mut RNG,
         name: &'a str,
         articles: &'a [(ArticleId, Article)],
