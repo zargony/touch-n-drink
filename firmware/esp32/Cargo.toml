@@ -34,19 +34,30 @@ log.workspace = true
 rand_core.workspace = true
 
 display-interface = "0.5"
-esp-alloc = { version = "0.10", features = ["esp32c3"] }
-esp-backtrace = { version = "0.19", features = ["esp32c3", "custom-halt", "panic-handler", "println"] }
-esp-bootloader-esp-idf = { version = "0.5", features = ["esp32c3"] }
-esp-hal = { version = "1.1.0-rc.0", features = ["esp32c3", "unstable"] }
-esp-println = { version = "0.17", features = ["esp32c3", "log-04"] }
-esp-radio = { version = "0.18", features = ["esp32c3", "unstable", "wifi"] }
-esp-rtos = { version = "0.3", features = ["embassy", "esp-alloc", "esp-radio", "esp32c3"] }
-esp-storage = { version = "0.9", features = ["esp32c3"] }
+esp-alloc = "0.10"
+esp-backtrace = { version = "0.19", features = ["custom-halt", "panic-handler", "println"] }
+esp-bootloader-esp-idf = "0.5"
+esp-hal = { version = "1.1.0-rc.0", features = ["unstable"] }
+esp-println = { version = "0.17", features = ["log-04"] }
+esp-radio = { version = "0.18", features = ["unstable", "wifi"] }
+esp-rtos = { version = "0.3", features = ["embassy", "esp-alloc", "esp-radio"] }
+esp-storage = "0.9"
 pn532 = "0.5"
 ssd1306 = { version = "0.10", features = ["async"] }
 
 [features]
-default = []
+default = ["esp32c3"]
+
+esp32 = ["esp-alloc/esp32", "esp-backtrace/esp32", "esp-bootloader-esp-idf/esp32", "esp-hal/esp32", "esp-println/esp32", "esp-radio/esp32", "esp-rtos/esp32", "esp-storage/esp32"]
+esp32c2 = ["esp-alloc/esp32c2", "esp-backtrace/esp32c2", "esp-bootloader-esp-idf/esp32c2", "esp-hal/esp32c2", "esp-println/esp32c2", "esp-radio/esp32c2", "esp-rtos/esp32c2", "esp-storage/esp32c2"]
+esp32c3 = ["esp-alloc/esp32c3", "esp-backtrace/esp32c3", "esp-bootloader-esp-idf/esp32c3", "esp-hal/esp32c3", "esp-println/esp32c3", "esp-radio/esp32c3", "esp-rtos/esp32c3", "esp-storage/esp32c3"]
+esp32c5 = ["esp-alloc/esp32c5", "esp-backtrace/esp32c5", "esp-bootloader-esp-idf/esp32c5", "esp-hal/esp32c5", "esp-println/esp32c5", "esp-radio/esp32c5", "esp-rtos/esp32c5", "esp-storage/esp32c5"]
+esp32c6 = ["esp-alloc/esp32c6", "esp-backtrace/esp32c6", "esp-bootloader-esp-idf/esp32c6", "esp-hal/esp32c6", "esp-println/esp32c6", "esp-radio/esp32c6", "esp-rtos/esp32c6", "esp-storage/esp32c6"]
+esp32c61 = ["esp-alloc/esp32c61", "esp-backtrace/esp32c61", "esp-bootloader-esp-idf/esp32c61", "esp-hal/esp32c61", "esp-println/esp32c61", "esp-radio/esp32c61", "esp-rtos/esp32c61", "esp-storage/esp32c61"]
+esp32h2 = ["esp-alloc/esp32h2", "esp-backtrace/esp32h2", "esp-bootloader-esp-idf/esp32h2", "esp-hal/esp32h2", "esp-println/esp32h2", "esp-radio/esp32h2", "esp-rtos/esp32h2", "esp-storage/esp32h2"]
+esp32s2 = ["esp-alloc/esp32s2", "esp-backtrace/esp32s2", "esp-bootloader-esp-idf/esp32s2", "esp-hal/esp32s2", "esp-println/esp32s2", "esp-radio/esp32s2", "esp-rtos/esp32s2", "esp-storage/esp32s2"]
+esp32s3 = ["esp-alloc/esp32s3", "esp-backtrace/esp32s3", "esp-bootloader-esp-idf/esp32s3", "esp-hal/esp32s3", "esp-println/esp32s3", "esp-radio/esp32s3", "esp-rtos/esp32s3", "esp-storage/esp32s3"]
+
 # Enable additional logging in dependencies
 log = [
     "embassy-executor/log", "embassy-futures/log", "embassy-net/log", "embassy-sync/log", "embassy-time/log",
