@@ -2796,7 +2796,6 @@ dependencies = [
 name = "touch-n-drink-esp32"
 version = "2.0.3"
 dependencies = [
- "chrono",
  "const-hex",
  "derive_more",
  "display-interface",
@@ -2808,7 +2807,6 @@ dependencies = [
  "embassy-time",
  "embedded-graphics",
  "embedded-hal-async",
- "embedded-storage",
  "esp-alloc",
  "esp-backtrace",
  "esp-bootloader-esp-idf",
@@ -2820,10 +2818,6 @@ dependencies = [
  "log",
  "pn532",
  "rand_core 0.9.5",
- "reqwless",
- "serde",
- "serde_json",
- "serde_with",
  "ssd1306",
  "touch-n-drink-common",
 ]
