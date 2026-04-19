@@ -164,22 +164,15 @@ struct ClippyArgs {
 impl ClippyArgs {
     fn run(self) -> Result<()> {
         let chip = self.chip.name;
-        let package = self.chip.package;
-        let target = self.chip.target;
-        let cargo = self.cargo;
-        let args = &self.args;
 
         // Cargo clippy
         println!("       {NOTE}XTask{NOTE:#} Running code checks for firmware variant `{chip}`");
-        run(Command::new(&cargo)
-            .current_dir(workspace_root(&cargo)?)
+        run(Command::new(&self.cargo)
+            .current_dir(workspace_root(&self.cargo)?)
             .arg("clippy")
-            .arg("--package")
-            .arg(format!("touch-n-drink-{package}"))
-            .arg("--target")
-            .arg(target)
+            .args(self.chip.cargo_args())
             .arg("--")
-            .args(args))?;
+            .args(&self.args))?;
 
         Ok(())
     }
@@ -232,11 +225,6 @@ impl BuildArgs {
     fn run(self) -> Result<()> {
         let profile = self.profile();
         let chip = self.chip.name;
-        let package = self.chip.package;
-        let target = self.chip.target;
-        let cargo = self.cargo;
-        let espflash = self.espflash;
-        let args = &self.args;
 
         // Find out target dir
         let target_dir: PathBuf = match env::var_os("CARGO_TARGET_DIR") {
@@ -246,14 +234,11 @@ impl BuildArgs {
 
         // Cargo build
         println!("       {NOTE}XTask{NOTE:#} Building images for firmware variant `{chip}`");
-        run(Command::new(&cargo)
-            .current_dir(workspace_root(&cargo)?)
+        run(Command::new(&self.cargo)
+            .current_dir(workspace_root(&self.cargo)?)
             .arg("build")
-            .arg("--package")
-            .arg(format!("touch-n-drink-{package}"))
-            .arg("--target")
-            .arg(target)
-            .args(args))?;
+            .args(self.chip.cargo_args())
+            .args(&self.args))?;
 
         // Create target directory for images
         let target_image_dir = target_dir.join(profile).join("images");
@@ -263,16 +248,16 @@ impl BuildArgs {
         let elf_file = target_image_dir.join(format!("touch-n-drink-{chip}.elf"));
         fs::copy(
             target_dir
-                .join(target)
+                .join(self.chip.target)
                 .join(profile)
-                .join(format!("touch-n-drink-{package}")),
+                .join(self.chip.package),
             &elf_file,
         )?;
 
         // Generate OTA image
         let ota_image = target_image_dir.join(format!("touch-n-drink-{chip}.bin"));
-        run(Command::new(&espflash)
-            .current_dir(workspace_root(&cargo)?)
+        run(Command::new(&self.espflash)
+            .current_dir(workspace_root(&self.cargo)?)
             .arg("save-image")
             .arg("--chip")
             .arg(chip)
@@ -286,15 +271,15 @@ impl BuildArgs {
 
         // Generate factory image
         let factory_image = target_image_dir.join(format!("touch-n-drink-{chip}.factory.bin"));
-        run(Command::new(&espflash)
-            .current_dir(workspace_root(&cargo)?)
+        run(Command::new(&self.espflash)
+            .current_dir(workspace_root(&self.cargo)?)
             .arg("save-image")
             .arg("--chip")
             .arg(chip)
             .arg("--merge")
             .arg("--skip-padding")
             .arg("--partition-table")
-            .arg(format!("{package}/partitions.csv"))
+            .arg("esp32/partitions.csv")
             .arg(&elf_file)
             .arg(&factory_image))?;
         generate_sha256(&factory_image)?;
@@ -327,21 +312,14 @@ struct RunArgs {
 impl RunArgs {
     fn run(self) -> Result<()> {
         let chip = self.chip.name;
-        let package = self.chip.package;
-        let target = self.chip.target;
-        let cargo = self.cargo;
-        let args = &self.args;
 
         // Cargo run
         println!("       {NOTE}XTask{NOTE:#} Running firmware variant `{chip}`");
-        run(Command::new(&cargo)
-            .current_dir(workspace_root(&cargo)?)
+        run(Command::new(&self.cargo)
+            .current_dir(workspace_root(&self.cargo)?)
             .arg("run")
-            .arg("--package")
-            .arg(format!("touch-n-drink-{package}"))
-            .arg("--target")
-            .arg(target)
-            .args(args))?;
+            .args(self.chip.cargo_args())
+            .args(&self.args))?;
 
         Ok(())
     }

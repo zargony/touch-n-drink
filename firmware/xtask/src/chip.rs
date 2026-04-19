@@ -6,7 +6,7 @@ use std::str::FromStr;
 // TODO: Instead of defining these ourselves, use esp_metadata::Chip? (implements ValueEnum)
 #[rustfmt::skip]
 pub const ALL_CHIPS: [Chip; 1] = [
-    Chip { name: "esp32c3", package: "esp32", target: "riscv32imc-unknown-none-elf" },
+    Chip { name: "esp32c3", package: "touch-n-drink-esp32", target: "riscv32imc-unknown-none-elf" },
 ];
 
 pub const DEFAULT_CHIP: &str = "esp32c3";
@@ -43,5 +43,11 @@ impl ValueEnum for Chip<'static> {
 
     fn to_possible_value(&self) -> Option<PossibleValue> {
         Some(PossibleValue::new(self.name))
+    }
+}
+
+impl Chip<'_> {
+    pub fn cargo_args(&self) -> [&str; 4] {
+        ["--package", self.package, "--target", self.target]
     }
 }
