@@ -23,11 +23,11 @@ pedantic = "warn"
 chrono = { version = "0.4", default-features = false, features = ["alloc"] }
 const-hex = { version = "1.14", default-features = false }
 derive_more = { version = "2.1", default-features = false }
-embassy-embedded-hal = "0.5"
-embassy-executor = "0.9"
+embassy-embedded-hal = "0.6"
+embassy-executor = "0.10"
 embassy-futures = "0.1"
-embassy-net = { version = "0.8", features = ["dhcpv4", "dns", "tcp", "proto-ipv4"] }
-embassy-sync = "0.7"
+embassy-net = { version = "0.9", features = ["dhcpv4", "dns", "tcp", "proto-ipv4"] }
+embassy-sync = "0.8"
 embassy-time = "0.5"
 embedded-graphics = "0.8"
 embedded-hal-async = "1.0"
@@ -37,7 +37,7 @@ embedded-nal-async = "0.9"
 embedded-storage = "0.3"
 embedded-text = "0.7"
 log = { version = "0.4", features = ["release_max_level_info"] }
-rand_core = "0.9"
+rand_core = "0.10"
 reqwless = { version = "0.14", default-features = false, features = ["alloc", "embedded-tls"] }
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }

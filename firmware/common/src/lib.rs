@@ -24,7 +24,7 @@ use embedded_graphics::prelude::DrawTarget;
 use embedded_nal_async::{Dns, TcpConnect};
 use embedded_storage::Storage;
 use log::debug;
-use rand_core::RngCore;
+use rand_core::Rng;
 use reqwless::client::{HttpClient, TlsConfig, TlsVerify};
 
 extern crate alloc;
@@ -155,7 +155,7 @@ pub trait Updater {
 #[must_use]
 pub struct Devices<
     'd,
-    RNG: RngCore,
+    RNG: Rng,
     DP: Display,
     KP: Keypad,
     NFC: NfcReader,
@@ -182,7 +182,7 @@ trait DeviceTypes {
     type NfcError: fmt::Debug + fmt::Display;
 
     /// Random number generator type
-    type Rng<'a>: RngCore;
+    type Rng<'a>: Rng;
     /// Display type
     type Display<'a>: Display<Error = Self::DisplayError>;
     /// Keypad type
@@ -201,7 +201,7 @@ trait DeviceTypes {
 /// to a single generic `D: DeviceTypes`, which is a lot more convenient to use.
 #[must_use]
 struct DeviceTypeAdapter<
-    RNG: RngCore,
+    RNG: Rng,
     DP: Display,
     KP: Keypad,
     NFC: NfcReader,
@@ -210,7 +210,7 @@ struct DeviceTypeAdapter<
     UPD: Updater,
 >(PhantomData<(RNG, DP, KP, NFC, BZZ, NET, UPD)>);
 
-impl<RNG: RngCore, DP: Display, KP: Keypad, NFC: NfcReader, BZZ: Buzzer, NET: Network, UPD: Updater>
+impl<RNG: Rng, DP: Display, KP: Keypad, NFC: NfcReader, BZZ: Buzzer, NET: Network, UPD: Updater>
     DeviceTypes for DeviceTypeAdapter<RNG, DP, KP, NFC, BZZ, NET, UPD>
 {
     type DisplayError = DP::Error;
@@ -254,7 +254,7 @@ struct Context<'c, D: DeviceTypes> {
 
 /// Run firmware
 pub async fn run<
-    RNG: RngCore,
+    RNG: Rng,
     DP: Display,
     KP: Keypad,
     NFC: NfcReader,

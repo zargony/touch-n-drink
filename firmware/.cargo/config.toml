@@ -9,8 +9,8 @@ ESP_LOG = "info,touch_n_drink=debug"
 [target.'cfg(all(target_arch = "riscv32", target_os = "none"))']
 runner = "espflash flash --monitor"
 rustflags = [
-    # Required by esp-backtrace, but may negatively impact code performance
-    "-C", "force-frame-pointers",
-    # Required by esp-hal
-    "-C", "link-arg=-Tlinkall.x",
+  # Required by esp-backtrace, but may negatively impact code performance
+  "-C", "force-frame-pointers",
+  # Required by esp-hal
+  "-C", "link-arg=-Tlinkall.x",
 ]
