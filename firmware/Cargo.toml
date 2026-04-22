@@ -45,10 +45,15 @@ serde_with = { version = "3.17", default-features = false, features = ["alloc", 
 sha2 = { version = "0.10", default-features = false }
 
 [profile.dev]
-# FIXME: LTO slows down linking a lot! But it's required to keep the app image small enough :-(
-lto = "fat"
-# Rust debug code is slow, so always build with some optimization
+# The default debug profile is too slow and too big, so always build with some optimization
 opt-level = "s"
+# Codegen units and LTO slows down compilation a little, but produces a smaller image
+codegen-units = 1
+lto = "thin"
+
+# Speed up compilation heavyweight crates
+[profile.dev.package.p384]
+opt-level = 3
 
 [profile.release]
 # LLVM can perform better optimizations using a single thread
