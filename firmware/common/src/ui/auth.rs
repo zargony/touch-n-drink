@@ -52,10 +52,11 @@ impl UiInteraction for Authentication {
 
         loop {
             // Wait for id card read or timeout
-            #[expect(clippy::single_match_else)]
             match with_timeout(TIMEOUT, frontend.nfc.read()).await {
                 // Id card detected
-                Ok(res) => break res.map_err(Error::Nfc),
+                Ok(Ok(uid)) => break Ok(uid),
+                // NFC reader error
+                Ok(Err(err)) => break Err(Error::Nfc(err)),
 
                 // Idle timeout, enter power saving
                 Err(TimeoutError) => {
@@ -68,9 +69,12 @@ impl UiInteraction for Authentication {
                         Either::First(Ok(_key)) => {
                             frontend.display.flush().await.map_err(Error::Display)?;
                         }
+                        // Keypad error
                         Either::First(Err(err)) => break Err(Error::Keypad(err)),
                         // Id card detected
-                        Either::Second(res) => break res.map_err(Error::Nfc),
+                        Either::Second(Ok(uid)) => break Ok(uid),
+                        // NFC reader error
+                        Either::Second(Err(err)) => break Err(Error::Nfc(err)),
                     }
                 }
             }
