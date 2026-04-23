@@ -244,13 +244,29 @@ impl Telemetry {
                 }
             }
 
-            // Submit buffered events to server
+            // Submit buffered events to server, try indefinitely
+            let mut retry_delay = Duration::from_millis(500);
             loop {
                 match self.submit(http).await {
                     Ok(()) => break,
                     Err(err) => {
-                        warn!("Telemetry: Submission failed, retrying in 10s: {err}");
-                        Timer::after_secs(10).await;
+                        warn!(
+                            "Telemetry: Submission failed, retrying in {}s: {err}",
+                            retry_delay.as_secs(),
+                        );
+                        // Note: We could actually track this error(s) as well, but this can
+                        // easily lead to the channel becoming clogged for real events when the
+                        // telemetry submission fails for a longer time while anything else works
+                        // Event::Error(None, err.to_string()).track();
+
+                        // Exponential backoff
+                        Timer::after(retry_delay).await;
+                        if retry_delay <= Duration::from_secs(64) {
+                            retry_delay *= 2;
+                        }
+
+                        // Buffer additional events that might be tracked in the meantime
+                        self.receive_more();
                     }
                 }
             }
@@ -259,7 +275,16 @@ impl Telemetry {
 }
 
 impl Telemetry {
-    /// Receive event and buffer it for submission (fills self.events)
+    /// Receive additional events if available (non-waiting, fills self.events)
+    fn receive_more(&mut self) {
+        while self.events.len() < MAX_BUFFER_EVENTS
+            && let Ok((time, event)) = CHANNEL.try_receive()
+        {
+            self.events.push((time, event));
+        }
+    }
+
+    /// Receive events and buffer it for submission (fills self.events)
     async fn receive(&mut self) {
         // Signal idle when there is no event right now
         if self.events.is_empty() && CHANNEL.is_empty() {
