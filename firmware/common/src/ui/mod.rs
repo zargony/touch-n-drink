@@ -6,7 +6,7 @@ mod splash;
 
 use crate::article::{Article, ArticleId};
 use crate::ota::{self, Ota};
-use crate::telemetry::Event;
+use crate::telemetry::{self, Event};
 use crate::user::{User, UserId};
 use crate::util::RectangleExt;
 use crate::{Buzzer, Context, DeviceTypes, Display, Network, Updater, time};
@@ -238,7 +238,7 @@ async fn wait_network_up<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> Result<(),
 /// Run main user interface loop
 pub(crate) async fn run<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> ! {
     // Track system start
-    Event::SystemStart.track(&mut ctx.telemetry);
+    Event::SystemStart.track_now();
 
     // Show splash screen for a while
     let _ = UserInterface(splash::Splash).run_timeout_ok(ctx).await;
@@ -256,8 +256,7 @@ pub(crate) async fn run<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> ! {
             // Display error to user and try again
             Err(err) => {
                 error!("Initialization error: {err}");
-                Event::Error(None, err.to_string()).track(&mut ctx.telemetry);
-                let _ = submit_telemetry(ctx).await;
+                Event::Error(None, err.to_string()).track_now();
                 let _ = UserInterface(error::ErrorMessage::new(err, false))
                     .run_timeout_ok(ctx)
                     .await;
@@ -279,8 +278,7 @@ pub(crate) async fn run<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> ! {
             // Display error to user and start over again
             Err(ErrorWithUser(error, opt_user_id)) => {
                 error!("Error: {error}");
-                Event::Error(opt_user_id, error.to_string()).track(&mut ctx.telemetry);
-                let _ = submit_telemetry(ctx).await;
+                Event::Error(opt_user_id, error.to_string()).track_now();
                 let _ = UserInterface(error::ErrorMessage::new(error, opt_user_id.is_some()))
                     .run_timeout_ok(ctx)
                     .await;
@@ -299,9 +297,6 @@ async fn run_init_flow<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> Result<(), E
 
 /// Run main user interface flow
 async fn run_main_flow<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> Result<(), ErrorWithUser<D>> {
-    // Submit telemetry data if needed
-    submit_telemetry(ctx).await?;
-
     // Wait for user authentication or schedule time
     let schedule_timer = ctx.schedule.timer();
     let (user_id, user) = match select(authenticate_user(ctx), schedule_timer).await {
@@ -371,6 +366,9 @@ async fn check_ota_update<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> Result<()
             .await
             .map_err(Error::Ota)?;
 
+        // Make sure all telemetry events are submitted before restarting
+        let _ = with_timeout(DEFAULT_TIMEOUT, telemetry::flush()).await;
+
         // OTA update completed, restart system
         D::Updater::restart();
     }
@@ -430,25 +428,7 @@ async fn refresh_articles_and_users<D: DeviceTypes>(
         ctx.users.count_uids(),
         ctx.users.count(),
     )
-    .track(&mut ctx.telemetry);
-
-    Ok(())
-}
-
-/// Submit telemetry data if needed
-async fn submit_telemetry<D: DeviceTypes>(ctx: &mut Context<'_, D>) -> Result<(), Error<D>> {
-    if !ctx.telemetry.needs_flush() {
-        return Ok(());
-    }
-
-    // Wait for network to become available (if not already)
-    wait_network_up(ctx).await?;
-
-    info!("UI: Submitting telemetry data...");
-    show_please_wait(ctx.dev.display, common::PleaseWait::SubmittingTelemetry).await?;
-
-    // Submit telemetry data, ignore any error
-    let _ = ctx.telemetry.flush(&mut ctx.http).await;
+    .track();
 
     Ok(())
 }
@@ -464,14 +444,14 @@ async fn authenticate_user<D: DeviceTypes>(
         if let Some((user_id, user)) = ctx.users.get_by_uid(&uid) {
             // User found, authorized
             info!("UI: NFC card {uid} identified as user {user_id}");
-            Event::UserAuthenticated(user_id, uid).track(&mut ctx.telemetry);
+            Event::UserAuthenticated(user_id, uid).track();
             ctx.dev.buzzer.confirm().await;
             break Ok((user_id, user.clone()));
         }
 
         // User not found, unauthorized
         info!("UI: NFC card {uid} unknown, rejecting");
-        Event::AuthenticationFailed(uid).track(&mut ctx.telemetry);
+        Event::AuthenticationFailed(uid).track();
         ctx.dev.buzzer.deny().await;
         Timer::after_secs(1).await;
     }
@@ -552,8 +532,7 @@ async fn submit_purchase<D: DeviceTypes>(
     let today = time::today().ok_or(Error::CurrentTimeNotSet)?;
     vf.purchase(today, article_id, amount, user_id, total_price)
         .await?;
-    Event::ArticlePurchased(user_id, article_id.clone(), amount, total_price)
-        .track(&mut ctx.telemetry);
+    Event::ArticlePurchased(user_id, article_id.clone(), amount, total_price).track_now();
 
     Ok(())
 }

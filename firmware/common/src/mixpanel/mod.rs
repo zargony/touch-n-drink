@@ -75,6 +75,7 @@ impl<'a> Mixpanel<'a> {
 
     /// Mixpanel API token
     #[must_use]
+    #[expect(dead_code)]
     pub fn token(&self) -> &str {
         self.token
     }

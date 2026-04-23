@@ -70,7 +70,6 @@ pub enum PleaseWait {
     UpdatingFirmware,
     UpdatingData,
     Purchasing,
-    SubmittingTelemetry,
 }
 
 impl UiContent for PleaseWait {
@@ -86,7 +85,6 @@ impl UiContent for PleaseWait {
             Self::UpdatingFirmware => "Lade\nFirmware-Update",
             Self::UpdatingData => "Daten-Aktualisierung",
             Self::Purchasing => "Zahlung wird\nbearbeitet",
-            Self::SubmittingTelemetry => "Daten-Übertragung",
         };
         let message =
             Text::with_alignment(message_text, Point::zero(), MEDIUM_STYLE, Alignment::Center);

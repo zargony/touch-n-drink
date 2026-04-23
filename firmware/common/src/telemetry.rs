@@ -1,26 +1,45 @@
 use crate::mixpanel::{self, Event as MixpanelEvent, Mixpanel};
 use crate::{GIT_SHA_STR, VERSION_STR, article, nfc, time, user};
-use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use chrono::{DateTime, Utc};
 use derive_more::{Display, From};
-use embassy_time::{Duration, Instant};
+use embassy_futures::select::{Either, select};
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
+use embassy_sync::channel::{Channel, TrySendError};
+use embassy_sync::signal::Signal;
+use embassy_time::{Duration, Instant, Timer, with_deadline};
 use embedded_nal_async::{Dns, TcpConnect};
 use log::{debug, info, warn};
 use reqwless::client::HttpClient;
 use serde::Serialize;
 use serde_with::{DisplayFromStr, serde_as};
 
-/// Time after which events are flushed even when queue isn't filled yet
-const MAX_BUFFER_DURATION: Duration = Duration::from_secs(30);
+/// Time to wait for more events to buffer before submitting to server
+const WAIT_MORE_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Max number of events to buffer before flushing
+/// Max number of events to buffer before submitting to server
 const MAX_BUFFER_EVENTS: usize = 10;
+
+/// Telemetry event channel. Used to receive events to track from other tasks.
+static CHANNEL: Channel<CriticalSectionRawMutex, (Instant, Event), 32> = Channel::new();
+
+/// Telemetry flush signal. Used to force submitting events now
+static FLUSH: Signal<CriticalSectionRawMutex, ()> = Signal::new();
+
+/// Telemetry idle signal. Can be used to wait for all events being submitted
+static IDLE: Signal<CriticalSectionRawMutex, ()> = Signal::new();
+
+/// Force to submit telemetry events immediately and wait for completion
+pub async fn flush() {
+    FLUSH.signal(());
+    IDLE.wait().await;
+}
 
 /// Telemetry error
 #[derive(Debug, Display, From)]
 #[must_use]
-pub enum Error {
+enum Error {
     /// Mixpanel error
     #[from]
     #[display("Mixpanel: {_0}")]
@@ -71,7 +90,7 @@ enum MixpanelEventPropertiesExtra<'a> {
 }
 
 /// Telemetry event
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[must_use]
 pub enum Event {
     /// System start
@@ -90,8 +109,23 @@ pub enum Event {
 
 impl Event {
     /// Track event
-    pub fn track(self, telemetry: &mut Telemetry<'_>) {
-        telemetry.track(self);
+    pub fn track(self) {
+        debug!("Telemetry: Tracking event {self:?}");
+        match CHANNEL.try_send((Instant::now(), self)) {
+            Ok(()) => (),
+            Err(TrySendError::Full((_time, event))) => {
+                warn!(
+                    "Telemetry: Event queue overflow, dropping event '{}'!",
+                    event.event_name()
+                );
+            }
+        }
+    }
+
+    /// Track event and submit immediately
+    pub fn track_now(self) {
+        self.track();
+        FLUSH.signal(());
     }
 }
 
@@ -152,55 +186,130 @@ impl Event {
             },
         }
     }
+
+    /// Mixpanel event for Mixpanel submission
+    fn mixpanel_event<'a>(
+        &'a self,
+        token: &'a str,
+        time: DateTime<Utc>,
+        device_id: &'a str,
+    ) -> MixpanelEvent<'a, MixpanelEventProperties<'a>> {
+        let user_or_device_id = if let Some(user_id) = self.user_id() {
+            user_id.to_string()
+        } else {
+            device_id.to_string()
+        };
+        MixpanelEvent::new(
+            self.event_name(),
+            token,
+            time,
+            user_or_device_id,
+            self.mixpanel_properties(device_id),
+        )
+    }
 }
 
 /// Telemetry for tracking events
 #[must_use]
-pub struct Telemetry<'a> {
-    mixpanel: Option<Mixpanel<'a>>,
-    device_id: &'a str,
-    events: VecDeque<(Instant, Event)>,
-    last_flush: Instant,
+pub struct Telemetry {
+    mp_token: Option<String>,
+    device_id: String,
+    events: Vec<(Instant, Event)>,
 }
 
-impl<'a> Telemetry<'a> {
+impl Telemetry {
     /// Create new telemetry
-    pub fn new(mp_token: Option<&'a str>, device_id: &'a str) -> Self {
-        let mixpanel = if let Some(token) = mp_token {
+    pub fn new(mp_token: Option<&str>, device_id: &str) -> Self {
+        if let Some(token) = mp_token {
             info!("Telemetry: Initialized with Mixpanel token {token}");
-            Some(Mixpanel::new(token))
         } else {
             warn!("Telemetry: Disabled! No Mixpanel token.");
-            None
-        };
+        }
         Self {
-            mixpanel,
-            device_id,
-            events: VecDeque::new(),
-            last_flush: Instant::now(),
+            mp_token: mp_token.map(ToString::to_string),
+            device_id: device_id.to_string(),
+            events: Vec::with_capacity(MAX_BUFFER_EVENTS),
         }
     }
 
-    /// Track event
-    pub fn track(&mut self, event: Event) {
-        if self.mixpanel.is_some() {
-            debug!("Telemetry: tracking event {event:?}");
-            self.events.push_back((Instant::now(), event));
+    /// Run telemetry submission
+    pub async fn run<T: TcpConnect, D: Dns>(&mut self, http: &mut HttpClient<'_, T, D>) -> ! {
+        loop {
+            // Receive and buffer events
+            match select(self.receive(), FLUSH.wait()).await {
+                Either::First(()) => (),
+                Either::Second(()) => {
+                    debug!("Telemetry: Flush received, submitting now");
+                    FLUSH.reset();
+                }
+            }
+
+            // Submit buffered events to server, try indefinitely
+            let mut retry_delay = Duration::from_millis(500);
+            loop {
+                match self.submit(http).await {
+                    Ok(()) => break,
+                    Err(err) => {
+                        warn!(
+                            "Telemetry: Submission failed, retrying in {}s: {err}",
+                            retry_delay.as_secs(),
+                        );
+                        // Note: We could actually track this error(s) as well, but this can
+                        // easily lead to the channel becoming clogged for real events when the
+                        // telemetry submission fails for a longer time while anything else works
+                        // Event::Error(None, err.to_string()).track();
+
+                        // Exponential backoff
+                        Timer::after(retry_delay).await;
+                        if retry_delay <= Duration::from_secs(64) {
+                            retry_delay *= 2;
+                        }
+
+                        // Buffer additional events that might be tracked in the meantime
+                        self.receive_more();
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl Telemetry {
+    /// Receive additional events if available (non-waiting, fills self.events)
+    fn receive_more(&mut self) {
+        while self.events.len() < MAX_BUFFER_EVENTS
+            && let Ok((time, event)) = CHANNEL.try_receive()
+        {
+            self.events.push((time, event));
         }
     }
 
-    /// Returns true if buffer has filled up or time has ran out and events should be submitted
-    pub fn needs_flush(&mut self) -> bool {
-        (self.last_flush.elapsed() >= MAX_BUFFER_DURATION && !self.events.is_empty())
-            || self.events.len() >= MAX_BUFFER_EVENTS
+    /// Receive events and buffer it for submission (fills self.events)
+    async fn receive(&mut self) {
+        // Signal idle when there is no event right now
+        if self.events.is_empty() && CHANNEL.is_empty() {
+            IDLE.signal(());
+        }
+
+        // Wait for first event to buffer
+        let (time, event) = CHANNEL.receive().await;
+        self.events.push((time, event));
+        IDLE.reset();
+
+        // Deadline for waiting is time of first buffered event + timeout
+        let deadline = time + WAIT_MORE_TIMEOUT;
+
+        // Wait for either enough events or timeout
+        while let Ok((time, event)) = with_deadline(deadline, CHANNEL.receive()).await {
+            self.events.push((time, event));
+            if self.events.len() >= MAX_BUFFER_EVENTS {
+                break;
+            }
+        }
     }
 
-    /// Submit tracked events to server
-    ///
-    /// # Errors
-    ///
-    /// An error will be returned if events couldn't be submitted.
-    pub async fn flush<T: TcpConnect, D: Dns>(
+    /// Submit tracked events to server (drains self.events)
+    async fn submit<T: TcpConnect, D: Dns>(
         &mut self,
         http: &mut HttpClient<'_, T, D>,
     ) -> Result<(), Error> {
@@ -208,10 +317,10 @@ impl<'a> Telemetry<'a> {
             return Ok(());
         }
 
-        if let Some(ref mut mixpanel) = self.mixpanel {
-            debug!("Telemetry: Flushing {} events...", self.events.len());
+        if let Some(ref token) = self.mp_token {
+            debug!("Telemetry: Submitting {} events...", self.events.len());
 
-            let token = mixpanel.token().to_string();
+            let mut mixpanel = Mixpanel::new(token);
             let mut mp = mixpanel.connect(http).await?;
 
             let events = self
@@ -219,33 +328,16 @@ impl<'a> Telemetry<'a> {
                 .iter()
                 .map(|(time, event)| -> Result<_, Error> {
                     let time = time::instant_to_datetime(*time).ok_or(Error::CurrentTimeNotSet)?;
-                    if let Some(user_id) = event.user_id() {
-                        Ok(MixpanelEvent::new(
-                            event.event_name(),
-                            &token,
-                            time,
-                            user_id.to_string(),
-                            event.mixpanel_properties(self.device_id),
-                        ))
-                    } else {
-                        Ok(MixpanelEvent::new(
-                            event.event_name(),
-                            &token,
-                            time,
-                            self.device_id,
-                            event.mixpanel_properties(self.device_id),
-                        ))
-                    }
+                    Ok(event.mixpanel_event(token, time, &self.device_id))
                 })
                 .collect::<Result<Vec<_>, Error>>()?;
             // TODO: Pass events iterator without allocating a temporary collection vector?
             mp.submit(&events).await?;
 
-            debug!("Telemetry: Flush successful");
-            self.events.clear();
-            self.last_flush = Instant::now();
+            debug!("Telemetry: Submission successful");
         }
 
+        self.events.clear();
         Ok(())
     }
 }
