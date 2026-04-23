@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-- Telemetry is now submitted in a background task
+## 2.0.4 - 2026-04-23
+
+- Telemetry is now submitted in a background task and won't interrupt the user interaction anymore
 
 ## 2.0.3 - 2026-04-17
 
