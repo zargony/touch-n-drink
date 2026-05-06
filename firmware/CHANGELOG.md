@@ -5,28 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
 
-## 2.0.4 - 2026-04-23
+## [Unreleased](https://github.com/zargony/touch-n-drink)
+
+[Full Changelog](https://github.com/zargony/touch-n-drink/compare/firmware-2.0.4...HEAD)
+
+
+## [2.0.4](https://github.com/zargony/touch-n-drink/releases/tag/firmware-2.0.4) - 2026-04-23
 
 - Telemetry is now submitted in a background task and won't interrupt the user interaction anymore
 
-## 2.0.3 - 2026-04-17
+[Full Changelog](https://github.com/zargony/touch-n-drink/compare/firmware-2.0.3...firmware-2.0.4)
+
+
+## [2.0.3](https://github.com/zargony/touch-n-drink/releases/tag/firmware-2.0.3) - 2026-04-17
 
 - Fixed a bug introduced in 2.0.1 where an expired Vereinsflieger access token (after long
   inactivity) wasn't detected and caused an error message instead an automatic relogin
 
-## 2.0.2 - 2026-04-11
+[Full Changelog](https://github.com/zargony/touch-n-drink/compare/firmware-2.0.2...firmware-2.0.3)
+
+
+## [2.0.2](https://github.com/zargony/touch-n-drink/releases/tag/firmware-2.0.2) - 2026-04-11
 
 - Fixed a bug where errors weren't submitted via telemetry until another run succeeded
 
-## 2.0.1 - 2026-04-10
+[Full Changelog](https://github.com/zargony/touch-n-drink/compare/firmware-2.0.1...firmware-2.0.2)
+
+
+## [2.0.1](https://github.com/zargony/touch-n-drink/releases/tag/firmware-2.0.1) - 2026-04-10
 
 - Fixed a bug where errors during initial startup weren't tracked via telemetry
 - Show a more detailed error message on Vereinsflieger API errors
 - Massive internal refactorings (API clients, UI management, build tooling)
 
-## 2.0.0 - 2026-03-16
+[Full Changelog](https://github.com/zargony/touch-n-drink/compare/firmware-2.0.0...firmware-2.0.1)
+
+
+## [2.0.0](https://github.com/zargony/touch-n-drink/releases/tag/firmware-2.0.0) - 2026-03-16
 
 **Breaking Change**: Partition table has been updated to a new layout. Especially the config
 partition type and location is different now. You must flash the factory image and a new configuration
@@ -41,7 +57,10 @@ to update!
 - Make sure turning off the buzzer completely stops LEDC timers and output driving
 - Updated to latest esp-rs and embassy versions
 
-## 1.0.1 - 2025-09-27
+[Full Changelog](https://github.com/zargony/touch-n-drink/compare/firmware-1.0.1...firmware-2.0.0)
+
+
+## [1.0.1](https://github.com/zargony/touch-n-drink/releases/tag/firmware-1.0.1) - 2025-09-27
 
 - Enabled system hardware watchdog (RWDT) to recover from unresponsive states
 - Adjust partition scheme for larger app image and optional persistent data
@@ -49,22 +68,34 @@ to update!
 - Provide app image (`.bin`) and factory image (`.factory.bin`, includes bootloader and partition table)
 - Fix CI building image with stock partition table instead our customized one
 
-## 1.0.0 - 2025-03-06
+[Full Changelog](https://github.com/zargony/touch-n-drink/compare/firmware-1.0.0...firmware-1.0.1)
+
+
+## [1.0.0](https://github.com/zargony/touch-n-drink/releases/tag/firmware-1.0.0) - 2025-03-06
 
 - Installed in club room
 - Fix "Buffer too small" NFC error with some cards
 
-## 0.3.0 - 2025-01-22
+[Full Changelog](https://github.com/zargony/touch-n-drink/compare/firmware-0.3.0...firmware-1.0.0)
+
+
+## [0.3.0](https://github.com/zargony/touch-n-drink/releases/tag/firmware-0.3.0) - 2025-01-22
 
 - Allow to choose from multiple articles to purchase
 - Automatically refresh article and user information once a day
 - Event tracking using Mixpanel for usage analytics
 
-## 0.2.0 - 2024-11-27
+[Full Changelog](https://github.com/zargony/touch-n-drink/compare/firmware-0.2.0...firmware-0.3.0)
+
+
+## [0.2.0](https://github.com/zargony/touch-n-drink/releases/tag/firmware-0.2.0) - 2024-11-27
 
 - Show random greetings to user
 
-## 0.1.0 - 2024-10-30
+[Full Changelog](https://github.com/zargony/touch-n-drink/compare/firmware-0.1.0...firmware-0.2.0)
+
+
+## [0.1.0](https://github.com/zargony/touch-n-drink/releases/tag/firmware-0.1.0) - 2024-10-30
 
 - Showcased on general meeting
 - Simple flow: authorize user by NFC, select number of drinks, confirm, purchase
