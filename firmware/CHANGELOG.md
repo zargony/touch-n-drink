@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [Full Changelog](https://github.com/zargony/touch-n-drink/compare/firmware-2.0.4...HEAD)
 
 
+## [2.0.5](https://github.com/zargony/touch-n-drink/releases/tag/firmware-2.0.5) - 2026-07-22
+
+- Improved system stability
+
+[Full Changelog](https://github.com/zargony/touch-n-drink/compare/firmware-2.0.4...firmware-2.0.5)
+
+
 ## [2.0.4](https://github.com/zargony/touch-n-drink/releases/tag/firmware-2.0.4) - 2026-04-23
 
 - Telemetry is now submitted in a background task and won't interrupt the user interaction anymore
