@@ -2,7 +2,6 @@
 use crate::pn532;
 
 use common::Uid;
-use core::convert::Infallible;
 use core::fmt::{self, Debug};
 use embassy_time::{Duration, Timer};
 use embedded_hal_async::digital::Wait;
@@ -62,7 +61,7 @@ pub struct Nfc<I2C, IRQ> {
     driver: Pn532<I2CInterfaceWithIrq<I2C, IRQ>, BUFFER_SIZE>,
 }
 
-impl<I2C: I2c, IRQ: Wait<Error = Infallible>> common::NfcReader for Nfc<I2C, IRQ> {
+impl<I2C: I2c, IRQ: Wait<Error = !>> common::NfcReader for Nfc<I2C, IRQ> {
     type Error = Error;
 
     async fn read(&mut self) -> Result<Uid, Self::Error> {
@@ -70,7 +69,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> common::NfcReader for Nfc<I2C, IRQ
     }
 }
 
-impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Nfc<I2C, IRQ> {
+impl<I2C: I2c, IRQ: Wait<Error = !>> Nfc<I2C, IRQ> {
     /// Create NFC driver and initialize NFC hardware
     pub async fn new(i2c: I2C, irq: IRQ) -> Result<Self, Error> {
         debug!("NFC: Initializing PN532...");

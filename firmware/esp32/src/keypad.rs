@@ -1,4 +1,3 @@
-use core::convert::Infallible;
 use embassy_futures::select::select_array;
 use embassy_time::{Duration, Timer};
 use esp_hal::gpio::{Input, Output};
@@ -94,7 +93,7 @@ impl Keypad<'_, 3, 4> {
 }
 
 impl common::Keypad for Keypad<'_, 3, 4> {
-    type Error = Infallible;
+    type Error = !;
 
     async fn read(&mut self) -> Result<char, Self::Error> {
         Ok(self.read().await)
@@ -120,7 +119,7 @@ impl Keypad<'_, 4, 4> {
 }
 
 impl common::Keypad for Keypad<'_, 4, 4> {
-    type Error = Infallible;
+    type Error = !;
 
     async fn read(&mut self) -> Result<char, Self::Error> {
         Ok(self.read().await)

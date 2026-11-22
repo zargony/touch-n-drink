@@ -7,7 +7,6 @@
     clippy::range_plus_one
 )]
 
-use core::convert::Infallible;
 use core::fmt::Debug;
 use embassy_time::{Duration, with_timeout};
 use embedded_hal_async::digital::Wait;
@@ -51,7 +50,7 @@ pub struct I2CInterfaceWithIrq<I2C, IRQ> {
     pub irq: IRQ,
 }
 
-impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Interface for I2CInterfaceWithIrq<I2C, IRQ> {
+impl<I2C: I2c, IRQ: Wait<Error = !>> Interface for I2CInterfaceWithIrq<I2C, IRQ> {
     type Error = I2C::Error;
 
     async fn write(&mut self, frame: &[u8]) -> Result<(), Self::Error> {
@@ -61,7 +60,7 @@ impl<I2C: I2c, IRQ: Wait<Error = Infallible>> Interface for I2CInterfaceWithIrq<
     async fn wait_ready(&mut self) -> Result<(), Self::Error> {
         // Wait for IRQ line to become low (ready). Instead of busy waiting, we use hardware
         // interrupt driven asynchronous waiting.
-        // Note: Always safe to unwrap because of `IRQ: Wait<Error=Infallible>` bound
+        // Note: Always safe to unwrap because of `IRQ: Wait<Error=!>` bound
         self.irq.wait_for_low().await.unwrap();
         Ok(())
     }
